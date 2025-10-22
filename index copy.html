@@ -1,0 +1,2203 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>판매관리 시스템</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --primary: #6366f1;
+        --primary-dark: #4f46e5;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --bg-light: #f9fafb;
+        --bg-white: #ffffff;
+        --text-dark: #1f2937;
+        --text-gray: #6b7280;
+        --border: #e5e7eb;
+        --sidebar-width: 260px;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+          sans-serif;
+        background: var(--bg-light);
+        color: var(--text-dark);
+      }
+
+      /* 로그인 페이지 */
+      .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+      }
+
+      .login-box {
+        background: var(--bg-white);
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        padding: 48px;
+        width: 100%;
+        max-width: 420px;
+        animation: fadeInUp 0.5s ease;
+      }
+
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .login-header {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+
+      .login-header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-bottom: 8px;
+      }
+
+      .login-header p {
+        color: var(--text-gray);
+        font-size: 14px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--text-dark);
+        font-size: 14px;
+      }
+
+      .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        outline: none;
+      }
+
+      .form-input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .btn-login {
+        width: 100%;
+        padding: 14px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 8px;
+      }
+
+      .btn-login:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+      }
+
+      .login-message {
+        margin-top: 20px;
+        padding: 12px;
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        border-radius: 4px;
+        font-size: 13px;
+        color: #92400e;
+        display: none;
+      }
+
+      .login-message.show {
+        display: block;
+        animation: slideIn 0.3s ease;
+      }
+
+      .login-message.error {
+        background: #fee;
+        border-left-color: #ef4444;
+        color: #991b1b;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      /* 대시보드 레이아웃 */
+      .dashboard {
+        display: none;
+        min-height: 100vh;
+      }
+
+      .dashboard.active {
+        display: flex;
+      }
+
+      /* 사이드바 */
+      .sidebar {
+        width: var(--sidebar-width);
+        background: var(--bg-white);
+        border-right: 1px solid var(--border);
+        height: 100vh;
+        position: fixed;
+        left: 0;
+        top: 0;
+        overflow-y: auto;
+        z-index: 100;
+      }
+
+      .sidebar-header {
+        padding: 24px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .sidebar-header h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--primary);
+      }
+
+      .sidebar-menu {
+        padding: 16px 0;
+      }
+
+      .menu-item {
+        margin: 4px 12px;
+      }
+
+      .menu-link {
+        display: flex;
+        align-items: center;
+        padding: 12px 16px;
+        color: var(--text-dark);
+        text-decoration: none;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+
+      .menu-link:hover {
+        background: var(--bg-light);
+        color: var(--primary);
+      }
+
+      .menu-link.active {
+        background: var(--primary);
+        color: white;
+      }
+
+      .menu-icon {
+        width: 20px;
+        height: 20px;
+        margin-right: 12px;
+      }
+
+      .submenu {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+        margin-left: 32px;
+      }
+
+      .submenu.open {
+        max-height: 500px;
+      }
+
+      .submenu-link {
+        display: block;
+        padding: 10px 16px;
+        color: var(--text-gray);
+        text-decoration: none;
+        font-size: 13px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+      }
+
+      .submenu-link:hover {
+        background: var(--bg-light);
+        color: var(--primary);
+      }
+
+      .submenu-link.active {
+        background: #e0e7ff;
+        color: var(--primary);
+        font-weight: 600;
+      }
+
+      .arrow {
+        margin-left: auto;
+        transition: transform 0.3s ease;
+      }
+
+      .menu-link.open .arrow {
+        transform: rotate(180deg);
+      }
+
+      /* 메인 컨텐츠 */
+      .main-content {
+        margin-left: var(--sidebar-width);
+        width: calc(100% - var(--sidebar-width));
+      }
+
+      .top-bar {
+        background: var(--bg-white);
+        border-bottom: 1px solid var(--border);
+        padding: 16px 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .top-bar h1 {
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+      }
+
+      .btn-logout {
+        padding: 8px 16px;
+        background: var(--bg-light);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+
+      .btn-logout:hover {
+        background: #fee;
+        border-color: #fca5a5;
+        color: #dc2626;
+      }
+
+      .content-area {
+        padding: 32px;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 24px;
+        margin-bottom: 32px;
+      }
+
+      .stat-card {
+        background: var(--bg-white);
+        padding: 24px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        transition: all 0.3s ease;
+      }
+
+      .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+      }
+
+      .stat-label {
+        color: var(--text-gray);
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+
+      .stat-value {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--text-dark);
+      }
+
+      .stat-change {
+        margin-top: 8px;
+        font-size: 13px;
+        color: #10b981;
+      }
+
+      .content-card {
+        background: var(--bg-white);
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        padding: 24px;
+        margin-bottom: 24px;
+      }
+
+      .card-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 16px;
+      }
+
+      .page-content {
+        display: none;
+      }
+
+      .page-content.active {
+        display: block;
+      }
+
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .toolbar-left {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .toolbar-right {
+        display: flex;
+        gap: 12px;
+      }
+
+      .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn-primary {
+        background: var(--primary);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      }
+
+      .btn-secondary {
+        background: var(--bg-light);
+        color: var(--text-dark);
+        border: 1px solid var(--border);
+      }
+
+      .btn-secondary:hover {
+        background: #e5e7eb;
+      }
+
+      .btn-success {
+        background: var(--success);
+        color: white;
+      }
+
+      .btn-success:hover {
+        background: #059669;
+      }
+
+      .search-box {
+        display: flex;
+        gap: 8px;
+      }
+
+      .search-input {
+        padding: 10px 16px;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        width: 300px;
+        transition: all 0.2s ease;
+      }
+
+      .search-input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .btn-light {
+        background: #f8f9fa;
+        border: 1px solid #ccc;
+        color: #333;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .btn-light:hover {
+        background: #e9ecef;
+      }
+
+      #selectAllCustomers {
+        transform: scale(1.2);
+        cursor: pointer;
+      }
+
+      .table-container {
+        background: var(--bg-white);
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+      }
+
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .data-table thead {
+        background: var(--bg-light);
+      }
+
+      .data-table th {
+        padding: 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-gray);
+        border-bottom: 2px solid var(--border);
+      }
+
+      .data-table td {
+        padding: 16px;
+        font-size: 14px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .data-table tbody tr {
+        transition: background 0.2s ease;
+      }
+
+      .data-table tbody tr:hover {
+        background: var(--bg-light);
+      }
+
+      .status-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        display: inline-block;
+      }
+
+      .status-active {
+        background: #d1fae5;
+        color: #065f46;
+      }
+
+      .status-pending {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .status-completed {
+        background: #dbeafe;
+        color: #1e40af;
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .btn-icon {
+        padding: 6px 12px;
+        background: var(--bg-light);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s ease;
+      }
+
+      .btn-icon:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        outline: none;
+      }
+
+      .form-control:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 24px;
+      }
+
+      .page-btn {
+        padding: 8px 12px;
+        background: var(--bg-white);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+
+      .page-btn:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+      }
+
+      .page-btn.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: var(--text-gray);
+      }
+
+      .pagination {
+        margin-top: 12px;
+        text-align: center;
+      }
+      .pagination button {
+        background: #fff;
+        border: 1px solid #ddd;
+        margin: 0 2px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .pagination button.active {
+        background: #007bff;
+        color: white;
+        font-weight: bold;
+      }
+      .pagination button:hover {
+        background: #f0f0f0;
+      }
+
+      @media (max-width: 768px) {
+        .sidebar {
+          transform: translateX(-100%);
+        }
+        .main-content {
+          margin-left: 0;
+          width: 100%;
+        }
+        .toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .search-input {
+          width: 100%;
+        }
+      }
+
+      /* 추가적인 스타일 필요 시 여기에 작성 */
+      /* 1. Table Container - 높이 차지 */
+      .table-container {
+        background: var(--bg-white);
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        flex: 1; /* ⭐ 남은 공간 차지 */
+        display: flex; /* ⭐ Flexbox */
+        flex-direction: column; /* ⭐ 수직 배치 */
+        margin-bottom: 12px;
+      }
+
+      .table-container table {
+        height: 100%;
+      }
+
+      /* 2. Data Table - Flex 레이아웃 */
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        display: flex; /* ⭐ Flexbox */
+        flex-direction: column; /* ⭐ 수직 배치 */
+        height: 100%; /* ⭐ 전체 높이 */
+      }
+
+      /* 3. Table Header - 고정 */
+      .data-table thead {
+        background: var(--bg-light);
+        flex-shrink: 0; /* ⭐ 크기 고정 */
+        display: table; /* ⭐ 테이블 디스플레이 */
+        width: 100%;
+        table-layout: fixed; /* ⭐ 컬럼 너비 고정 */
+      }
+
+      .data-table th {
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 12px;
+        color: var(--text-gray);
+        border-bottom: 2px solid var(--border);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* 4. Table Body - 스크롤 */
+      .data-table tbody {
+        display: block; /* ⭐ 블록 레이아웃 */
+        overflow-y: auto; /* ⭐ 수직 스크롤 */
+        flex: 1; /* ⭐ 남은 공간 차지 */
+        width: 100%;
+      }
+
+      .data-table td {
+        padding: 12px 16px;
+        font-size: 13px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .data-table tbody tr {
+        display: table; /* ⭐ 테이블 디스플레이 */
+        width: 100%;
+        table-layout: fixed; /* ⭐ 컬럼 너비 고정 */
+        transition: background 0.2s ease;
+      }
+
+      .data-table tbody tr:hover {
+        background: var(--bg-light);
+      }
+
+      /* 5. Pagination - 크기 고정 */
+      .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 12px; /* ⭐ 축소 (24px → 12px) */
+        flex-shrink: 0; /* ⭐ 크기 고정 */
+        flex-wrap: wrap;
+      }
+
+      .page-btn {
+        padding: 8px 12px;
+        background: var(--bg-white);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s ease;
+        min-width: 32px;
+      }
+
+      .page-btn:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+      }
+
+      .page-btn.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+      }
+
+      /* 6. Scrollbar - 커스톰 스타일 */
+      .data-table tbody::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .data-table tbody::-webkit-scrollbar-track {
+        background: var(--bg-light);
+      }
+
+      .data-table tbody::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+
+      .data-table tbody::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+
+      /* 7. 컬럼 너비 - 매출처관리 (총 880px) */
+      #customerPage .data-table th:nth-child(1),
+      #customerPage .data-table td:nth-child(1) {
+        width: 40px;
+        max-width: 40px;
+      }
+
+      #customerPage .data-table th:nth-child(2),
+      #customerPage .data-table td:nth-child(2) {
+        width: 50px;
+        max-width: 50px;
+      }
+
+      #customerPage .data-table th:nth-child(3),
+      #customerPage .data-table td:nth-child(3) {
+        width: 80px;
+        max-width: 80px;
+      }
+
+      #customerPage .data-table th:nth-child(4),
+      #customerPage .data-table td:nth-child(4) {
+        width: 130px;
+        max-width: 130px;
+      }
+
+      #customerPage .data-table th:nth-child(5),
+      #customerPage .data-table td:nth-child(5) {
+        width: 100px;
+        max-width: 100px;
+      }
+
+      #customerPage .data-table th:nth-child(6),
+      #customerPage .data-table td:nth-child(6) {
+        width: 130px;
+        max-width: 130px;
+      }
+
+      #customerPage .data-table th:nth-child(7),
+      #customerPage .data-table td:nth-child(7) {
+        width: 110px;
+        max-width: 110px;
+      }
+
+      #customerPage .data-table th:nth-child(8),
+      #customerPage .data-table td:nth-child(8) {
+        width: 90px;
+        max-width: 90px;
+      }
+
+      #customerPage .data-table th:nth-child(9),
+      #customerPage .data-table td:nth-child(9) {
+        width: 90px;
+        max-width: 90px;
+      }
+
+      #customerPage .data-table th:nth-child(10),
+      #customerPage .data-table td:nth-child(10) {
+        width: 80px;
+        max-width: 80px;
+      }
+
+      /* 8. 컬럼 너비 - 매입처관리 (동일 구조) */
+      #supplierPage .data-table th:nth-child(1),
+      #supplierPage .data-table td:nth-child(1) {
+        width: 40px;
+        max-width: 40px;
+      }
+
+      #supplierPage .data-table th:nth-child(2),
+      #supplierPage .data-table td:nth-child(2) {
+        width: 50px;
+        max-width: 50px;
+      }
+
+      #supplierPage .data-table th:nth-child(3),
+      #supplierPage .data-table td:nth-child(3) {
+        width: 80px;
+        max-width: 80px;
+      }
+
+      #supplierPage .data-table th:nth-child(4),
+      #supplierPage .data-table td:nth-child(4) {
+        width: 130px;
+        max-width: 130px;
+      }
+
+      #supplierPage .data-table th:nth-child(5),
+      #supplierPage .data-table td:nth-child(5) {
+        width: 100px;
+        max-width: 100px;
+      }
+
+      #supplierPage .data-table th:nth-child(6),
+      #supplierPage .data-table td:nth-child(6) {
+        width: 130px;
+        max-width: 130px;
+      }
+
+      #supplierPage .data-table th:nth-child(7),
+      #supplierPage .data-table td:nth-child(7) {
+        width: 110px;
+        max-width: 110px;
+      }
+
+      #supplierPage .data-table th:nth-child(8),
+      #supplierPage .data-table td:nth-child(8) {
+        width: 90px;
+        max-width: 90px;
+      }
+
+      #supplierPage .data-table th:nth-child(9),
+      #supplierPage .data-table td:nth-child(9) {
+        width: 90px;
+        max-width: 90px;
+      }
+
+      #supplierPage .data-table th:nth-child(10),
+      #supplierPage .data-table td:nth-child(10) {
+        width: 80px;
+        max-width: 80px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 로그인 페이지 -->
+    <div class="login-container" id="loginPage">
+      <div class="login-box">
+        <div class="login-header">
+          <h1>판매관리 시스템</h1>
+          <p>로그인하여 시스템을 사용하세요</p>
+        </div>
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="userId">사용자 아이디</label>
+            <input
+              type="text"
+              id="userId"
+              class="form-input"
+              placeholder="아이디를 입력하세요"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="password">비밀번호</label>
+            <input
+              type="password"
+              id="password"
+              class="form-input"
+              placeholder="비밀번호를 입력하세요"
+              required
+            />
+          </div>
+          <button type="submit" class="btn-login">로그인</button>
+        </form>
+        <div class="login-message" id="loginMessage">시스템에 오신 것을 환영합니다.</div>
+      </div>
+    </div>
+
+    <!-- 대시보드 -->
+    <div class="dashboard" id="dashboard">
+      <!-- 사이드바 -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>판매관리 시스템</h2>
+        </div>
+        <nav class="sidebar-menu">
+          <div class="menu-item">
+            <a class="menu-link active" onclick="showPage('dashboard')">
+              <svg class="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                ></path>
+              </svg>
+              대시보드
+            </a>
+          </div>
+
+          <div class="menu-item">
+            <a class="menu-link">
+              <svg class="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                ></path>
+              </svg>
+              장부관리
+            </a>
+          </div>
+
+          <div class="menu-item">
+            <a class="menu-link" onclick="toggleSubmenu(this)" id="purchaseMenu">
+              <svg class="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                ></path>
+              </svg>
+              매입관리
+              <span class="arrow">▼</span>
+            </a>
+            <div class="submenu" id="purchaseSubmenu">
+              <a class="submenu-link" onclick="showPage('order')">발주관리</a>
+              <a class="submenu-link" onclick="showPage('purchase')">매입전표관리</a>
+              <a class="submenu-link" onclick="showPage('supplier')">매입처관리</a>
+            </div>
+          </div>
+
+          <div class="menu-item">
+            <a class="menu-link" onclick="toggleSubmenu(this)" id="salesMenu">
+              <svg class="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                ></path>
+              </svg>
+              매출관리
+              <span class="arrow">▼</span>
+            </a>
+            <div class="submenu" id="salesSubmenu">
+              <a class="submenu-link" onclick="showPage('quotation')">견적관리</a>
+              <a class="submenu-link" onclick="showPage('transaction')">거래명세서관리</a>
+              <a class="submenu-link" onclick="showPage('customer')">매출처관리</a>
+            </div>
+          </div>
+
+          <div class="menu-item">
+            <a class="menu-link">
+              <svg class="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                ></path>
+              </svg>
+              재고관리
+            </a>
+          </div>
+
+          <div class="menu-item">
+            <a class="menu-link">
+              <svg class="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                ></path>
+              </svg>
+              회계관리
+            </a>
+          </div>
+
+          <div class="menu-item">
+            <a class="menu-link">
+              <svg class="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                ></path>
+              </svg>
+              출력물관리
+            </a>
+          </div>
+
+          <div class="menu-item">
+            <a class="menu-link">
+              <svg class="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                ></path>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                ></path>
+              </svg>
+              설정관리
+            </a>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- 메인 컨텐츠 -->
+      <main class="main-content">
+        <div class="top-bar">
+          <h1 id="pageTitle">대시보드</h1>
+          <div class="user-info">
+            <div class="user-avatar" id="userAvatar">U</div>
+            <span id="userName">사용자</span>
+            <button class="btn-logout" onclick="logout()">로그아웃</button>
+          </div>
+        </div>
+
+        <div class="content-area">
+          <!-- 대시보드 페이지 -->
+          <div class="page-content active" id="dashboardPage">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-label">오늘 매출</div>
+                <div class="stat-value">₩0</div>
+                <div class="stat-change">데이터 로딩중...</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">이번달 매출</div>
+                <div class="stat-value">₩0</div>
+                <div class="stat-change">데이터 로딩중...</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">미수금</div>
+                <div class="stat-value">₩0</div>
+                <div class="stat-change">데이터 로딩중...</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">재고 현황</div>
+                <div class="stat-value">0건</div>
+                <div class="stat-change">데이터 로딩중...</div>
+              </div>
+            </div>
+
+            <div class="content-card">
+              <h3 class="card-title">판매관리 시스템에 오신 것을 환영합니다</h3>
+              <p style="color: var(--text-gray); margin-top: 16px; line-height: 1.6">
+                좌측 메뉴에서 원하시는 기능을 선택하세요.<br />
+                • 매출관리: 견적, 거래명세서, 매출처 관리<br />
+                • 매입관리: 발주, 매입전표, 매입처 관리<br />
+                • 재고관리: 자재 및 재고 현황 조회
+              </p>
+            </div>
+          </div>
+
+          <!-- 매출처관리 페이지 -->
+          <div class="page-content" id="customerPage">
+            <div class="toolbar">
+              <div class="toolbar-left">
+                <div class="search-box">
+                  <input
+                    type="text"
+                    class="search-input"
+                    id="customerSearch"
+                    placeholder="매출처명 또는 사업자번호로 검색..."
+                  />
+                  <button class="btn btn-secondary" onclick="loadCustomers()">검색</button>
+                </div>
+              </div>
+              <div class="toolbar-right">
+                <button class="btn btn-success"><span>+</span> 신규 등록</button>
+                <button class="btn btn-secondary"><span>📄</span> 엑셀 내보내기</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <!-- <th>선택</th> -->
+                    <th style="width: 40px">
+                      <input
+                        type="checkbox"
+                        id="selectAllCustomers"
+                        onclick="toggleSelectAllCustomers(this)"
+                      />
+                    </th>
+                    <th>번호</th>
+                    <th>매출처코드</th>
+                    <th>매출처명</th>
+                    <th>대표자</th>
+                    <th>사업자번호</th>
+                    <th>연락처</th>
+                    <th>거래상태</th>
+                    <th>등록일</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="customerTableBody">
+                  <tr>
+                    <td colspan="8" class="loading">데이터를 불러오는 중...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination" id="customerPagination"></div>
+          </div>
+
+          <!-- 매입처관리 페이지 -->
+          <div class="page-content" id="supplierPage">
+            <div class="toolbar">
+              <div class="toolbar-left">
+                <div class="search-box">
+                  <input
+                    type="text"
+                    class="search-input"
+                    id="supplierSearch"
+                    placeholder="매입처명 또는 사업자번호로 검색..."
+                  />
+                  <button class="btn btn-secondary" onclick="loadSuppliers()">검색</button>
+                </div>
+              </div>
+              <div class="toolbar-right">
+                <button class="btn btn-success"><span>+</span> 신규 등록</button>
+                <button class="btn btn-secondary"><span>📄</span> 엑셀 내보내기</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40px">
+                      <input
+                        type="checkbox"
+                        id="selectAllSuppliers"
+                        onclick="toggleSelectAllSuppliers(this)"
+                      />
+                    </th>
+                    <th>번호</th>
+                    <th>매입처코드</th>
+                    <th>매입처명</th>
+                    <th>대표자</th>
+                    <th>사업자번호</th>
+                    <th>연락처</th>
+                    <th>거래상태</th>
+                    <th>등록일</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="supplierTableBody">
+                  <tr>
+                    <td colspan="8" class="loading">데이터를 불러오는 중...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination" id="supplierPagination"></div>
+          </div>
+
+          <!-- 견적관리 페이지 -->
+          <div class="page-content" id="quotationPage">
+            <div class="toolbar">
+              <div class="toolbar-left">
+                <select class="form-control" style="width: 150px">
+                  <option>전체</option>
+                  <option>진행중</option>
+                  <option>승인</option>
+                  <option>반려</option>
+                </select>
+                <div class="search-box">
+                  <input
+                    type="text"
+                    class="search-input"
+                    id="quotationSearch"
+                    placeholder="견적번호 또는 매출처명으로 검색..."
+                  />
+                  <button class="btn btn-secondary" onclick="loadQuotations()">검색</button>
+                </div>
+              </div>
+              <div class="toolbar-right">
+                <button class="btn btn-success"><span>+</span> 견적서 작성</button>
+                <button class="btn btn-secondary"><span>📄</span> 출력</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>견적번호</th>
+                    <th>매출처명</th>
+                    <th>견적일자</th>
+                    <th>유효기간</th>
+                    <th>견적금액</th>
+                    <th>담당자</th>
+                    <th>상태</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="quotationTableBody">
+                  <tr>
+                    <td colspan="8" class="loading">데이터를 불러오는 중...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination" id="quotationPagination"></div>
+          </div>
+
+          <!-- 발주관리 페이지 -->
+          <div class="page-content" id="orderPage">
+            <div class="toolbar">
+              <div class="toolbar-left">
+                <select class="form-control" style="width: 150px">
+                  <option>전체</option>
+                  <option>발주대기</option>
+                  <option>발주완료</option>
+                  <option>입고완료</option>
+                </select>
+                <div class="search-box">
+                  <input
+                    type="text"
+                    class="search-input"
+                    id="orderSearch"
+                    placeholder="발주번호 또는 매입처명으로 검색..."
+                  />
+                  <button class="btn btn-secondary" onclick="loadOrders()">검색</button>
+                </div>
+              </div>
+              <div class="toolbar-right">
+                <button class="btn btn-success"><span>+</span> 발주서 작성</button>
+                <button class="btn btn-secondary"><span>📄</span> 출력</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>발주번호</th>
+                    <th>매입처명</th>
+                    <th>발주일자</th>
+                    <th>납기일자</th>
+                    <th>발주금액</th>
+                    <th>담당자</th>
+                    <th>상태</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="orderTableBody">
+                  <tr>
+                    <td colspan="8" class="loading">데이터를 불러오는 중...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination" id="orderPagination"></div>
+          </div>
+
+          <!-- 거래명세서관리 페이지 -->
+          <div class="page-content" id="transactionPage">
+            <div class="toolbar">
+              <div class="toolbar-left">
+                <input type="date" class="form-control" style="width: 180px" />
+                <span style="padding: 0 8px">~</span>
+                <input type="date" class="form-control" style="width: 180px" />
+                <button class="btn btn-secondary">조회</button>
+              </div>
+              <div class="toolbar-right">
+                <button class="btn btn-success"><span>+</span> 거래명세서 작성</button>
+                <button class="btn btn-secondary"><span>📄</span> 출력</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>명세서번호</th>
+                    <th>매출처명</th>
+                    <th>거래일자</th>
+                    <th>공급가액</th>
+                    <th>부가세</th>
+                    <th>합계금액</th>
+                    <th>담당자</th>
+                    <th>상태</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colspan="9" class="loading">데이터를 불러오는 중...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 매입전표관리 페이지 -->
+          <div class="page-content" id="purchasePage">
+            <div class="toolbar">
+              <div class="toolbar-left">
+                <input type="date" class="form-control" style="width: 180px" />
+                <span style="padding: 0 8px">~</span>
+                <input type="date" class="form-control" style="width: 180px" />
+                <button class="btn btn-secondary">조회</button>
+              </div>
+              <div class="toolbar-right">
+                <button class="btn btn-success"><span>+</span> 매입전표 작성</button>
+                <button class="btn btn-secondary"><span>📄</span> 출력</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>전표번호</th>
+                    <th>매입처명</th>
+                    <th>매입일자</th>
+                    <th>공급가액</th>
+                    <th>부가세</th>
+                    <th>합계금액</th>
+                    <th>담당자</th>
+                    <th>상태</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colspan="9" class="loading">데이터를 불러오는 중...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      // API 기본 URL
+      const API_BASE_URL = 'http://localhost:3000/api';
+
+      // 현재 로그인 사용자 정보
+      let currentUser = null;
+
+      let currentCustomerPage = 1;
+      let customerPageSizeSelected = 10;
+      let customerPageSizeEffective = 10;
+
+      let currentSupplierPage = 1;
+      let supplierPageSizeSelected = 10;
+      let supplierPageSizeEffective = 10;
+
+      function getCustomerEffectivePageSize() {
+        // 셀렉터 선택값을 그대로 사용 (화면 높이로 제한하지 않음)
+        const select = document.getElementById('customerPageSizeSelect');
+        const selected = Number(select?.value || customerPageSizeSelected || 10);
+        customerPageSizeSelected = selected;
+        customerPageSizeEffective = selected;
+        return selected;
+      }
+
+      function getSupplierEffectivePageSize() {
+        const select = document.getElementById('supplierPageSizeSelect');
+        const selected = Number(select?.value || supplierPageSizeSelected || 10);
+        supplierPageSizeSelected = selected;
+        supplierPageSizeEffective = selected;
+        return selected;
+      }
+
+      function debounce(fn, wait = 200) {
+        let t;
+        return (...args) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...args), wait);
+        };
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        // 주입식 페이지 사이즈 선택 박스 생성
+        const toolbarLeft = document.querySelector('#customerPage .toolbar .toolbar-left');
+        if (toolbarLeft && !document.getElementById('customerPageSizeSelect')) {
+          const sel = document.createElement('select');
+          sel.id = 'customerPageSizeSelect';
+          sel.className = 'form-control';
+          sel.style.width = '120px';
+          sel.style.marginLeft = '8px';
+          [10, 15, 20, 25, 50].forEach((n) => {
+            const opt = document.createElement('option');
+            opt.value = String(n);
+            opt.textContent = n + '개';
+            if (n === 10) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          toolbarLeft.appendChild(sel);
+          sel.addEventListener('change', () => loadCustomers(1));
+        }
+
+        const supplierToolbarLeft = document.querySelector('#supplierPage .toolbar .toolbar-left');
+        if (supplierToolbarLeft && !document.getElementById('supplierPageSizeSelect')) {
+          const sel = document.createElement('select');
+          sel.id = 'supplierPageSizeSelect';
+          sel.className = 'form-control';
+          sel.style.width = '120px';
+          sel.style.marginLeft = '8px';
+          [10, 15, 20, 25, 50].forEach((n) => {
+            const opt = document.createElement('option');
+            opt.value = String(n);
+            opt.textContent = n + '개';
+            if (n === 10) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          supplierToolbarLeft.appendChild(sel);
+          sel.addEventListener('change', () => loadSuppliers(1));
+        }
+
+        window.addEventListener(
+          'resize',
+          debounce(() => {
+            const isActive = document.getElementById('customerPage')?.classList.contains('active');
+            if (isActive) loadCustomers(currentCustomerPage);
+          }, 200),
+        );
+      });
+
+      // API 호출 헬퍼 함수
+      async function apiCall(endpoint, method = 'GET', data = null) {
+        /**
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.message || '서버 오류');
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('API 호출 에러:', error);
+                throw error;
+            }
+			**/
+        try {
+          let url = `${API_BASE_URL}${endpoint}`;
+          const options = {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+          };
+
+          // ✅ GET 요청일 때: data를 쿼리스트링으로 변환
+          if (method.toUpperCase() === 'GET' && data && typeof data === 'object') {
+            const queryString = new URLSearchParams(data).toString();
+            if (queryString) url += (url.includes('?') ? '&' : '?') + queryString;
+          }
+          // ✅ POST/PUT/DELETE 요청일 때: body에 JSON으로 추가
+          else if (data) {
+            options.body = JSON.stringify(data);
+          }
+
+          const response = await fetch(url, options);
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.message || '서버 오류');
+          }
+
+          return result;
+        } catch (error) {
+          console.error('API 호출 에러:', error);
+          throw error;
+        }
+      }
+
+      // 로그인 처리
+      document.getElementById('loginForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const userId = document.getElementById('userId').value;
+        const password = document.getElementById('password').value;
+        const messageEl = document.getElementById('loginMessage');
+
+        try {
+          messageEl.textContent = '로그인 중...';
+          messageEl.classList.remove('error');
+          messageEl.classList.add('show');
+
+          const result = await apiCall('/auth/login', 'POST', {
+            userId: userId,
+            password: password,
+          });
+
+          if (result.success) {
+            currentUser = result.data;
+
+            messageEl.textContent = result.message;
+
+            setTimeout(() => {
+              document.getElementById('loginPage').style.display = 'none';
+              document.getElementById('dashboard').classList.add('active');
+
+              document.getElementById('userName').textContent = currentUser.사용자명;
+              document.getElementById('userAvatar').textContent = currentUser.사용자명.charAt(0);
+
+              // 대시보드 통계 로드
+              loadDashboardStats();
+            }, 800);
+          }
+        } catch (error) {
+          messageEl.textContent = '로그인 실패: ' + error.message;
+          messageEl.classList.add('error');
+          messageEl.classList.add('show');
+        }
+      });
+
+      // 대시보드 통계 로드
+      async function loadDashboardStats() {
+        try {
+          const result = await apiCall(`/dashboard/stats?사업장코드=${currentUser.사업장코드}`);
+
+          if (result.success) {
+            const stats = result.data;
+            const statCards = document.querySelectorAll('.stat-card');
+
+            statCards[0].querySelector('.stat-value').textContent =
+              '₩' + Number(stats.todaySales).toLocaleString();
+            statCards[0].querySelector('.stat-change').textContent = '전일 대비';
+
+            statCards[1].querySelector('.stat-value').textContent =
+              '₩' + Number(stats.monthlySales).toLocaleString();
+            statCards[1].querySelector('.stat-change').textContent = '전월 대비';
+
+            statCards[2].querySelector('.stat-value').textContent =
+              '₩' + Number(stats.unpaidAmount).toLocaleString();
+            statCards[2].querySelector('.stat-change').textContent = '미수금 현황';
+
+            statCards[3].querySelector('.stat-value').textContent =
+              Number(stats.inventoryCount).toLocaleString() + '건';
+            statCards[3].querySelector('.stat-change').textContent = '재고 품목';
+          }
+        } catch (error) {
+          console.error('통계 로드 실패:', error);
+        }
+      }
+
+      // 전체 선택/해제
+      let allSelected = false; // 전체 선택 상태 기억
+
+      function toggleSelectAllCustomers() {
+        const checkboxes = document.querySelectorAll('.customerCheckbox');
+        allSelected = !allSelected;
+        checkboxes.forEach((cb) => (cb.checked = allSelected));
+
+        // 버튼 문구 변경
+        // const btn = document.getElementById('selectAllCustomers');
+        // btn.textContent = allSelected ? '선택해제' : '전체선택';
+      }
+
+      function toggleSelectAllSuppliers(checkbox) {
+        const supplierCheckboxes = document.querySelectorAll('.supplierCheckbox');
+        supplierCheckboxes.forEach((cb) => (cb.checked = checkbox.checked));
+      }
+
+      // 매출처 목록 로드
+      async function loadCustomers(page = 1) {
+        try {
+          const searchValue = document.getElementById('customerSearch')?.value || '';
+          const tbody = document.getElementById('customerTableBody');
+          const pagination = document.getElementById('customerPagination');
+          tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터를 불러오는 중...</td></tr>';
+
+          pagination.innerHTML = '';
+          const effectivePageSize = getCustomerEffectivePageSize();
+          currentCustomerPage = page;
+
+          // ✅ 서버로 API 호출 (page, pageSize 함께 전송)
+          const result = await apiCall('/customers', 'GET', {
+            사업장코드: currentUser.사업장코드,
+            search: searchValue,
+            page,
+            pageSize: effectivePageSize,
+          });
+
+          // const result = await apiCall(`/customers?사업장코드=${currentUser.사업장코드}&search=${searchValue}`);
+          // const result = await apiCall(`/customers?사업장코드=${currentUser.사업장코드}&search=${searchValue}&page=${page}&pageSize=25`);
+
+          if (result.success) {
+            tbody.innerHTML = '';
+
+            if (result.data.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터가 없습니다.</td></tr>';
+              return;
+            }
+
+            const startNumber = (result.currentPage - 1) * customerPageSizeEffective + 1;
+
+            result.data.forEach((customer, index) => {
+              const statusClass = customer.사용구분 === 0 ? 'status-active' : 'status-pending';
+              const statusText = customer.사용구분 === 0 ? '정상거래' : '거래보류';
+              const rowNumber = startNumber + index;
+
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+						    <td><input type="checkbox" class="customerCheckbox" value="${customer.매출처코드}"></td>
+							<td>${rowNumber}</td>
+                            <td>${customer.매출처코드}</td>
+                            <td>${customer.매출처명}</td>
+                            <td>${customer.대표자명 || '-'}</td>
+                            <td>${customer.사업자번호 || '-'}</td>
+                            <td>${customer.전화번호 || '-'}</td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            <td>${customer.수정일자 || '-'}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-icon" onclick="viewCustomer('${
+                                      customer.매출처코드
+                                    }')">상세</button>
+                                </div>
+                            </td>
+                        `;
+              tbody.appendChild(tr);
+            });
+          }
+
+          renderCustomerPagination(result.currentPage, result.totalPages);
+        } catch (error) {
+          console.error('매출처 목록 로드 실패:', error);
+          const tbody = document.getElementById('customerTableBody');
+          tbody.innerHTML = `<tr><td colspan="8" class="loading" style="color: red;">오류: ${error.message}</td></tr>`;
+        }
+      }
+
+      // 페이지네이션 렌더링
+      function renderCustomerPagination(currentPage, totalPages) {
+        const pagination = document.getElementById('customerPagination');
+        pagination.innerHTML = '';
+
+        if (totalPages <= 1) return;
+
+        const maxButtons = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+        if (endPage - startPage < maxButtons - 1) {
+          startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        // 이전 버튼
+        if (currentPage > 1) {
+          const prev = document.createElement('button');
+          prev.textContent = '〈';
+          prev.onclick = () => loadCustomers(currentPage - 1);
+          pagination.appendChild(prev);
+        }
+
+        // 페이지 번호 버튼
+        for (let i = startPage; i <= endPage; i++) {
+          const btn = document.createElement('button');
+          btn.textContent = i;
+          if (i === currentPage) btn.classList.add('active');
+          btn.onclick = () => loadCustomers(i);
+          pagination.appendChild(btn);
+        }
+
+        // 다음 버튼
+        if (currentPage < totalPages) {
+          const next = document.createElement('button');
+          next.textContent = '〉';
+          next.onclick = () => loadCustomers(currentPage + 1);
+          pagination.appendChild(next);
+        }
+      }
+
+      // 매입처 목록 로드
+      async function loadSuppliers(page = 1) {
+        try {
+          /**  
+          const searchValue = document.getElementById('supplierSearch')?.value || '';
+          const tbody = document.getElementById('supplierTableBody');
+          tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터를 불러오는 중...</td></tr>';
+
+          const result = await apiCall(
+            `/suppliers?사업장코드=${currentUser.사업장코드}&search=${searchValue}`,
+          );
+
+
+          if (result.success) {
+            tbody.innerHTML = '';
+
+            if (result.data.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터가 없습니다.</td></tr>';
+              return;
+            }
+
+            result.data.forEach((supplier) => {
+              const statusClass = supplier.사용구분 === 0 ? 'status-active' : 'status-pending';
+              const statusText = supplier.사용구분 === 0 ? '정상거래' : '거래보류';
+
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                            <td>${supplier.매입처코드}</td>
+                            <td>${supplier.매입처명}</td>
+                            <td>${supplier.대표자명 || '-'}</td>
+                            <td>${supplier.사업자번호 || '-'}</td>
+                            <td>${supplier.전화번호 || '-'}</td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            <td>${supplier.수정일자 || '-'}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-icon" onclick="viewSupplier('${
+                                      supplier.매입처코드
+                                    }')">상세</button>
+                                </div>
+                            </td>
+                        `;
+              tbody.appendChild(tr);
+            });
+          } **/
+          const searchValue = document.getElementById('supplierSearch')?.value || '';
+          const tbody = document.getElementById('supplierTableBody');
+          tbody.innerHTML =
+            '<tr><td colspan="10" class="loading">데이터를 불러오는 중...</td></tr>';
+
+          // ✅ 객체 파라미터로 전달 (page, pageSize 포함)
+          const result = await apiCall('/suppliers', 'GET', {
+            사업장코드: currentUser.사업장코드,
+            search: searchValue,
+            page,
+            pageSize: 10,
+          });
+
+          if (result.success) {
+            tbody.innerHTML = '';
+
+            if (result.data.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="10" class="loading">데이터가 없습니다.</td></tr>';
+              return;
+            }
+
+            // ✅ 행 번호 계산
+            const pageSize = 10;
+            const startNumber = (result.currentPage - 1) * pageSize + 1;
+
+            result.data.forEach((supplier, index) => {
+              const statusClass = supplier.사용구분 === 0 ? 'status-active' : 'status-pending';
+              const statusText = supplier.사용구분 === 0 ? '정상거래' : '거래보류';
+              const rowNumber = startNumber + index; // ✅ 페이지별 순차 번호
+
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                    <td><input type="checkbox" class="supplierCheckbox" value="${
+                      supplier.매입처코드
+                    }"></td>
+                    <td>${rowNumber}</td>  <!-- ✅ 행 번호 추가 -->
+                    <td>${supplier.매입처코드}</td>
+                    <td>${supplier.매입처명}</td>
+                    <td>${supplier.대표자명 || '-'}</td>
+                    <td>${supplier.사업자번호 || '-'}</td>
+                    <td>${supplier.전화번호 || '-'}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>${supplier.수정일자 || '-'}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-icon" onclick="viewSupplier('${
+                              supplier.매입처코드
+                            }')">상세</button>
+                        </div>
+                    </td>
+                `;
+              tbody.appendChild(tr);
+            });
+          }
+
+          // ✅ 페이지네이션 렌더링
+          renderSupplierPagination(result.currentPage, result.totalPages);
+        } catch (error) {
+          console.error('매입처 목록 로드 실패:', error);
+          const tbody = document.getElementById('supplierTableBody');
+          tbody.innerHTML = `<tr><td colspan="8" class="loading" style="color: red;">오류: ${error.message}</td></tr>`;
+        }
+      }
+
+      // 페이지네이션 렌더링
+
+      function renderSupplierPagination(currentPage, totalPages) {
+        const pagination = document.getElementById('supplierPagination');
+        pagination.innerHTML = '';
+
+        if (totalPages <= 1) return;
+
+        const maxButtons = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+        if (endPage - startPage < maxButtons - 1) {
+          startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        // 이전 버튼
+        if (currentPage > 1) {
+          const prev = document.createElement('button');
+          prev.textContent = '〈';
+          prev.onclick = () => loadSuppliers(currentPage - 1);
+          pagination.appendChild(prev);
+        }
+
+        // 페이지 번호 버튼
+        for (let i = startPage; i <= endPage; i++) {
+          const btn = document.createElement('button');
+          btn.textContent = i;
+          if (i === currentPage) btn.classList.add('active');
+          btn.onclick = () => loadSuppliers(i);
+          pagination.appendChild(btn);
+        }
+
+        // 다음 버튼
+        if (currentPage < totalPages) {
+          const next = document.createElement('button');
+          next.textContent = '〉';
+          next.onclick = () => loadSuppliers(currentPage + 1);
+          pagination.appendChild(next);
+        }
+      }
+
+      // 견적 목록 로드
+      async function loadQuotations() {
+        try {
+          const searchValue = document.getElementById('quotationSearch')?.value || '';
+          const tbody = document.getElementById('quotationTableBody');
+          tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터를 불러오는 중...</td></tr>';
+
+          const result = await apiCall(
+            `/quotations?사업장코드=${currentUser.사업장코드}&search=${searchValue}`,
+          );
+
+          if (result.success) {
+            tbody.innerHTML = '';
+
+            if (result.data.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터가 없습니다.</td></tr>';
+              return;
+            }
+
+            result.data.forEach((quotation) => {
+              const statusMap = {
+                1: { class: 'status-pending', text: '진행중' },
+                2: { class: 'status-completed', text: '승인' },
+                3: { class: 'status-pending', text: '반려' },
+              };
+              const status = statusMap[quotation.상태코드] || statusMap[1];
+
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                            <td>Q${quotation.견적일자}-${quotation.견적번호}</td>
+                            <td>${quotation.매출처명 || '-'}</td>
+                            <td>${quotation.견적일자}</td>
+                            <td>${quotation.출고희망일자 || '-'}</td>
+                            <td>₩0</td>
+                            <td>${quotation.사용자명 || '-'}</td>
+                            <td><span class="status-badge ${status.class}">${
+                status.text
+              }</span></td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-icon" onclick="viewQuotation('${
+                                      quotation.견적일자
+                                    }', ${quotation.견적번호})">상세</button>
+                                </div>
+                            </td>
+                        `;
+              tbody.appendChild(tr);
+            });
+          }
+        } catch (error) {
+          console.error('견적 목록 로드 실패:', error);
+          const tbody = document.getElementById('quotationTableBody');
+          tbody.innerHTML = `<tr><td colspan="8" class="loading" style="color: red;">오류: ${error.message}</td></tr>`;
+        }
+      }
+
+      // 발주 목록 로드
+      async function loadOrders() {
+        try {
+          const searchValue = document.getElementById('orderSearch')?.value || '';
+          const tbody = document.getElementById('orderTableBody');
+          tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터를 불러오는 중...</td></tr>';
+
+          const result = await apiCall(
+            `/orders?사업장코드=${currentUser.사업장코드}&search=${searchValue}`,
+          );
+
+          if (result.success) {
+            tbody.innerHTML = '';
+
+            if (result.data.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터가 없습니다.</td></tr>';
+              return;
+            }
+
+            result.data.forEach((order) => {
+              const statusMap = {
+                1: { class: 'status-pending', text: '발주대기' },
+                2: { class: 'status-pending', text: '발주완료' },
+                3: { class: 'status-completed', text: '입고완료' },
+              };
+              const status = statusMap[order.상태코드] || statusMap[1];
+
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                            <td>PO${order.발주일자}-${order.발주번호}</td>
+                            <td>${order.매입처명 || '-'}</td>
+                            <td>${order.발주일자}</td>
+                            <td>${order.입고희망일자 || '-'}</td>
+                            <td>₩0</td>
+                            <td>${order.사용자명 || '-'}</td>
+                            <td><span class="status-badge ${status.class}">${
+                status.text
+              }</span></td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-icon" onclick="viewOrder('${
+                                      order.발주일자
+                                    }', ${order.발주번호})">상세</button>
+                                </div>
+                            </td>
+                        `;
+              tbody.appendChild(tr);
+            });
+          }
+        } catch (error) {
+          console.error('발주 목록 로드 실패:', error);
+          const tbody = document.getElementById('orderTableBody');
+          tbody.innerHTML = `<tr><td colspan="8" class="loading" style="color: red;">오류: ${error.message}</td></tr>`;
+        }
+      }
+
+      // 서브메뉴 토글
+      function toggleSubmenu(element) {
+        element.classList.toggle('open');
+        const submenu = element.nextElementSibling;
+        submenu.classList.toggle('open');
+      }
+
+      // 페이지 전환
+      function showPage(pageName) {
+        document.querySelectorAll('.page-content').forEach((page) => {
+          page.classList.remove('active');
+        });
+
+        document.querySelectorAll('.menu-link').forEach((link) => {
+          link.classList.remove('active');
+        });
+        document.querySelectorAll('.submenu-link').forEach((link) => {
+          link.classList.remove('active');
+        });
+
+        const pageMap = {
+          dashboard: {
+            element: 'dashboardPage',
+            title: '대시보드',
+            menu: null,
+            loadFunc: loadDashboardStats,
+          },
+          supplier: {
+            element: 'supplierPage',
+            title: '매입처관리',
+            menu: 'purchase',
+            loadFunc: loadSuppliers,
+          },
+          order: {
+            element: 'orderPage',
+            title: '발주관리',
+            menu: 'purchase',
+            loadFunc: loadOrders,
+          },
+          purchase: {
+            element: 'purchasePage',
+            title: '매입전표관리',
+            menu: 'purchase',
+            loadFunc: null,
+          },
+          customer: {
+            element: 'customerPage',
+            title: '매출처관리',
+            menu: 'sales',
+            loadFunc: loadCustomers,
+          },
+          quotation: {
+            element: 'quotationPage',
+            title: '견적관리',
+            menu: 'sales',
+            loadFunc: loadQuotations,
+          },
+          transaction: {
+            element: 'transactionPage',
+            title: '거래명세서관리',
+            menu: 'sales',
+            loadFunc: null,
+          },
+        };
+
+        if (pageMap[pageName]) {
+          document.getElementById(pageMap[pageName].element).classList.add('active');
+          document.getElementById('pageTitle').textContent = pageMap[pageName].title;
+
+          if (pageMap[pageName].menu === 'purchase') {
+            document.getElementById('purchaseMenu').classList.add('open');
+            document.getElementById('purchaseSubmenu').classList.add('open');
+          } else if (pageMap[pageName].menu === 'sales') {
+            document.getElementById('salesMenu').classList.add('open');
+            document.getElementById('salesSubmenu').classList.add('open');
+          }
+
+          if (event && event.target) {
+            event.target.classList.add('active');
+          }
+
+          // 페이지별 데이터 로드
+          if (currentUser && pageMap[pageName].loadFunc) {
+            pageMap[pageName].loadFunc();
+          }
+        }
+      }
+
+      // 로그아웃
+      async function logout() {
+        if (confirm('로그아웃 하시겠습니까?')) {
+          try {
+            await apiCall('/auth/logout', 'POST', { userId: currentUser.사용자코드 });
+          } catch (error) {
+            console.error('로그아웃 에러:', error);
+          }
+
+          currentUser = null;
+          document.getElementById('dashboard').classList.remove('active');
+          document.getElementById('loginPage').style.display = 'flex';
+          document.getElementById('loginForm').reset();
+          document.getElementById('loginMessage').classList.remove('show');
+        }
+      }
+
+      // 상세 조회 함수들
+      async function viewCustomer(id) {
+        try {
+          const result = await apiCall(`/customers/${id}`);
+          if (result.success) {
+            alert(
+              '매출처 정보:\n\n' +
+                `매출처명: ${result.data.매출처명}\n` +
+                `대표자: ${result.data.대표자명}\n` +
+                `사업자번호: ${result.data.사업자번호}\n` +
+                `전화번호: ${result.data.전화번호}\n` +
+                `주소: ${result.data.주소} ${result.data.번지}`,
+            );
+          }
+        } catch (error) {
+          alert('매출처 조회 실패: ' + error.message);
+        }
+      }
+
+      async function viewSupplier(id) {
+        try {
+          const result = await apiCall(`/suppliers/${id}`);
+          if (result.success) {
+            alert(
+              '매입처 정보:\n\n' +
+                `매입처명: ${result.data.매입처명}\n` +
+                `대표자: ${result.data.대표자명}\n` +
+                `사업자번호: ${result.data.사업자번호}\n` +
+                `전화번호: ${result.data.전화번호}\n` +
+                `주소: ${result.data.주소} ${result.data.번지}`,
+            );
+          }
+        } catch (error) {
+          alert('매입처 조회 실패: ' + error.message);
+        }
+      }
+
+      async function viewQuotation(date, no) {
+        try {
+          const result = await apiCall(`/quotations/${date}/${no}`);
+          if (result.success) {
+            console.log('견적 상세:', result.data);
+            alert('견적 정보가 콘솔에 출력되었습니다.');
+          }
+        } catch (error) {
+          alert('견적 조회 실패: ' + error.message);
+        }
+      }
+
+      async function viewOrder(date, no) {
+        try {
+          const result = await apiCall(`/orders/${date}/${no}`);
+          if (result.success) {
+            console.log('발주 상세:', result.data);
+            alert('발주 정보가 콘솔에 출력되었습니다.');
+          }
+        } catch (error) {
+          alert('발주 조회 실패: ' + error.message);
+        }
+      }
+    </script>
+  </body>
+</html>
