@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>판매관리 시스템</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
       * {
         margin: 0;
@@ -496,17 +498,29 @@
         border-radius: 12px;
         border: 1px solid var(--border);
         overflow: hidden;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 12px;
+        height: 500px; /* ⭐ 고정 높이 설정 (필요시 조정) */
       }
 
       .data-table {
         width: 100%;
         border-collapse: collapse;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
       }
 
       .data-table thead {
         background: var(--bg-light);
+        flex-shrink: 0;
+        display: table;
+        width: 100%;
+        table-layout: fixed;
       }
-
+      /**
       .data-table th {
         padding: 16px;
         text-align: left;
@@ -514,20 +528,80 @@
         font-size: 13px;
         color: var(--text-gray);
         border-bottom: 2px solid var(--border);
+      } **/
+      .data-table th {
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 12px;
+        color: var(--text-gray);
+        border-bottom: 2px solid var(--border);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
-      .data-table td {
+      /* 테이블 바디 - 스크롤 적용 */
+      .data-table tbody {
+        display: block;
+        overflow-y: auto; /* ⭐ 스크롤바 표시 */
+        overflow-x: hidden;
+        flex: 1;
+        width: 100%;
+      }
+
+      /* .data-table td {
         padding: 16px;
         font-size: 14px;
         border-bottom: 1px solid var(--border);
+      } */
+
+      .data-table td {
+        padding: 12px 16px;
+        font-size: 13px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
+      /* .data-table tbody tr {
+        transition: background 0.2s ease;
+      }*/
+
       .data-table tbody tr {
+        display: table;
+        width: 100%;
+        table-layout: fixed;
         transition: background 0.2s ease;
       }
 
       .data-table tbody tr:hover {
         background: var(--bg-light);
+      }
+
+      /* 스크롤바 커스텀 스타일 */
+      .data-table tbody::-webkit-scrollbar {
+        width: 10px; /* ⭐ 스크롤바 너비 증가 */
+      }
+
+      .data-table tbody::-webkit-scrollbar-track {
+        background: var(--bg-light);
+      }
+
+      .data-table tbody::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 5px;
+      }
+
+      .data-table tbody::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+
+      /* Firefox 스크롤바 */
+      .data-table tbody {
+        scrollbar-color: #cbd5e1 var(--bg-light);
+        scrollbar-width: thin;
       }
 
       .status-badge {
@@ -589,11 +663,21 @@
         box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
       }
 
-      .pagination {
+      /* .pagination {
         display: flex;
         justify-content: center;
         gap: 8px;
         margin-top: 24px;
+      }*/
+
+      /* 페이지네이션 - 크기 고정 */
+      .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 12px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
       }
 
       .page-btn {
@@ -1151,7 +1235,10 @@
               </div>
               <div class="toolbar-right">
                 <button class="btn btn-success"><span>+</span> 신규 등록</button>
-                <button class="btn btn-secondary"><span>📄</span> 엑셀 내보내기</button>
+                <!-- <button class="btn btn-secondary"><span>📄</span> 엑셀 내보내기</button> -->
+                <button class="btn btn-secondary" onclick="exportCustomersToExcel()">
+                  <span>📄</span> 엑셀 내보내기
+                </button>
               </div>
             </div>
 
@@ -1205,7 +1292,10 @@
               </div>
               <div class="toolbar-right">
                 <button class="btn btn-success"><span>+</span> 신규 등록</button>
-                <button class="btn btn-secondary"><span>📄</span> 엑셀 내보내기</button>
+                <!-- <button class="btn btn-secondary"><span>📄</span> 엑셀 내보내기</button> -->
+                <button class="btn btn-secondary" onclick="exportCustomersToExcel()">
+                  <span>📄</span> 엑셀 내보내기
+                </button>
               </div>
             </div>
 
@@ -1506,8 +1596,15 @@
         window.addEventListener(
           'resize',
           debounce(() => {
-            const isActive = document.getElementById('customerPage')?.classList.contains('active');
-            if (isActive) loadCustomers(currentCustomerPage);
+            const customerActive = document
+              .getElementById('customerPage')
+              ?.classList.contains('active');
+            if (customerActive) loadCustomers(currentCustomerPage);
+
+            const supplierActive = document
+              .getElementById('supplierPage')
+              ?.classList.contains('active');
+            if (supplierActive) loadSuppliers(currentSupplierPage);
           }, 200),
         );
       });
@@ -1773,91 +1870,54 @@
       // 매입처 목록 로드
       async function loadSuppliers(page = 1) {
         try {
-          /**  
           const searchValue = document.getElementById('supplierSearch')?.value || '';
           const tbody = document.getElementById('supplierTableBody');
-          tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터를 불러오는 중...</td></tr>';
+          const pagination = document.getElementById('supplierPagination');
+          const effectivePageSize = getSupplierEffectivePageSize();
+          currentSupplierPage = page;
 
-          const result = await apiCall(
-            `/suppliers?사업장코드=${currentUser.사업장코드}&search=${searchValue}`,
-          );
+          tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading...</td></tr>';
+          pagination.innerHTML = '';
 
-
-          if (result.success) {
-            tbody.innerHTML = '';
-
-            if (result.data.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터가 없습니다.</td></tr>';
-              return;
-            }
-
-            result.data.forEach((supplier) => {
-              const statusClass = supplier.사용구분 === 0 ? 'status-active' : 'status-pending';
-              const statusText = supplier.사용구분 === 0 ? '정상거래' : '거래보류';
-
-              const tr = document.createElement('tr');
-              tr.innerHTML = `
-                            <td>${supplier.매입처코드}</td>
-                            <td>${supplier.매입처명}</td>
-                            <td>${supplier.대표자명 || '-'}</td>
-                            <td>${supplier.사업자번호 || '-'}</td>
-                            <td>${supplier.전화번호 || '-'}</td>
-                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                            <td>${supplier.수정일자 || '-'}</td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="btn-icon" onclick="viewSupplier('${
-                                      supplier.매입처코드
-                                    }')">상세</button>
-                                </div>
-                            </td>
-                        `;
-              tbody.appendChild(tr);
-            });
-          } **/
-          const searchValue = document.getElementById('supplierSearch')?.value || '';
-          const tbody = document.getElementById('supplierTableBody');
-          tbody.innerHTML =
-            '<tr><td colspan="10" class="loading">데이터를 불러오는 중...</td></tr>';
-
-          // ✅ 객체 파라미터로 전달 (page, pageSize 포함)
           const result = await apiCall('/suppliers', 'GET', {
             사업장코드: currentUser.사업장코드,
             search: searchValue,
             page,
-            pageSize: 10,
+            pageSize: effectivePageSize,
           });
 
-          if (result.success) {
-            tbody.innerHTML = '';
+          if (!result.success) {
+            throw new Error(result.message || '서버 오류');
+          }
 
-            if (result.data.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="10" class="loading">데이터가 없습니다.</td></tr>';
-              return;
-            }
+          tbody.innerHTML = '';
 
-            // ✅ 행 번호 계산
-            const pageSize = 10;
-            const startNumber = (result.currentPage - 1) * pageSize + 1;
+          if (result.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">데이터가 없습니다.</td></tr>';
+            renderSupplierPagination(result.currentPage, result.totalPages);
+            return;
+          }
 
-            result.data.forEach((supplier, index) => {
-              const statusClass = supplier.사용구분 === 0 ? 'status-active' : 'status-pending';
-              const statusText = supplier.사용구분 === 0 ? '정상거래' : '거래보류';
-              const rowNumber = startNumber + index; // ✅ 페이지별 순차 번호
+          const startNumber = (result.currentPage - 1) * supplierPageSizeEffective + 1;
 
-              const tr = document.createElement('tr');
-              tr.innerHTML = `
+          result.data.forEach((supplier, index) => {
+            const statusClass = supplier.사용구분 === 0 ? 'status-active' : 'status-pending';
+            const statusText = supplier.사용구분 === 0 ? '정상거래' : '거래보류';
+            const rowNumber = startNumber + index;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
                     <td><input type="checkbox" class="supplierCheckbox" value="${
                       supplier.매입처코드
                     }"></td>
-                    <td>${rowNumber}</td>  <!-- ✅ 행 번호 추가 -->
+                    <td>${rowNumber}</td>
                     <td>${supplier.매입처코드}</td>
                     <td>${supplier.매입처명}</td>
-                    <td>${supplier.대표자명 || '-'}</td>
+                    <td>${supplier.대표자 || '-'}</td>
                     <td>${supplier.사업자번호 || '-'}</td>
                     <td>${supplier.전화번호 || '-'}</td>
                     <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                    <td>${supplier.수정일자 || '-'}</td>
+                    <td>${supplier.작성자 || '-'}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="btn-icon" onclick="viewSupplier('${
@@ -1866,21 +1926,18 @@
                         </div>
                     </td>
                 `;
-              tbody.appendChild(tr);
-            });
-          }
+            tbody.appendChild(tr);
+          });
 
-          // ✅ 페이지네이션 렌더링
           renderSupplierPagination(result.currentPage, result.totalPages);
         } catch (error) {
           console.error('매입처 목록 로드 실패:', error);
           const tbody = document.getElementById('supplierTableBody');
-          tbody.innerHTML = `<tr><td colspan="8" class="loading" style="color: red;">오류: ${error.message}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="10" class="loading" style="color: red;">오류: ${error.message}</td></tr>`;
         }
       }
 
       // 페이지네이션 렌더링
-
       function renderSupplierPagination(currentPage, totalPages) {
         const pagination = document.getElementById('supplierPagination');
         pagination.innerHTML = '';
@@ -2196,6 +2253,142 @@
           }
         } catch (error) {
           alert('발주 조회 실패: ' + error.message);
+        }
+      }
+
+      // ==================== 엑셀 내보내기 기능 ====================
+
+      // 매출처 엑셀 내보내기
+      function exportCustomersToExcel() {
+        try {
+          // 선택된 행 가져오기
+          const checkboxes = document.querySelectorAll('.customerCheckbox:checked');
+
+          if (checkboxes.length === 0) {
+            alert('선택된 매출처가 없습니다.');
+            return;
+          }
+
+          // 선택된 레코드의 데이터 수집
+          const selectedData = [];
+          checkboxes.forEach((checkbox) => {
+            const row = checkbox.closest('tr');
+            const cells = row.querySelectorAll('td');
+
+            selectedData.push({
+              번호: cells[1].textContent.trim(),
+              매출처코드: cells[2].textContent.trim(),
+              매출처명: cells[3].textContent.trim(),
+              대표자: cells[4].textContent.trim(),
+              사업자번호: cells[5].textContent.trim(),
+              연락처: cells[6].textContent.trim(),
+              거래상태: cells[7].textContent.trim(),
+              등록일: cells[8].textContent.trim(),
+            });
+          });
+
+          // 워크북 생성
+          const worksheet = XLSX.utils.json_to_sheet(selectedData);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, '매출처');
+
+          // 컬럼 너비 설정
+          worksheet['!cols'] = [
+            { wch: 8 }, // 번호
+            { wch: 12 }, // 매출처코드
+            { wch: 20 }, // 매출처명
+            { wch: 12 }, // 대표자
+            { wch: 18 }, // 사업자번호
+            { wch: 15 }, // 연락처
+            { wch: 12 }, // 거래상태
+            { wch: 12 }, // 등록일
+          ];
+
+          // 파일명 생성 (매출처_{yyyyMMdd_HHmmss}.xlsx)
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const date = String(now.getDate()).padStart(2, '0');
+          const hours = String(now.getHours()).padStart(2, '0');
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+          const seconds = String(now.getSeconds()).padStart(2, '0');
+
+          const fileName = `매출처_${year}${month}${date}_${hours}${minutes}${seconds}.xlsx`;
+
+          // 파일 다운로드
+          XLSX.writeFile(workbook, fileName);
+
+          alert(`${selectedData.length}개의 매출처 정보가 엑셀로 저장되었습니다.`);
+        } catch (error) {
+          console.error('엑셀 내보내기 오류:', error);
+          alert('엑셀 내보내기 중 오류가 발생했습니다: ' + error.message);
+        }
+      }
+
+      // 매입처 엑셀 내보내기
+      function exportSuppliersToExcel() {
+        try {
+          // 선택된 행 가져오기
+          const checkboxes = document.querySelectorAll('.supplierCheckbox:checked');
+
+          if (checkboxes.length === 0) {
+            alert('선택된 매입처가 없습니다.');
+            return;
+          }
+
+          // 선택된 레코드의 데이터 수집
+          const selectedData = [];
+          checkboxes.forEach((checkbox) => {
+            const row = checkbox.closest('tr');
+            const cells = row.querySelectorAll('td');
+
+            selectedData.push({
+              번호: cells[1].textContent.trim(),
+              매입처코드: cells[2].textContent.trim(),
+              매입처명: cells[3].textContent.trim(),
+              대표자: cells[4].textContent.trim(),
+              사업자번호: cells[5].textContent.trim(),
+              연락처: cells[6].textContent.trim(),
+              거래상태: cells[7].textContent.trim(),
+              작성자: cells[8].textContent.trim(),
+            });
+          });
+
+          // 워크북 생성
+          const worksheet = XLSX.utils.json_to_sheet(selectedData);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, '매입처');
+
+          // 컬럼 너비 설정
+          worksheet['!cols'] = [
+            { wch: 8 }, // 번호
+            { wch: 12 }, // 매입처코드
+            { wch: 20 }, // 매입처명
+            { wch: 12 }, // 대표자
+            { wch: 18 }, // 사업자번호
+            { wch: 15 }, // 연락처
+            { wch: 12 }, // 거래상태
+            { wch: 12 }, // 작성자
+          ];
+
+          // 파일명 생성 (매입처_{yyyyMMdd_HHmmss}.xlsx)
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const date = String(now.getDate()).padStart(2, '0');
+          const hours = String(now.getHours()).padStart(2, '0');
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+          const seconds = String(now.getSeconds()).padStart(2, '0');
+
+          const fileName = `매입처_${year}${month}${date}_${hours}${minutes}${seconds}.xlsx`;
+
+          // 파일 다운로드
+          XLSX.writeFile(workbook, fileName);
+
+          alert(`${selectedData.length}개의 매입처 정보가 엑셀로 저장되었습니다.`);
+        } catch (error) {
+          console.error('엑셀 내보내기 오류:', error);
+          alert('엑셀 내보내기 중 오류가 발생했습니다: ' + error.message);
         }
       }
     </script>
