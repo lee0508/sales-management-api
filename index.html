@@ -325,7 +325,7 @@
                 <th style="width: 40px;">
                   <input type="checkbox" id="selectAllCustomers" title="전체 선택" aria-label="전체 선택" />
                 </th>
-                <th style="width: 60px;">순번</th>
+                <th>순번</th>
                 <th>매출처코드</th>
                 <th>매출처명</th>
                 <th>대표자</th>
@@ -418,7 +418,24 @@
                   ">
                 <span style="font-size: 18px; margin-right: 4px;">+</span> 견적서 작성
               </button>
+              <button class="btn btn-secondary" onclick="exportQuotationsToExcel()" style="
+                  padding: 10px 20px;
+                  background: #6c757d;
+                  color: white;
+                  border: none;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  cursor: pointer;
+                ">
+                <span>&#128196;</span> Google Sheets로 내보내기
+              </button>
             </div>
+          </div>
+
+          <!-- ✅ 견적 요약 정보 -->
+          <div class="summary-bar" style="margin: 10px 0; font-size: 14px;">
+            총 견적 수: <span id="quotationCount" style="font-weight: bold;">0</span> 건
           </div>
 
           <!-- DataTable -->
@@ -426,21 +443,56 @@
             <thead>
               <tr>
                 <th style="width: 40px;"><input type="checkbox" id="selectAllQuotations" /></th>
-                <th style="width: 60px;">순번</th>
-                <th style="width: 120px;">견적번호</th>
+                <th>순번</th>
+                <th>견적번호</th>
                 <th>매출처명</th>
-                <th style="width: 100px;">견적일자</th>
-                <th style="width: 100px;">출고희망일</th>
+                <th>견적일자</th>
+                <th>출고희망일</th>
                 <th>제목</th>
-                <th style="width: 80px;">담당자</th>
-                <th style="width: 100px;">상태</th>
-                <th style="width: 180px;">관리</th>
+                <th>담당자</th>
+                <th>상태</th>
+                <th>관리</th>
               </tr>
             </thead>
-            <tbody>
-            </tbody>
-          </table>
+            <tbody id="quotationTableBody">
+            </tbody>            
+          </table>          
         </div>
+        
+
+        <!-- ✅ 견적 상세보기 모달 -->
+        <div id="quotationDetailModal" class="modal hidden">
+          <div class="modal-content large">
+            <span id="closeQuotationDetailModal" class="close">&times;</span>
+            <h2>견적 상세 보기</h2>
+            <!-- 견적 기본 정보 -->
+            <div id="quotationInfo">
+              <table class="info-table">
+                <tr><th>견적번호</th><td id="q_no"></td></tr>
+                <tr><th>견적일자</th><td id="q_date"></td></tr>
+                <tr><th>매출처명</th><td id="q_customer"></td></tr>
+                <tr><th>비고</th><td id="q_remark"></td></tr>
+              </table>
+            </div>
+
+            <!-- 견적 상세 목록 -->
+            <h3>견적 품목 내역</h3>
+            <table id="quotationDetailTable" class="display" style="width:100%">
+              <thead>
+                <tr>
+                  <th>품목코드</th>
+                  <th>품명</th>
+                  <th>규격</th>
+                  <th>수량</th>
+                  <th>단가</th>
+                  <th>금액</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
 
         <!-- 발주관리 페이지 -->
         <div class="page-content" id="orderPage">
@@ -580,6 +632,19 @@
   <script>
     // 모달을 body 직속으로 이동 (dashboard CSS 영향 회피)
     document.addEventListener('DOMContentLoaded', function () {
+      
+      const today = new Date();
+      const formatted = today.toISOString().slice(0, 10); // YYYY-MM-DD 형식
+
+      const loginDateText = document.getElementById("loginDateText");
+      const loginDatePicker = document.getElementById("loginDatePicker");
+
+      // 두 입력창 모두 오늘 날짜 자동 설정
+      if (loginDateText) loginDateText.value = formatted;
+      if (loginDatePicker) loginDatePicker.value = formatted;
+
+      console.log(`✅ 로그인 날짜 자동 설정 완료: ${formatted}`);
+      
       const customerModal = document.getElementById('customerModal');
       const supplierModal = document.getElementById('supplierModal');
 
@@ -1287,6 +1352,14 @@
           if (result.data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="loading">데이터가 없습니다.</td></tr>';
             return;
+          }
+
+          // ✅ 견적 수 표시 (요소 존재 여부 확인)
+          const countEl = document.getElementById("quotationCount");
+          if (countEl) {
+            countEl.innerText = result.total || result.data.length;
+          } else {
+            console.warn("⚠️ quotationCount element not found in DOM");
           }
 
           result.data.forEach((quotation) => {
@@ -2183,6 +2256,106 @@
         );
       } catch (error) {
         console.error('❌ Google Sheets 내보내기 오류:', error);
+        alert('내보내기 중 오류가 발생했습니다: ' + error.message);
+    }
+  }
+
+    // 견적 Google Sheets 내보내기
+    function exportQuotationsToExcel() {
+      try {
+        console.log('===== 견적 Google Sheets 내보내기 시작 =====');
+
+        const checkboxes = document.querySelectorAll('.quotationCheckbox:checked');
+
+        if (checkboxes.length === 0) {
+          alert('내보낼 견적을 선택해 주세요.');
+          return;
+        }
+
+        const selectedData = [];
+        checkboxes.forEach((checkbox) => {
+          const row = checkbox.closest('tr');
+          if (!row) return;
+          const cells = row.querySelectorAll('td');
+          if (cells.length < 9) return;
+
+          selectedData.push({
+            번호: cells[1]?.textContent.trim() || '',
+            견적번호: cells[2]?.textContent.trim() || '',
+            매출처명: cells[3]?.textContent.trim() || '',
+            견적일자: cells[4]?.textContent.trim() || '',
+            출고희망일: cells[5]?.textContent.trim() || '',
+            비고: cells[6]?.textContent.trim() || '',
+            담당자: cells[7]?.textContent.trim() || '',
+            상태: cells[8]?.textContent.trim() || '',
+          });
+        });
+
+        if (selectedData.length === 0) {
+          alert('선택한 견적 행 정보를 불러오지 못했습니다. 다시 시도해 주세요.');
+          return;
+        }
+
+        const headers = [
+          '번호',
+          '견적번호',
+          '매출처명',
+          '견적일자',
+          '출고희망일',
+          '비고',
+          '담당자',
+          '상태',
+        ];
+
+        const escapeCsv = (value) => {
+          const text = (value ?? '').replace(/"/g, '""');
+          return `"${text}"`;
+        };
+
+        let csvContent = '\uFEFF' + headers.join(',') + '\n';
+        selectedData.forEach((item) => {
+          const row = [
+            item.번호,
+            item.견적번호,
+            item.매출처명,
+            item.견적일자,
+            item.출고희망일,
+            item.비고,
+            item.담당자,
+            item.상태,
+          ].map(escapeCsv);
+          csvContent += row.join(',') + '\n';
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const date = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const fileName = `견적_${year}${month}${date}_${hours}${minutes}${seconds}.csv`;
+
+        if (navigator.msSaveBlob) {
+          navigator.msSaveBlob(blob, fileName);
+        } else {
+          link.href = URL.createObjectURL(blob);
+          link.download = fileName;
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+
+        console.log('CSV 파일 다운로드 완료:', fileName);
+        alert(
+          `${selectedData.length}개의 견적 정보가 CSV로 내려받아졌습니다.\n\nGoogle Sheets에서 불러오려면:\n1. sheets.google.com 접속\n2. 파일 > 가져오기 > 업로드\n3. 방금 다운로드한 CSV 파일 선택`,
+        );
+      } catch (error) {
+        console.error('견적 Google Sheets 내보내기 오류:', error);
         alert('내보내기 중 오류가 발생했습니다: ' + error.message);
       }
     }

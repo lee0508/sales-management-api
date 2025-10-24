@@ -1,4 +1,4 @@
-﻿// server.js - 판매 관리 서버
+// server.js - 판매 관리 서버
 const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
@@ -322,7 +322,6 @@ app.get('/api/customers/:code', async (req, res) => {
 app.post('/api/customers', async (req, res) => {
   try {
     const {
-      사업장코드,
       매출처코드,
       매출처명,
       사업자번호,
@@ -339,17 +338,12 @@ app.post('/api/customers', async (req, res) => {
       팩스번호,
       은행코드,
       계좌번호,
-      계산서발행여부,
-      계산서발행율,
       담당자명,
       사용구분,
-      사용자코드,
       비고란,
-      단가구분,
     } = req.body;
 
     console.log('===== 매출처 신규 등록 요청 =====');
-    console.log('사업장코드:', 사업장코드);
     console.log('매출처코드:', 매출처코드);
     console.log('매출처명:', 매출처명);
 
@@ -358,7 +352,6 @@ app.post('/api/customers', async (req, res) => {
 
     await pool
       .request()
-      .input('사업장코드', sql.VarChar(2), 사업장코드 || '01')
       .input('매출처코드', sql.VarChar(8), 매출처코드)
       .input('매출처명', sql.VarChar(30), 매출처명)
       .input('사업자번호', sql.VarChar(14), 사업자번호 || '')
@@ -375,22 +368,18 @@ app.post('/api/customers', async (req, res) => {
       .input('팩스번호', sql.VarChar(14), 팩스번호 || '')
       .input('은행코드', sql.VarChar(2), 은행코드 || '')
       .input('계좌번호', sql.VarChar(20), 계좌번호 || '')
-      .input('계산서발행여부', sql.TinyInt, 계산서발행여부 || 1)
-      .input('계산서발행율', sql.Money, 계산서발행율 || 100)
       .input('담당자명', sql.VarChar(30), 담당자명 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드 || '')
-      .input('비고란', sql.VarChar(100), 비고란 || '')
-      .input('단가구분', sql.TinyInt, 단가구분 || 1).query(`
+      .input('비고란', sql.VarChar(100), 비고란 || '').query(`
         INSERT INTO 매출처 (
-          사업장코드, 매출처코드, 매출처명, 사업자번호, 법인번호, 대표자명, 대표자주민번호,
+          매출처코드, 매출처명, 사업자번호, 법인번호, 대표자명, 대표자주민번호,
           개업일자, 우편번호, 주소, 번지, 업태, 업종, 전화번호, 팩스번호,
-          은행코드, 계좌번호, 계산서발행여부, 계산서발행율, 담당자명, 사용구분, 수정일자, 사용자코드, 비고란, 단가구분
+          은행코드, 계좌번호, 담당자명, 사용구분, 수정일자, 비고란
         ) VALUES (
-          @사업장코드, @매출처코드, @매출처명, @사업자번호, @법인번호, @대표자명, @대표자주민번호,
+          @매출처코드, @매출처명, @사업자번호, @법인번호, @대표자명, @대표자주민번호,
           @개업일자, @우편번호, @주소, @번지, @업태, @업종, @전화번호, @팩스번호,
-          @은행코드, @계좌번호, @계산서발행여부, @계산서발행율, @담당자명, @사용구분, @수정일자, @사용자코드, @비고란, @단가구분
+          @은행코드, @계좌번호, @담당자명, @사용구분, @수정일자, @비고란
         )
       `);
 
@@ -821,7 +810,9 @@ app.delete('/api/suppliers_delete/:code', async (req, res) => {
 // 견적 리스트
 app.get('/api/quotations', async (req, res) => {
   try {
-    const { search, 사업장코드, 상태코드, startDate, endDate } = req.query;
+    const { search, 사업장코드, 상태코드 } = req.query;
+    const startDate = req.query.startDate || req.query.start;
+    const endDate = req.query.endDate || req.query.end;
 
     let query = `
             SELECT 
@@ -1038,6 +1029,26 @@ app.post('/api/quotations_add', async (req, res) => {
   } catch (err) {
     console.error('견적 등록 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+//---------------------------------------------
+// ✅ 견적 상세 품목 목록 조회
+//---------------------------------------------
+app.get('/api/quotation/:id/details', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = `
+      SELECT 품목코드, 품명, 규격, 수량, 단가, (수량 * 단가) AS 금액
+      FROM 견적상세
+      WHERE 견적번호 = '${id}'
+      ORDER BY 품목코드;
+    `;
+    const result = await pool.request().query(query);
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    console.error('❌ 견적 상세 조회 오류:', err);
+    res.status(500).json({ success: false, message: '견적 상세 조회 실패' });
   }
 });
 
