@@ -1,4 +1,4 @@
-// server.js - 메인 서버 파일
+﻿// server.js - 판매 관리 서버
 const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
@@ -6,11 +6,13 @@ const sql = require('mssql');
 const app = express();
 const PORT = 3000;
 
+const path = require('path');
+
 // 미들웨어 설정
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+app.use(express.static(path.join(__dirname))); // index.html 및 css/js 제공
 // SQL Server 연결 설정 Dlehdgus0508@1
 const dbConfig = {
   user: 'sa',
@@ -19,7 +21,7 @@ const dbConfig = {
   database: 'YmhDB',
   options: {
     encrypt: false,
-    trustServerCertificate: true,
+    // trustServerCertificate: true,
     // enableArithAbort: true
   },
   pool: {
@@ -1430,6 +1432,243 @@ app.get('/api/inventory/:workplace', async (req, res) => {
     });
   } catch (err) {
     console.error('재고 현황 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// --------------------------
+// 거래명세서(Transactions) API 추가 (MS SQL 2008 호환)
+// --------------------------
+
+/*
+  1) 거래명세서 목록 조회
+     - 쿼리는 자재입출내역(i)에서 출고(입출고구분 = 2) 기준으로 그룹화하여 헤더 리스트 반환
+     - 입력: startDate (YYYYMMDD), endDate (YYYYMMDD), customerCode (매출처코드, optional)
+*/
+app.get('/api/transactions', async (req, res) => {
+  try {
+    // const { startDate, endDate, customerCode } = req.query;
+
+    const { startDate, endDate, customerCode, transactionNo } = req.query;
+
+    // 기본 WHERE 조건 (출고, 사용구분=0)
+    // SQL Server 2008에서는 파라미터를 사용해 안전하게 쿼리 실행
+    let sqlQuery = `
+      SELECT 
+        i.입출고일자, i.입출고번호, c.매출처명,
+        SUM(i.출고수량 * i.출고단가) AS 공급가액,
+        SUM(i.출고부가) AS 부가세,
+        SUM(i.출고수량 * i.출고단가) + SUM(i.출고부가) AS 합계금액
+      FROM 자재입출내역 i
+      LEFT JOIN 매출처 c ON i.매출처코드 = c.매출처코드
+      WHERE i.입출고구분 = 2 AND i.사용구분 = 0
+    `;
+
+    if (transactionNo) {
+      sqlQuery += ` AND i.입출고번호 = @transactionNo`;
+    } else {
+      if (startDate && endDate) sqlQuery += ` AND i.입출고일자 BETWEEN @startDate AND @endDate`;
+      if (customerCode) sqlQuery += ` AND i.매출처코드 = @customerCode`;
+    }
+
+    sqlQuery += `
+      GROUP BY i.입출고일자, i.입출고번호, c.매출처명
+      ORDER BY i.입출고일자 DESC, i.입출고번호 DESC
+    `;
+
+    const request = pool.request();
+    if (startDate) request.input('startDate', sql.VarChar(8), startDate);
+    if (endDate) request.input('endDate', sql.VarChar(8), endDate);
+    if (customerCode) request.input('customerCode', sql.VarChar(8), customerCode);
+    if (transactionNo) request.input('transactionNo', sql.Int, transactionNo);
+
+    const result = await request.query(sqlQuery);
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    console.error('거래명세서 조회 오류:', err);
+    res.status(500).json({ success: false, message: 'DB 조회 실패' });
+  }
+});
+
+/*
+  2) 거래명세서 상세 조회 (마스터의 날짜,번호로 디테일 조회)
+     - 경로: /api/transactions/:date/:no
+     - date: YYYYMMDD, no: 입출고번호 (정수 or 실수)
+*/
+app.get('/api/transactions/:date/:no', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+
+    const result = await pool
+      .request()
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고번호', sql.Real, parseFloat(no)).query(`
+        SELECT 
+          i.분류코드, i.세부코드, 
+          (i.분류코드 + i.세부코드) AS 자재코드,
+          m.자재명, m.규격, m.단위,
+          ISNULL(i.출고수량,0) AS 수량,
+          ISNULL(i.출고단가,0) AS 단가,
+          ISNULL(i.출고수량,0) * ISNULL(i.출고단가,0) AS 공급가액,
+          ISNULL(i.출고부가,0) AS 부가세,
+          (ISNULL(i.출고수량,0) * ISNULL(i.출고단가,0)) + ISNULL(i.출고부가,0) AS 합계금액,
+          i.적요
+        FROM 자재입출내역 i
+        LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
+        WHERE i.입출고일자 = @입출고일자 AND i.입출고번호 = @입출고번호
+        ORDER BY m.자재명
+      `);
+
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    console.error('거래명세서 상세 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+/*
+  3) 단가 이력 조회 (최근 1년) — 특정 매출처 + 자재코드 기준
+     - 쿼리는 BETWEEN을 사용하여 최근 1년 범위로 데이터 조회
+     - materialCode는 '분류코드+세부코드' 형태
+*/
+app.get('/api/transactions/price-history', async (req, res) => {
+  try {
+    const { customerCode, materialCode } = req.query;
+    if (!customerCode || !materialCode) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'customerCode와 materialCode가 필요합니다.' });
+    }
+
+    // 오늘 및 1년 전 날짜 계산 (JS에서 YYYYMMDD 문자열로 만든 뒤 파라미터로 전달)
+    const today = new Date();
+    const endDate = today.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+    const lastYear = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+    const startDate = lastYear.toISOString().slice(0, 10).replace(/-/g, '');
+
+    const 분류코드 = materialCode.substring(0, 2);
+    const 세부코드 = materialCode.substring(2);
+
+    const result = await pool
+      .request()
+      .input('startDate', sql.VarChar(8), startDate)
+      .input('endDate', sql.VarChar(8), endDate)
+      .input('customerCode', sql.VarChar(8), customerCode)
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드).query(`
+        SELECT 
+          i.입출고일자, c.매출처명, (i.분류코드 + i.세부코드) AS 자재코드,
+          m.자재명, ISNULL(i.출고수량,0) AS 수량, ISNULL(i.출고단가,0) AS 단가
+        FROM 자재입출내역 i
+        LEFT JOIN 매출처 c ON i.매출처코드 = c.매출처코드
+        LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
+        WHERE i.입출고구분 = 2
+          AND i.입출고일자 BETWEEN @startDate AND @endDate
+          AND i.매출처코드 = @customerCode
+          AND i.분류코드 = @분류코드 AND i.세부코드 = @세부코드
+        ORDER BY i.입출고일자 DESC
+      `);
+
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    console.error('단가 이력 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 세금계산서 발행 API
+
+app.post('/api/taxinvoice/create', async (req, res) => {
+  try {
+    const { date, no } = req.body;
+    if (!date || !no) {
+      return res.status(400).json({ success: false, message: '거래명세서 정보가 없습니다.' });
+    }
+
+    const tx = await pool
+      .request()
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고번호', sql.Real, parseFloat(no)).query(`
+        SELECT TOP 1 i.매출처코드, c.매출처명,
+          SUM(i.출고수량 * i.출고단가) AS 공급가액,
+          SUM(i.출고부가) AS 세액
+        FROM 자재입출내역 i
+        LEFT JOIN 매출처 c ON i.매출처코드 = c.매출처코드
+        WHERE i.입출고일자 = @입출고일자 AND i.입출고번호 = @입출고번호
+        GROUP BY i.매출처코드, c.매출처명
+      `);
+
+    const data = tx.recordset[0];
+    if (!data)
+      return res.status(404).json({ success: false, message: '거래명세서를 찾을 수 없습니다.' });
+
+    const 공급가액 = data.공급가액 || 0;
+    const 세액 = data.세액 || 0;
+    const 합계 = 공급가액 + 세액;
+
+    // 단순히 세금계산서 테이블에 insert (실무에서는 전자세금계산서 API 연동)
+    const invReq = await pool
+      .request()
+      .input('매출처코드', sql.VarChar(8), data.매출처코드)
+      .input('발행일자', sql.VarChar(8), date)
+      .input('거래일자', sql.VarChar(8), date)
+      .input('공급가액', sql.Decimal(12, 2), 공급가액)
+      .input('세액', sql.Decimal(12, 2), 세액)
+      .input('합계금액', sql.Decimal(12, 2), 합계).query(`
+        INSERT INTO 세금계산서 (매출처코드, 발행일자, 거래일자, 공급가액, 세액, 합계금액)
+        OUTPUT INSERTED.세금계산서번호
+        VALUES (@매출처코드, @발행일자, @거래일자, @공급가액, @세액, @합계금액)
+      `);
+
+    const invoiceNo = invReq.recordset[0].세금계산서번호;
+    res.json({ success: true, data: { invoiceNo } });
+  } catch (err) {
+    console.error('세금계산서 발행 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 거래명세서 인쇄용 데이터 조회
+app.get('/api/transactions/:date/:no/print', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+    const resultHeader = await pool
+      .request()
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고번호', sql.Real, parseFloat(no)).query(`
+        SELECT TOP 1 i.입출고일자, i.입출고번호, i.매출처코드, c.매출처명,
+          SUM(i.출고수량 * i.출고단가) AS 공급가액,
+          SUM(i.출고부가) AS 부가세,
+          SUM((i.출고수량 * i.출고단가) + i.출고부가) AS 총합계
+        FROM 자재입출내역 i
+        LEFT JOIN 매출처 c ON i.매출처코드 = c.매출처코드
+        WHERE i.입출고일자 = @입출고일자 AND i.입출고번호 = @입출고번호
+        GROUP BY i.입출고일자, i.입출고번호, i.매출처코드, c.매출처명
+      `);
+
+    const resultDetail = await pool
+      .request()
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고번호', sql.Real, parseFloat(no)).query(`
+        SELECT (i.분류코드 + i.세부코드) AS 자재코드, m.자재명, m.규격, m.단위,
+          i.출고수량 AS 수량, i.출고단가 AS 단가,
+          (i.출고수량 * i.출고단가) AS 공급가액,
+          i.출고부가 AS 부가세,
+          (i.출고수량 * i.출고단가 + i.출고부가) AS 합계금액
+        FROM 자재입출내역 i
+        LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
+        WHERE i.입출고일자 = @입출고일자 AND i.입출고번호 = @입출고번호
+      `);
+
+    res.json({
+      success: true,
+      data: {
+        header: resultHeader.recordset[0],
+        details: resultDetail.recordset,
+      },
+    });
+  } catch (err) {
+    console.error('거래명세서 인쇄 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });

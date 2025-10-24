@@ -487,6 +487,7 @@ body {
   cursor: pointer;
 }
 
+/*
 .table-container {
   background: var(--bg-white);
   border-radius: 12px;
@@ -496,8 +497,7 @@ body {
   display: flex;
   flex-direction: column;
   margin-bottom: 12px;
-  height: 500px;
-  /* ⭐ 고정 높이 설정 (필요시 조정) */
+  height: 500px; 
 }
 
 .data-table {
@@ -515,16 +515,19 @@ body {
   width: 100%;
   table-layout: fixed;
 }
+  
 
-/**
-      .data-table th {
-        padding: 16px;
-        text-align: left;
-        font-weight: 600;
-        font-size: 13px;
-        color: var(--text-gray);
-        border-bottom: 2px solid var(--border);
-      } **/
+.data-table th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-gray);
+  border-bottom: 2px solid var(--border);
+}
+*/
+
+/*
 .data-table th {
   padding: 12px 16px;
   text-align: left;
@@ -536,22 +539,18 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+*/
 
 /* 테이블 바디 - 스크롤 적용 */
+
+/*
 .data-table tbody {
   display: block;
   overflow-y: auto;
-  /* ⭐ 스크롤바 표시 */
   overflow-x: hidden;
   flex: 1;
   width: 100%;
 }
-
-/* .data-table td {
-        padding: 16px;
-        font-size: 14px;
-        border-bottom: 1px solid var(--border);
-      } */
 
 .data-table td {
   padding: 12px 16px;
@@ -561,10 +560,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-/* .data-table tbody tr {
-        transition: background 0.2s ease;
-      }*/
 
 .data-table tbody tr {
   display: table;
@@ -577,10 +572,8 @@ body {
   background: var(--bg-light);
 }
 
-/* 스크롤바 커스텀 스타일 */
 .data-table tbody::-webkit-scrollbar {
   width: 10px;
-  /* ⭐ 스크롤바 너비 증가 */
 }
 
 .data-table tbody::-webkit-scrollbar-track {
@@ -595,6 +588,7 @@ body {
 .data-table tbody::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+*/
 
 /* Firefox 스크롤바 */
 .data-table tbody {
@@ -625,6 +619,7 @@ body {
   color: #1e40af;
 }
 
+/*
 .action-buttons {
   display: flex;
   gap: 8px;
@@ -639,11 +634,88 @@ body {
   font-size: 12px;
   transition: all 0.2s ease;
 }
+*/
 
+/* 관리 버튼 컨테이너 */
+.action-buttons {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  min-width: 80px; /* 버튼 3개가 들어갈 수 있는 최소 너비 */
+}
+
+/* 기본 버튼 스타일 */
+.btn-icon {
+  padding: 6px 8px;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  min-width: 60px;
+  text-align: center;
+}
+
+/*
 .btn-icon:hover {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
+} */
+
+/* 상세 버튼 (파란색) */
+.btn-view {
+  background: var(--primary);
+}
+
+.btn-view:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+
+/* 수정 버튼 (초록색) */
+.btn-edit {
+  background: #28a745;
+}
+
+.btn-edit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+/* 삭제 버튼 (빨간색) */
+.btn-delete {
+  background: #dc3545;
+}
+
+.btn-delete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
+
+/* 버튼 클릭 효과 */
+.btn-icon:active {
+  transform: translateY(0);
+}
+
+/* 비활성화 버튼 */
+.btn-icon:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn-icon:disabled:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .form-control {
@@ -660,13 +732,6 @@ body {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
-
-/* .pagination {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        margin-top: 24px;
-      }*/
 
 /* 페이지네이션 - 크기 고정 */
 .pagination {
@@ -751,19 +816,14 @@ body {
   }
 }
 
-/* 추가적인 스타일 필요 시 여기에 작성 */
-/* 1. Table Container - 높이 차지 */
 .table-container {
   background: var(--bg-white);
   border-radius: 12px;
   border: 1px solid var(--border);
   overflow: hidden;
   flex: 1;
-  /* ⭐ 남은 공간 차지 */
   display: flex;
-  /* ⭐ Flexbox */
   flex-direction: column;
-  /* ⭐ 수직 배치 */
   margin-bottom: 12px;
 }
 
@@ -771,28 +831,20 @@ body {
   height: 100%;
 }
 
-/* 2. Data Table - Flex 레이아웃 */
 .data-table {
   width: 100%;
   border-collapse: collapse;
   display: flex;
-  /* ⭐ Flexbox */
   flex-direction: column;
-  /* ⭐ 수직 배치 */
   height: 100%;
-  /* ⭐ 전체 높이 */
 }
 
-/* 3. Table Header - 고정 */
 .data-table thead {
   background: var(--bg-light);
   flex-shrink: 0;
-  /* ⭐ 크기 고정 */
   display: table;
-  /* ⭐ 테이블 디스플레이 */
   width: 100%;
   table-layout: fixed;
-  /* ⭐ 컬럼 너비 고정 */
 }
 
 .data-table th {
@@ -807,14 +859,10 @@ body {
   text-overflow: ellipsis;
 }
 
-/* 4. Table Body - 스크롤 */
 .data-table tbody {
   display: block;
-  /* ⭐ 블록 레이아웃 */
   overflow-y: auto;
-  /* ⭐ 수직 스크롤 */
   flex: 1;
-  /* ⭐ 남은 공간 차지 */
   width: 100%;
 }
 
@@ -829,10 +877,8 @@ body {
 
 .data-table tbody tr {
   display: table;
-  /* ⭐ 테이블 디스플레이 */
   width: 100%;
   table-layout: fixed;
-  /* ⭐ 컬럼 너비 고정 */
   transition: background 0.2s ease;
 }
 
@@ -840,15 +886,12 @@ body {
   background: var(--bg-light);
 }
 
-/* 5. Pagination - 크기 고정 */
 .pagination {
   display: flex;
   justify-content: center;
   gap: 8px;
   margin-top: 12px;
-  /* ⭐ 축소 (24px → 12px) */
   flex-shrink: 0;
-  /* ⭐ 크기 고정 */
   flex-wrap: wrap;
 }
 
@@ -875,7 +918,6 @@ body {
   border-color: var(--primary);
 }
 
-/* 6. Scrollbar - 커스톰 스타일 */
 .data-table tbody::-webkit-scrollbar {
   width: 8px;
 }
@@ -893,7 +935,6 @@ body {
   background: #94a3b8;
 }
 
-/* 7. 컬럼 너비 - 매출처관리 (총 880px) */
 #customerPage .data-table th:nth-child(1),
 #customerPage .data-table td:nth-child(1) {
   width: 40px;
@@ -950,7 +991,7 @@ body {
 
 #customerPage .data-table th:nth-child(10),
 #customerPage .data-table td:nth-child(10) {
-  width: 80px;
+  width: 120px;
   max-width: 80px;
 }
 
@@ -1011,6 +1052,315 @@ body {
 
 #supplierPage .data-table th:nth-child(10),
 #supplierPage .data-table td:nth-child(10) {
-  width: 80px;
+  width: 120px;
   max-width: 80px;
+}
+
+/* 모달 강제 표시 - dashboard 내부에서도 작동하도록 */
+#customerModal,
+#supplierModal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 99999 !important;
+}
+
+/* onstyles.css 파일에 추가하거나 수정할 CSS */
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  margin-top: 16px;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 1200px;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.data-table thead th {
+  background: var(--bg-light);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-dark);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.data-table tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-dark);
+  white-space: nowrap;
+}
+
+.data-table th:nth-child(1),  /* 체크박스 */
+.data-table td:nth-child(1) {
+  width: 40px;
+  text-align: center;
+}
+
+.data-table th:nth-child(2),  /* 번호 */
+.data-table td:nth-child(2) {
+  width: 60px;
+  text-align: center;
+}
+
+.data-table th:nth-child(3),  /* 매출처코드 */
+.data-table td:nth-child(3) {
+  width: 100px;
+}
+
+.data-table th:nth-child(4),  /* 매출처명 */
+.data-table td:nth-child(4) {
+  min-width: 150px;
+  max-width: 200px;
+}
+
+.data-table th:nth-child(5),  /* 대표자 */
+.data-table td:nth-child(5) {
+  width: 100px;
+}
+
+.data-table th:nth-child(6),  /* 사업자번호 */
+.data-table td:nth-child(6) {
+  width: 130px;
+}
+
+.data-table th:nth-child(7),  /* 연락처 */
+.data-table td:nth-child(7) {
+  width: 130px;
+}
+
+.data-table th:nth-child(8),  /* 거래상태 */
+.data-table td:nth-child(8) {
+  width: 100px;
+  text-align: center;
+}
+
+.data-table th:nth-child(9),  /* 등록일 */
+.data-table td:nth-child(9) {
+  width: 110px;
+  text-align: center;
+}
+
+.data-table th:nth-child(10), /* 관리 */
+.data-table td:nth-child(10) {
+  width: 100px;
+  text-align: center;
+  padding-right: 20px; /* 오른쪽 여백 추가 */
+}
+
+/* 관리 버튼 스타일 */
+
+/*
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-icon {
+  padding: 6px 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-icon:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+*/
+
+/* 상태 뱃지 */
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-pending {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-completed {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* 로딩 및 빈 데이터 표시 */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-gray);
+  font-size: 14px;
+}
+
+/* 체크박스 스타일 */
+input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* 반응형: 작은 화면에서는 가로 스크롤 표시 */
+@media screen and (max-width: 1400px) {
+  .data-table {
+    min-width: 1400px; /* 작은 화면에서 더 넓은 최소 너비 */
+  }
+
+  .table-container {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  /* 스크롤바 스타일 */
+  .table-container::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+}
+
+/* 관리 칼럼 너비 조정 */
+.data-table thead th:nth-child(10) {
+  width: 180px; /* 버튼 3개를 위한 너비 확장 */
+  text-align: center;
+  min-width: 180px;
+}
+
+.data-table tbody td:nth-child(10) {
+  text-align: center;
+  min-width: 180px;
+}
+
+/* 테이블 최소 너비 조정 */
+.data-table {
+  min-width: 1300px;
+}
+
+/* 체크박스 스타일 개선 */
+.customerCheckbox,
+.supplierCheckbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+/* 전체 선택 체크박스 */
+#selectAllCustomers,
+#selectAllSuppliers {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+/* 테이블 행 선택 시 하이라이트 */
+.data-table tbody tr:has(.customerCheckbox:checked),
+.data-table tbody tr:has(.supplierCheckbox:checked) {
+  background-color: #e7f3ff;
+}
+
+/* 거래명세서 미리보기 모달 */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.modal-content {
+  background: #fff;
+  margin: 5% auto;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  animation: fadeIn 0.3s;
+}
+
+.close {
+  float: right;
+  font-size: 24px;
+  cursor: pointer;
+  color: #555;
+}
+
+.close:hover {
+  color: #000;
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.preview-table th,
+.preview-table td {
+  border: 1px solid #ddd;
+  padding: 6px;
+  text-align: center;
+}
+
+.preview-table th {
+  background-color: #f0f0f0;
+}
+
+.preview-total {
+  text-align: right;
+  margin-top: 10px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

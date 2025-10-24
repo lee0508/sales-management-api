@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
@@ -10,7 +10,7 @@
     <script src="js/customer.js" defer></script>
     <script src="js/supplier.js" defer></script>
     <script src="js/postoffice.js" defer></script>
-    <!-- <script src="js/transaction.js" defer></script> -->
+    <script src="js/transaction.js" defer></script>
 
     <link rel="stylesheet" href="css/onstyles.css" />
   </head>
@@ -26,7 +26,7 @@
         <form id="loginForm">
           <div class="form-group">
             <label for="loginDateText">접속일자</label>
-            <div style="display: flex; gap: 12px; align-items: center">
+            <div style="display: flex; gap: 12px; align-items: center;">
               <input
                 type="text"
                 id="loginDateText"
@@ -34,12 +34,12 @@
                 placeholder="YYYY-MM-DD 직접 입력"
                 autocomplete="off"
               />
-              <div style="position: relative; flex: 1">
+              <div style="position: relative; flex: 1;">
                 <input
                   type="date"
                   id="loginDatePicker"
                   class="form-input"
-                  style="padding-right: 44px"
+                  style="padding-right: 44px;"
                 />
                 <button
                   type="button"
@@ -91,7 +91,6 @@
               id="password"
               class="form-input"
               placeholder="비밀번호를 입력하세요"
-              autocomplete="current-password"
               required
             />
           </div>
@@ -144,7 +143,7 @@
             현금출납장관리 -> Cash receipt and disbursement management
             세금계산서관리 -> Tax invoice management
             -->
-            <div class="submenu" id="jangbuSubmenu">
+            <div class="submenu" id="salesSubmenu">
               <a class="submenu-link" onclick="showPage('item-catagory')">매입처장부관리</a>
               <a class="submenu-link" onclick="showPage('item-history')">매출처장부관리</a>
               <a class="submenu-link" onclick="showPage('item-stock')">미수금관리</a>
@@ -207,7 +206,7 @@
               자재관리
               <span class="arrow">▼</span>
             </a>
-            <div class="submenu" id="itemsSubmenu">
+            <div class="submenu" id="salesSubmenu">
               <a class="submenu-link" onclick="showPage('item-catagory')">자재분류관리</a>
               <a class="submenu-link" onclick="showPage('item-history')">자재내역관리</a>
               <a class="submenu-link" onclick="showPage('item-stock')">자재재고관리</a>
@@ -227,7 +226,7 @@
               회계관리
               <span class="arrow">▼</span>
             </a>
-            <div class="submenu" id="accountSubmenu">
+            <div class="submenu" id="salesSubmenu">
               <a class="submenu-link" onclick="showPage('account-catagory')">회계개정관리</a>
               <a class="submenu-link" onclick="showPage('account-history')">현금출납내역관리</a>
               <a class="submenu-link" onclick="showPage('total-balnace')">합계잔액시산표</a>
@@ -248,7 +247,7 @@
               출력물관리
               <span class="arrow">▼</span>
             </a>
-            <div class="submenu" id="printSubmenu">
+            <div class="submenu" id="salesSubmenu">
               <a class="submenu-link" onclick="showPage('itembook-printMenu')">자재대장출력관리</a>
               <a class="submenu-link" onclick="showPage('salesbook-printMenu')">매출처출력관리</a>
               <a class="submenu-link" onclick="showPage('quotation-printMenu')">매입처출력관리</a>
@@ -277,7 +276,7 @@
               설정관리
               <span class="arrow">▼</span>
             </a>
-            <div class="submenu" id="settingSubmenu">
+            <div class="submenu" id="salesSubmenu">
               <a class="submenu-link" onclick="showPage('paper-setting')">용지설정관리</a>
               <a class="submenu-link" onclick="showPage('salespaper-setting')"
                 >거래명세서설정관리</a
@@ -566,19 +565,11 @@
           <div class="page-content" id="transactionPage">
             <div class="toolbar">
               <div class="toolbar-left">
-                <!-- 거래명세서 번호 입력 -->
-                <input type="text" id="transactionNo" class="form-input" placeholder="거래명세서 번호 입력" style="width:140px;" />
-
-                <!-- 기준일자 -->
-                <input type="date" id="transactionDate" class="form-input" />
-
-                <!-- 거래처 선택 -->
-                <select id="customerSelect" class="form-input">
-                    <option value="">전체 거래처</option>
-                </select>
-
-                <!-- 조회 버튼 -->
-                <button class="btn btn-secondary" onclick="loadTransactions()">조회</button>
+                <input type="date" class="form-control" style="width: 180px" />
+                <span style="padding: 0 8px">~</span>
+                <input type="date" class="form-control" style="width: 180px" />
+                <button class="btn btn-secondary">조회</button>
+              </div>
               <div class="toolbar-right">
                 <button class="btn btn-success"><span>+</span> 거래명세서 작성</button>
                 <button class="btn btn-secondary"><span>📄</span> 출력</button>
@@ -824,12 +815,12 @@
         const input = document.getElementById('loginDatePicker');
         if (!input) return;
 
-        if (typeof input.showPicker === 'function') {
-          input.showPicker();
-        } else {
-          input.focus();
-        }
+      if (typeof input.showPicker === 'function') {
+        input.showPicker();
+      } else {
+        input.focus();
       }
+    }
 
       const loginDateTextInput = document.getElementById('loginDateText');
       const loginDatePickerInput = document.getElementById('loginDatePicker');
@@ -2693,240 +2684,315 @@
         </form>
       </div>
     </div>
+  </body>
+</html>
 
-    <!-- ========================= -->
-    <!-- 거래명세서관리 페이지 -->
-    <!-- ========================= -->
-    <div class="page-content" id="transactionPage">
-      <div class="toolbar">
-        <div class="toolbar-left">
-          <!-- 기준일자 -->
-          <input type="date" id="transactionDate" class="form-input" />
-          <!-- 거래처 선택 -->
-          <select id="customerSelect" class="form-input">
-            <option value="">전체 거래처</option>
-          </select>
-          <button class="btn btn-secondary" onclick="loadTransactions()">조회</button>
-        </div>
-        <div class="toolbar-right">
-          <button class="btn btn-success" onclick="openTransactionModal()">
-            <span>+</span> 신규 등록
-          </button>
-        </div>
+<!-- ========================================================= -->
+<!-- 거래명세서관리 개선안 (UI & Modal & Script Hook Snippet) -->
+<!-- ========================================================= -->
+
+<!-- head 영역에 추가할 스크립트 -->
+<script src="js/transaction.js" defer></script>
+
+<!-- 거래명세서관리 섹션 (기존 transactionPage 대체용) -->
+<div class="page-content" id="transactionPage">
+  <div class="toolbar">
+    <div class="toolbar-left" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+      <div style="display: flex; gap: 8px; align-items: center">
+        <label for="transactionStartDate" style="font-size: 14px; color: var(--text-gray)">거래일자</label>
+        <input type="date" id="transactionStartDate" class="form-control" style="width: 150px" />
+        <span style="padding: 0 4px; color: var(--text-gray)">~</span>
+        <input type="date" id="transactionEndDate" class="form-control" style="width: 150px" />
+        <button class="btn btn-tertiary" id="transactionTodayBtn" type="button">오늘</button>
+        <button class="btn btn-tertiary" id="transactionWeekBtn" type="button">7일</button>
+        <button class="btn btn-tertiary" id="transactionMonthBtn" type="button">1개월</button>
       </div>
+      <div style="display: flex; gap: 8px; align-items: center">
+        <input
+          type="text"
+          id="transactionKeyword"
+          class="form-control"
+          style="width: 220px"
+          placeholder="거래처명 또는 코드 검색"
+        />
+        <button class="btn btn-secondary" id="transactionSearchBtn" type="button">조회</button>
+        <button class="btn btn-light" id="transactionResetBtn" type="button">초기화</button>
+      </div>
+    </div>
+    <div class="toolbar-right" style="display: flex; gap: 8px">
+      <button class="btn btn-success" id="transactionCreateBtn" type="button">
+        <span>+</span> 거래명세서 등록
+      </button>
+      <button class="btn btn-secondary" id="transactionExportBtn" type="button">
+        <span>📄</span> 엑셀
+      </button>
+    </div>
+  </div>
 
-      <!-- 거래명세서 목록 -->
-      <div class="table-container">
+  <div class="transaction-layout" style="display: flex; gap: 24px; align-items: stretch; margin-top: 24px">
+    <section
+      class="transaction-panel"
+      style="
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.05);
+        padding: 20px;
+      "
+    >
+      <header
+        class="panel-header"
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px"
+      >
+        <div>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--text-dark)">거래명세서 목록</h3>
+          <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-gray)">
+            조회 조건에 해당하는 거래명세서 헤더 목록입니다.
+          </p>
+        </div>
+        <div style="display: flex; gap: 12px">
+          <span
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              font-size: 12px;
+              background: var(--bg-light);
+              color: var(--text-gray);
+              padding: 6px 12px;
+              border-radius: 999px;
+            "
+          >
+            총 건수
+            <strong id="transactionTotalCount" style="font-size: 14px; color: var(--text-dark)">0</strong>
+          </span>
+          <span
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              font-size: 12px;
+              background: var(--bg-light);
+              color: var(--text-gray);
+              padding: 6px 12px;
+              border-radius: 999px;
+            "
+          >
+            총 금액
+            <strong id="transactionTotalAmount" style="font-size: 14px; color: var(--primary)">0</strong>
+          </span>
+        </div>
+      </header>
+
+      <div class="table-container" style="flex: 1">
         <table class="data-table" id="transactionHeaderTable">
           <thead>
             <tr>
-              <th><input type="checkbox" id="selectAllTransactions" /></th>
-              <th>거래번호</th>
-              <th>거래일자</th>
-              <th>거래처명</th>
-              <th>공급가액</th>
-              <th>부가세</th>
-              <th>합계금액</th>
-              <th>담당자</th>
-              <th>비고</th>
+              <th style="width: 120px">거래일자</th>
+              <th style="width: 140px">문서번호</th>
+              <th style="width: 200px">거래처명</th>
+              <th style="width: 140px">거래처코드</th>
+              <th style="width: 120px">담당자</th>
+              <th style="width: 140px">공급가액</th>
+              <th style="width: 120px">부가세</th>
+              <th style="width: 140px">합계금액</th>
+              <th style="width: 120px">상태</th>
             </tr>
           </thead>
           <tbody id="transactionHeaderBody">
             <tr>
-              <td colspan="9" class="loading">데이터를 불러오는 중...</td>
+              <td colspan="9" class="loading">조회 조건을 선택하고 조회 버튼을 눌러 주세요.</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- 거래명세서 상세내역 -->
-      <div class="table-container" style="margin-top: 20px">
-        <h4>📦 상세 품목 내역</h4>
+      <div class="pagination" id="transactionPagination" style="margin-top: 16px"></div>
+    </section>
+
+    <section
+      class="transaction-panel"
+      style="
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.05);
+        padding: 20px;
+      "
+    >
+      <header
+        class="panel-header"
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px"
+      >
+        <div>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--text-dark)">상세 내역</h3>
+          <p id="transactionDetailTitle" style="margin: 4px 0 0; font-size: 13px; color: var(--text-gray)">
+            상단 목록에서 거래명세서를 선택하면 상세가 표시됩니다.
+          </p>
+        </div>
+        <div style="display: flex; gap: 12px">
+          <span
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              font-size: 12px;
+              background: var(--bg-light);
+              color: var(--text-gray);
+              padding: 6px 12px;
+              border-radius: 999px;
+            "
+          >
+            품목 수
+            <strong id="transactionDetailCount" style="font-size: 14px; color: var(--text-dark)">0</strong>
+          </span>
+          <span
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              font-size: 12px;
+              background: var(--bg-light);
+              color: var(--text-gray);
+              padding: 6px 12px;
+              border-radius: 999px;
+            "
+          >
+            합계 수량
+            <strong id="transactionDetailQuantity" style="font-size: 14px; color: var(--primary)">0</strong>
+          </span>
+        </div>
+      </header>
+
+      <div class="table-container" style="flex: 1">
         <table class="data-table" id="transactionDetailTable">
           <thead>
             <tr>
-              <th>품목코드</th>
-              <th>품명</th>
-              <th>규격</th>
-              <th>단위</th>
-              <th>수량</th>
-              <th>단가</th>
-              <th>공급가액</th>
-              <th>부가세</th>
-              <th>합계금액</th>
-              <th>단가조회</th>
+              <th style="width: 160px">자재분류</th>
+              <th style="width: 200px">자재명</th>
+              <th style="width: 120px">규격</th>
+              <th style="width: 100px">단위</th>
+              <th style="width: 120px">자재시세</th>
+              <th style="width: 120px">수량</th>
+              <th style="width: 120px">단가</th>
+              <th style="width: 140px">공급가액</th>
+              <th style="width: 140px">입출내역</th>
+              <th style="width: 140px">비고</th>
             </tr>
           </thead>
           <tbody id="transactionDetailBody">
             <tr>
-              <td colspan="10" class="loading">거래명세서를 선택하세요.</td>
+              <td colspan="10" class="loading">상세를 보려면 목록에서 거래명세서를 선택하세요.</td>
             </tr>
           </tbody>
         </table>
       </div>
+    </section>
+  </div>
+</div>
+
+<!-- 거래명세서 등록 모달 -->
+<div id="transactionModal" class="modal-overlay" style="display: none">
+  <div class="modal-content large">
+    <div class="modal-header">
+      <h2 id="transactionModalTitle">거래명세서 등록</h2>
+      <button type="button" class="modal-close" onclick="closeTransactionModal()">×</button>
     </div>
 
-    <!-- ========================= -->
-    <!-- 거래명세서 신규등록 모달 -->
-    <!-- ========================= -->
-    <div id="transactionModal" class="modal hidden">
-      <div class="modal-content">
-        <h3>거래명세서 신규등록</h3>
-
-        <div class="form-group">
-          <label>거래일자</label>
-          <input type="date" id="newTransactionDate" />
-        </div>
-
-        <div class="form-group">
-          <label>매출처</label>
-          <div style="display: flex; gap: 8px">
-            <input type="text" id="newCustomerName" placeholder="매출처 선택" readonly />
-            <button class="btn btn-secondary" onclick="openCustomerModal()">조회</button>
+    <form id="transactionForm">
+      <section class="modal-section">
+        <h3>기본 정보</h3>
+        <div class="form-grid two-columns">
+          <div class="form-group">
+            <label for="transactionDate">거래일자 *</label>
+            <input type="date" id="transactionDate" name="transactionDate" required />
+          </div>
+          <div class="form-group">
+            <label for="transactionDocumentNo">문서번호</label>
+            <input type="text" id="transactionDocumentNo" name="transactionDocumentNo" placeholder="자동 생성 또는 직접 입력" />
+          </div>
+          <div class="form-group">
+            <label for="transactionCustomerCode">거래처 코드 *</label>
+            <div class="input-with-button">
+              <input type="text" id="transactionCustomerCode" name="transactionCustomerCode" required />
+              <button type="button" class="btn btn-tertiary" id="transactionCustomerSearchBtn">검색</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="transactionCustomerName">거래처명 *</label>
+            <input type="text" id="transactionCustomerName" name="transactionCustomerName" required />
+          </div>
+          <div class="form-group">
+            <label for="transactionSalesUser">담당자</label>
+            <input type="text" id="transactionSalesUser" name="transactionSalesUser" />
+          </div>
+          <div class="form-group">
+            <label for="transactionMemo">비고</label>
+            <input type="text" id="transactionMemo" name="transactionMemo" />
           </div>
         </div>
+      </section>
 
-        <div class="form-group">
-          <label>자재추가</label>
-          <button class="btn btn-primary" onclick="openItemModal()">자재조회</button>
+      <section class="modal-section">
+        <div class="modal-section-header">
+          <h3>자재 내역</h3>
+          <button type="button" class="btn btn-tertiary" id="transactionAddItemBtn">+ 품목 추가</button>
         </div>
 
-        <div id="newTransactionItems"></div>
-
-        <div style="margin-top: 16px; text-align: right">
-          <button class="btn btn-success" onclick="saveTransaction()">저장</button>
-          <button class="btn btn-secondary" onclick="closeTransactionModal()">닫기</button>
+        <div class="table-container compact">
+          <table class="data-table" id="transactionItemTable">
+            <thead>
+              <tr>
+                <th style="width: 160px">자재분류</th>
+                <th style="width: 220px">자재명</th>
+                <th style="width: 120px">규격</th>
+                <th style="width: 100px">단위</th>
+                <th style="width: 120px">시세</th>
+                <th style="width: 120px">수량</th>
+                <th style="width: 120px">단가</th>
+                <th style="width: 140px">공급가액</th>
+                <th style="width: 140px">입출내역</th>
+                <th style="width: 60px">삭제</th>
+              </tr>
+            </thead>
+            <tbody id="transactionItemBody">
+              <tr class="empty-row">
+                <td colspan="10" class="loading">품목을 추가해 주세요.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- ========================= -->
-    <!-- 자재조회 모달 -->
-    <!-- ========================= -->
-    <div id="itemModal" class="modal hidden">
-      <div class="modal-content">
-        <h3>자재 조회</h3>
-        <input type="text" id="itemSearch" placeholder="자재명 또는 코드 검색..." />
-        <button class="btn btn-secondary" onclick="searchItems()">검색</button>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>코드</th>
-              <th>자재명</th>
-              <th>규격</th>
-              <th>단위</th>
-              <th>선택</th>
-            </tr>
-          </thead>
-          <tbody id="itemTableBody">
-            <tr>
-              <td colspan="5">검색 결과가 없습니다.</td>
-            </tr>
-          </tbody>
-        </table>
-        <div style="text-align: right">
-          <button class="btn btn-secondary" onclick="closeItemModal()">닫기</button>
+      <section class="modal-section footer-section">
+        <div class="footer-summary">
+          <span>총 품목 <strong id="transactionModalItemCount">0</strong> 건</span>
+          <span>총 수량 <strong id="transactionModalTotalQty">0</strong></span>
+          <span>총 금액 <strong id="transactionModalTotalAmount">0</strong></span>
         </div>
-      </div>
-    </div>
-
-    <!-- ========================= -->
-    <!-- 매출처조회 모달 -->
-    <!-- ========================= -->
-    <div id="customerModal" class="modal hidden">
-      <div class="modal-content">
-        <h3>매출처 조회</h3>
-        <input type="text" id="customerSearchSimple" placeholder="매출처명 검색..." />
-        <button class="btn btn-secondary" onclick="searchCustomers()">검색</button>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>코드</th>
-              <th>매출처명</th>
-              <th>사업자번호</th>
-              <th>연락처</th>
-              <th>선택</th>
-            </tr>
-          </thead>
-          <tbody id="customerTableBodyModal">
-            <tr>
-              <td colspan="5">검색 결과가 없습니다.</td>
-            </tr>
-          </tbody>
-        </table>
-        <div style="text-align: right">
-          <button class="btn btn-secondary" onclick="closeCustomerModal()">닫기</button>
+        <div class="footer-actions">
+          <button type="button" class="btn btn-light" onclick="closeTransactionModal()">취소</button>
+          <button type="submit" class="btn btn-primary">저장</button>
         </div>
-      </div>
-    </div>
+      </section>
+    </form>
+  </div>
+</div>
 
-    <!-- ========================= -->
-    <!-- 단가조회 모달 -->
-    <!-- ========================= -->
-    <div id="priceModal" class="modal hidden">
-      <div class="modal-content">
-        <h3>최근 1년 거래단가 조회</h3>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>거래일자</th>
-              <th>매출처</th>
-              <th>자재명</th>
-              <th>수량</th>
-              <th>단가</th>
-            </tr>
-          </thead>
-          <tbody id="priceTableBody">
-            <tr>
-              <td colspan="5">데이터를 불러오는 중...</td>
-            </tr>
-          </tbody>
-        </table>
-        <div style="text-align: right">
-          <button class="btn btn-secondary" onclick="closePriceModal()">닫기</button>
-        </div>
-      </div>
-    </div>
+<!-- showPage 매핑 변경 -->
+<script>
+  const transactionPageMapEntry = {
+    element: 'transactionPage',
+    title: '거래명세서관리',
+    menu: 'sales',
+    loadFunc: loadTransactionPage,
+  };
+</script>
 
-    <!-- 거래명세서 미리보기 모달 style="width: 800px" -->
-    <div id="previewModal" class="modal">
-      <div class="modal-content" style="display:none;">
-        <span class="close" onclick="closePreviewModal()">&times;</span>
-        <h2>거래명세서 미리보기</h2>
 
-        <div id="previewHeader">
-          <p><strong>거래일자:</strong> <span id="previewDate"></span></p>
-          <p><strong>거래번호:</strong> <span id="previewNo"></span></p>
-          <p><strong>거래처명:</strong> <span id="previewCustomer"></span></p>
-        </div>
-
-        <table class="table preview-table">
-          <thead>
-            <tr>
-              <th>자재명</th>
-              <th>규격</th>
-              <th>단위</th>
-              <th>수량</th>
-              <th>단가</th>
-              <th>공급가액</th>
-              <th>부가세</th>
-              <th>합계금액</th>
-            </tr>
-          </thead>
-          <tbody id="previewBody"></tbody>
-        </table>
-
-        <div class="preview-total">
-          <p><strong>총 공급가액:</strong> <span id="previewSubtotal"></span> 원</p>
-          <p><strong>총 부가세:</strong> <span id="previewTax"></span> 원</p>
-          <p><strong>총 합계금액:</strong> <span id="previewTotal"></span> 원</p>
-        </div>
-
-        <div style="text-align: right; margin-top: 15px">
-          <button class="btn btn-primary" onclick="printPreview()">🖨 인쇄</button>
-          <button class="btn btn-secondary" onclick="closePreviewModal()">닫기</button>
-        </div>
-      </div>
-    </div>
-  </body>
-</html>

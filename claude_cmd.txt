@@ -1,0 +1,29 @@
+// 브라우저 콘솔에서 실행
+const modal = document.getElementById('supplierModal');
+modal.style.display = 'flex';
+modal.style.position = 'fixed';
+modal.style.top = '0';
+modal.style.left = '0';
+modal.style.width = '100%';
+modal.style.height = '100%';
+modal.style.zIndex = '9999';
+modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+
+
+/* 반응형: 작은 화면 대응 */
+@media screen and (max-width: 1400px) {
+  .action-buttons {
+    gap: 4px;
+  }
+
+  .btn-icon {
+    padding: 5px 10px;
+    font-size: 11px;
+    min-width: 45px;
+  }
+
+  .data-table thead th:nth-child(10),
+  .data-table tbody td:nth-child(10) {
+    min-width: 160px;
+  }
+}
