@@ -1,150 +1,126 @@
-/**
- * 매출처 모달 열기 (신규 등록)
- */
-function openCustomerModal() {
-  console.log('===== 매출처 신규 등록 모달 열기 =====');
+// ✅ [REPLACE] js/customer.js — 전체 교체
+// 주석: DataTables 공통 초기화(initDataTable) 사용 + 서버 응답 스키마 호환 + 상대경로 사용
+$(document).ready(function () {
+  let table;
 
-  const modal = document.getElementById('customerModal');
-  if (!modal) {
-    console.error('❌ 모달을 찾을 수 없습니다.');
-    return;
+  function loadCustomers() {
+    // 기존 인스턴스가 있으면 파괴 후 재생성
+    if (table) table.destroy();
+
+    // ✅ 공통 초기화 함수 사용 (dataTableInit.js) — server.js의 {data:[...]} 스키마와 호환
+    // ✅ 절대 경로 사용하여 포트 3000 서버로 요청
+    table = initDataTable('customerTable', 'http://localhost:3000/api/customers', [
+      {
+        // 선택 체크박스
+        data: null,
+        orderable: false,
+        className: 'text-center',
+        render: function (data, type, row) {
+          return '<input type="checkbox" class="customerCheckbox" data-code="' + row.매출처코드 + '" />';
+        },
+      },
+      {
+        // 순번
+        data: null,
+        orderable: false,
+        className: 'text-center',
+        render: function (data, type, row, meta) {
+          return meta.row + 1;
+        },
+      },
+      { data: '매출처코드' },
+      { data: '매출처명' },
+      {
+        // 대표자
+        data: '대표자명',
+        defaultContent: '-'
+      },
+      {
+        // 사업자번호
+        data: '사업자번호',
+        defaultContent: '-'
+      },
+      {
+        // 연락처
+        data: '전화번호',
+        defaultContent: '-'
+      },
+      {
+        // 거래상태
+        data: '사용구분',
+        className: 'text-center',
+        render: function (data, type, row) {
+          if (data === 0) {
+            return '<span class="status-badge status-active">정상거래</span>';
+          } else {
+            return '<span class="status-badge status-pending">거래보류</span>';
+          }
+        },
+      },
+      {
+        // 등록일
+        data: '수정일자',
+        className: 'text-center',
+        defaultContent: '-',
+        render: function (data, type, row) {
+          if (data && data.length === 8) {
+            return data.substring(0, 4) + '-' + data.substring(4, 6) + '-' + data.substring(6, 8);
+          }
+          return data || '-';
+        },
+      },
+      {
+        // 관리 버튼
+        data: null,
+        orderable: false,
+        className: 'text-center',
+        render: function (data, type, row) {
+          return `
+            <div class="action-buttons" id="actions-${row.매출처코드}">
+              <button class="btn-icon btn-view" onclick="viewCustomerDetail('${row.매출처코드}')">상세</button>
+              <button class="btn-icon btn-edit" style="display: none;" onclick="editCustomer('${row.매출처코드}')">수정</button>
+              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteCustomer('${row.매출처코드}')">삭제</button>
+            </div>
+          `;
+        },
+      },
+    ]);
   }
 
-  // 모달 제목 설정
-  const modalTitle = modal.querySelector('h2');
-  if (modalTitle) {
-    modalTitle.textContent = '매출처 신규등록';
-  }
+  // 최초 로드
+  loadCustomers();
 
-  // 폼 초기화
-  const form = document.getElementById('customerForm');
-  form.reset();
+  // 새로고침 버튼
+  $('#btnReload').on('click', () => table.ajax.reload(null, false));
 
-  // 모드 설정 (신규 등록)
-  form.removeAttribute('data-mode');
-  form.removeAttribute('data-customer-code');
+  // 전체 선택 체크박스
+  $(document).on('change', '#selectAllCustomers', function () {
+    const isChecked = $(this).prop('checked');
+    $('.customerCheckbox').prop('checked', isChecked).trigger('change');
+  });
 
-  // 모달 표시
-  modal.style.display = 'flex';
+  // 개별 체크박스 변경 시
+  $(document).on('change', '.customerCheckbox', function () {
+    // 전체 선택 체크박스 상태 업데이트
+    const totalCheckboxes = $('.customerCheckbox').length;
+    const checkedCheckboxes = $('.customerCheckbox:checked').length;
+    $('#selectAllCustomers').prop('checked', totalCheckboxes === checkedCheckboxes);
 
-  console.log('✅ 매출처 신규 등록 모달 열기 완료');
-}
+    // 현재 행의 버튼 표시/숨김 처리
+    const customerCode = $(this).data('code');
+    const isChecked = $(this).prop('checked');
+    const actionDiv = $('#actions-' + customerCode);
 
-/**
- * 매출처 모달 닫기
- */
-function closeCustomerModal() {
-  console.log('===== 매출처 모달 닫기 =====');
-
-  const modal = document.getElementById('customerModal');
-  if (!modal) {
-    console.error('❌ 모달을 찾을 수 없습니다.');
-    return;
-  }
-
-  // 모달 숨기기
-  modal.style.display = 'none';
-
-  // 폼 초기화
-  const form = document.getElementById('customerForm');
-  form.reset();
-  form.removeAttribute('data-mode');
-  form.removeAttribute('data-customer-code');
-
-  console.log('✅ 매출처 모달 닫기 완료');
-}
-
-// 모달 외부 클릭 시 닫기
-document.addEventListener('DOMContentLoaded', function () {
-  const customerModal = document.getElementById('customerModal');
-  if (customerModal) {
-    customerModal.addEventListener('click', function (e) {
-      if (e.target === this) {
-        closeCustomerModal();
-      }
-    });
-    console.log('✅ 매출처 모달 이벤트 리스너 등록 완료');
-  } else {
-    console.error('❌ customerModal 요소를 찾을 수 없습니다!');
-  }
-});
-
-// 매출처 등록 제출
-// index.html의 submitCustomer 함수 - 업데이트 버전
-
-/**
- * 매출처 등록/수정 폼 제출 처리 (수정된 버전)
- * @param {Event} event - 폼 제출 이벤트
- */
-async function submitCustomer(event) {
-  event.preventDefault();
-
-  try {
-    console.log('===== 매출처 등록/수정 시작 =====');
-
-    const form = event.target;
-    const mode = form.getAttribute('data-mode') || 'create'; // 'create' 또는 'edit'
-    const customerCode = form.getAttribute('data-customer-code');
-
-    console.log('모드:', mode);
-    console.log('매출처코드:', customerCode);
-
-    // 폼 데이터 수집
-    const formData = {
-      사업장코드: currentUser.사업장코드,
-      매출처코드: document.getElementById('customerCode').value.trim() || null,
-      매출처명: document.getElementById('customerName').value.trim(),
-      대표자명: document.getElementById('ceoName').value.trim(),
-      사업자번호: document.getElementById('businessNo').value.trim(),
-      업태: document.getElementById('businessType').value.trim(),
-      업종: document.getElementById('businessCategory').value.trim(),
-      전화번호: document.getElementById('phone').value.trim(),
-      팩스번호: document.getElementById('fax').value.trim(),
-      우편번호: document.getElementById('zipCode').value.trim(),
-      주소: document.getElementById('address').value.trim(),
-      번지: document.getElementById('addressDetail').value.trim(),
-      은행코드: document.getElementById('bankCode').value,
-      계좌번호: document.getElementById('accountNo').value.trim(),
-      담당자: document.getElementById('managerName').value.trim(),
-      사용구분: parseInt(document.getElementById('status').value),
-      비고: document.getElementById('remark').value.trim(),
-      작성자: currentUser.사용자코드,
-    };
-
-    console.log('전송 데이터:', formData);
-
-    // API 호출
-    let result;
-    if (mode === 'edit') {
-      // 수정 모드
-      result = await apiCall(`/customers/${customerCode}`, 'PUT', formData);
+    if (isChecked) {
+      // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
+      actionDiv.find('.btn-view').hide();
+      actionDiv.find('.btn-edit').show();
+      actionDiv.find('.btn-delete').show();
     } else {
-      // 등록 모드
-      result = await apiCall('/customers', 'POST', formData);
+      // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
+      actionDiv.find('.btn-view').show();
+      actionDiv.find('.btn-edit').hide();
+      actionDiv.find('.btn-delete').hide();
     }
-
-    if (!result.success) {
-      throw new Error(result.message || '처리에 실패했습니다.');
-    }
-
-    console.log('✅ 처리 성공:', result);
-
-    // 성공 메시지
-    alert(
-      mode === 'edit'
-        ? '매출처가 성공적으로 수정되었습니다.'
-        : '매출처가 성공적으로 등록되었습니다.',
-    );
-
-    // 모달 닫기
-    closeCustomerModal();
-
-    // 목록 새로고침
-    await loadCustomers(currentCustomerPage);
-
-    console.log('✅ 매출처 목록 새로고침 완료');
-  } catch (error) {
-    console.error('❌ 매출처 등록/수정 오류:', error);
-    alert('처리 중 오류가 발생했습니다: ' + error.message);
-  }
-}
+  });
+});

@@ -50,6 +50,18 @@ async function connectDB() {
   }
 }
 
+connectDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`✅ Server running at http://127.0.0.1:${PORT}`);
+      console.log('✅ Static files served from project root (index.html 포함)');
+    });
+  })
+  .catch((err) => {
+    console.error('❌ 서버 기동 중 DB 연결 실패로 종료:', err);
+    process.exit(1);
+  });
+
 // ==================== 인증 API ====================
 
 // 로그인
@@ -196,135 +208,86 @@ app.get('/api/workplaces/:code', async (req, res) => {
   }
 });
 
-// ==================== 매출처 API ====================
+//---------------------------------------------
+// ✅ 매출처관리 - 신규 매출처코드 생성 API
+//---------------------------------------------
+app.get('/api/customer_new', async (req, res) => {
+  try {
+    console.log('===== 신규 매출처코드 생성 요청 =====');
 
-// 매출처 목록 조회
+    // 1. 현재 가장 큰 매출처코드 조회
+    const query = `
+      SELECT TOP 1 매출처코드
+      FROM 매출처
+      ORDER BY 매출처코드 DESC
+    `;
+
+    const result = await pool.request().query(query);
+
+    let newCode;
+
+    if (result.recordset.length > 0) {
+      const lastCode = result.recordset[0].매출처코드;
+      console.log('마지막 매출처코드:', lastCode);
+
+      // 2. 영문 1자리 + 숫자 7자리 = 총 8자리 형식
+      const prefix = lastCode.charAt(0); // 첫 글자 (영문)
+      const numPart = lastCode.substring(1); // 나머지 숫자 부분
+
+      // 3. 숫자 +1 증가
+      const nextNum = parseInt(numPart) + 1;
+
+      // 4. 영문 1자리 + 숫자 7자리 = 총 8자리로 포맷
+      newCode = prefix + String(nextNum).padStart(7, '0');
+
+      console.log(`  - 접두사: ${prefix}`);
+      console.log(`  - 숫자 부분: ${numPart} -> ${nextNum}`);
+    } else {
+      // 매출처가 하나도 없으면 A0000001부터 시작 (영문 1자리 + 숫자 7자리)
+      newCode = 'A0000001';
+    }
+
+    console.log('✅ 생성된 매출처코드:', newCode, `(총 ${newCode.length}자리)`);
+
+    res.json({
+      success: true,
+      data: {
+        매출처코드: newCode,
+      },
+    });
+  } catch (err) {
+    console.error('❌ /api/customer_new 오류:', err);
+    res.status(500).json({ success: false, message: '매출처코드 생성 실패' });
+  }
+});
+
+//---------------------------------------------
+// ✅ 매출처관리 - 고객 목록 조회 API
+//---------------------------------------------
 app.get('/api/customers', async (req, res) => {
   try {
-    // const { search, 사업장코드 } = req.query;
-    const { search = '', 사업장코드, page = 1, pageSize = 10 } = req.query;
+    const { page = 1, pageSize = 500 } = req.query;
     const offset = (page - 1) * pageSize;
 
-    // 총 레코드 수 계산
-    let countQuery = `
-            SELECT COUNT(*) AS totalCount
-            FROM 매출처
-            WHERE 1=1
-        `;
-
-    if (사업장코드) countQuery += ` AND 사업장코드 = '${사업장코드}'`;
-    if (search) countQuery += ` AND (매출처명 LIKE '%${search}%' OR 사업자번호 LIKE '%${search}%')`;
-
-    const countResult = await pool.request().query(countQuery);
-    const totalCount = countResult.recordset[0].totalCount;
-
-    // ✅ ROW_NUMBER()로 페이지네이션 처리
-    let query = `
-            SELECT *
-            FROM (
-                SELECT 
-                    ROW_NUMBER() OVER (ORDER BY 매출처코드 ASC) AS RowNum,
-                    사업장코드, 매출처코드, 매출처명, 사업자번호,
-                    대표자명, 전화번호, 사용구분, 수정일자, 담당자명, 비고란
-                FROM 매출처
-                WHERE 1=1
-        `;
-
-    if (사업장코드) query += ` AND 사업장코드 = '${사업장코드}'`;
-    if (search) query += ` AND (매출처명 LIKE '%${search}%' OR 사업자번호 LIKE '%${search}%')`;
-
-    query += `
-            ) AS Result
-            WHERE RowNum BETWEEN ${offset + 1} AND ${offset + Number(pageSize)}
-            ORDER BY RowNum
-        `;
+    const query = `
+      SELECT 매출처코드, 매출처명, 대표자명, 사업자번호, 전화번호, 사용구분, 수정일자
+      FROM (
+        SELECT ROW_NUMBER() OVER (ORDER BY 매출처코드) AS RowNum,
+              매출처코드, 매출처명, 대표자명, 사업자번호, 전화번호, 사용구분, 수정일자
+        FROM 매출처
+      ) AS T
+      WHERE RowNum BETWEEN ${offset + 1} AND ${offset + Number(pageSize)};
+    `;
 
     const result = await pool.request().query(query);
 
     res.json({
       success: true,
       data: result.recordset,
-      total: totalCount,
-      currentPage: Number(page),
-      totalPages: Math.ceil(totalCount / pageSize),
     });
-    /**
-		let whereClause = `WHERE 1=1`;
-		if (사업장코드) {
-		  whereClause += ` AND 사업장코드 = @사업장코드`;
-		}
-		if (search) {
-		  whereClause += ` AND (매출처명 LIKE '%' + @search + '%' OR 사업자번호 LIKE '%' + @search + '%')`;
-		}
-        
-        let query = `
-            SELECT 
-                사업장코드, 매출처코드, 매출처명, 사업자번호,
-                대표자명, 전화번호, 사용구분, 수정일자, 담당자명, 비고란
-            FROM 매출처
-            WHERE 1=1
-        `;
-        
-        if (사업장코드) {
-            query += ` AND 사업장코드 = '${사업장코드}'`;
-        }
-        
-        if (search) {
-            query += ` AND (매출처명 LIKE '%${search}%' OR 사업자번호 LIKE '%${search}%')`;
-        }
-        
-        query += ` ORDER BY 매출처코드`;
-        
-        const result = await pool.request().query(query);
-		**/
-    //const pool = await sql.connect(dbConfig);
-
-    // 전체 개수 구하기
-    /**
-		const countResult = await pool.request()
-		  .input('사업장코드', sql.VarChar(10), 사업장코드 || '')
-		  .input('search', sql.VarChar(50), search)
-		  .query(`
-			SELECT COUNT(*) AS totalCount
-			FROM 매출처
-			${whereClause}
-		  `);
-		const totalCount = countResult.recordset[0].totalCount;
-		**/
-    // 페이지 데이터 조회
-    /**
-		const dataResult = await pool.request()
-		  .input('사업장코드', sql.VarChar(10), 사업장코드 || '')
-		  .input('search', sql.VarChar(50), search)
-		  .input('offset', sql.Int, offset)
-		  .input('pageSize', sql.Int, parseInt(pageSize))
-		  .query(`
-			SELECT 
-			  사업장코드, 매출처코드, 매출처명, 사업자번호,
-			  대표자명, 전화번호, 사용구분, 수정일자, 담당자명, 비고란
-			FROM 매출처
-			${whereClause}
-			ORDER BY 매출처코드
-			OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
-		  `);		
-        
-		res.json({
-		  success: true,
-		  data: dataResult.recordset,
-		  totalCount,
-		  totalPages: Math.ceil(totalCount / pageSize),
-		  currentPage: parseInt(page, 10)
-		});
-		**/
-    /**
-        res.json({
-            success: true,
-            data: result.recordset,
-            total: result.recordset.length
-        }); **/
   } catch (err) {
-    console.error('매출처 조회 에러:', err);
-    res.status(500).json({ success: false, message: '서버 오류' });
+    console.error('❌ /api/customers 오류:', err);
+    res.status(500).json({ success: false, message: '매출처 조회 실패' });
   }
 });
 
@@ -355,7 +318,7 @@ app.get('/api/customers/:code', async (req, res) => {
   }
 });
 
-// 매출처 등록
+// 매출처 신규 등록
 app.post('/api/customers', async (req, res) => {
   try {
     const {
@@ -380,15 +343,22 @@ app.post('/api/customers', async (req, res) => {
       계산서발행율,
       담당자명,
       사용구분,
+      사용자코드,
       비고란,
       단가구분,
     } = req.body;
 
+    console.log('===== 매출처 신규 등록 요청 =====');
+    console.log('사업장코드:', 사업장코드);
+    console.log('매출처코드:', 매출처코드);
+    console.log('매출처명:', 매출처명);
+
+    // 수정일자 (YYYYMMDD 형식)
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     await pool
       .request()
-      .input('사업장코드', sql.VarChar(2), 사업장코드 || '')
+      .input('사업장코드', sql.VarChar(2), 사업장코드 || '01')
       .input('매출처코드', sql.VarChar(8), 매출처코드)
       .input('매출처명', sql.VarChar(30), 매출처명)
       .input('사업자번호', sql.VarChar(14), 사업자번호 || '')
@@ -410,31 +380,29 @@ app.post('/api/customers', async (req, res) => {
       .input('담당자명', sql.VarChar(30), 담당자명 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), '')
+      .input('사용자코드', sql.VarChar(4), 사용자코드 || '')
       .input('비고란', sql.VarChar(100), 비고란 || '')
       .input('단가구분', sql.TinyInt, 단가구분 || 1).query(`
-                INSERT INTO 매출처 (
-                    사업장코드, 매출처코드, 매출처명, 사업자번호, 법인번호,
-                    대표자명, 대표자주민번호, 개업일자, 우편번호, 주소, 번지,
-                    업태, 업종, 전화번호, 팩스번호, 은행코드, 계좌번호,
-                    계산서발행여부, 계산서발행율, 담당자명, 사용구분,
-                    수정일자, 사용자코드, 비고란, 단가구분
-                ) VALUES (
-                    @사업장코드, @매출처코드, @매출처명, @사업자번호, @법인번호,
-                    @대표자명, @대표자주민번호, @개업일자, @우편번호, @주소, @번지,
-                    @업태, @업종, @전화번호, @팩스번호, @은행코드, @계좌번호,
-                    @계산서발행여부, @계산서발행율, @담당자명, @사용구분,
-                    @수정일자, @사용자코드, @비고란, @단가구분
-                )
-            `);
+        INSERT INTO 매출처 (
+          사업장코드, 매출처코드, 매출처명, 사업자번호, 법인번호, 대표자명, 대표자주민번호,
+          개업일자, 우편번호, 주소, 번지, 업태, 업종, 전화번호, 팩스번호,
+          은행코드, 계좌번호, 계산서발행여부, 계산서발행율, 담당자명, 사용구분, 수정일자, 사용자코드, 비고란, 단가구분
+        ) VALUES (
+          @사업장코드, @매출처코드, @매출처명, @사업자번호, @법인번호, @대표자명, @대표자주민번호,
+          @개업일자, @우편번호, @주소, @번지, @업태, @업종, @전화번호, @팩스번호,
+          @은행코드, @계좌번호, @계산서발행여부, @계산서발행율, @담당자명, @사용구분, @수정일자, @사용자코드, @비고란, @단가구분
+        )
+      `);
+
+    console.log('✅ 매출처 등록 완료');
 
     res.json({
       success: true,
       message: '매출처가 등록되었습니다.',
     });
   } catch (err) {
-    console.error('매출처 등록 에러:', err);
-    res.status(500).json({ success: false, message: '서버 오류' });
+    console.error('❌ 매출처 등록 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
   }
 });
 
@@ -458,12 +426,9 @@ app.put('/api/customers/:code', async (req, res) => {
       팩스번호,
       은행코드,
       계좌번호,
-      계산서발행여부,
-      계산서발행율,
       담당자명,
       사용구분,
       비고란,
-      단가구분,
     } = req.body;
 
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -486,38 +451,32 @@ app.put('/api/customers/:code', async (req, res) => {
       .input('팩스번호', sql.VarChar(14), 팩스번호 || '')
       .input('은행코드', sql.VarChar(2), 은행코드 || '')
       .input('계좌번호', sql.VarChar(20), 계좌번호 || '')
-      .input('계산서발행여부', sql.TinyInt, 계산서발행여부 || 1)
-      .input('계산서발행율', sql.Money, 계산서발행율 || 100)
       .input('담당자명', sql.VarChar(30), 담당자명 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('비고란', sql.VarChar(100), 비고란 || '')
-      .input('단가구분', sql.TinyInt, 단가구분 || 1).query(`
-                UPDATE 매출처 SET
-                    매출처명 = @매출처명,
-                    사업자번호 = @사업자번호,
-                    법인번호 = @법인번호,
-                    대표자명 = @대표자명,
-                    대표자주민번호 = @대표자주민번호,
-                    개업일자 = @개업일자,
-                    우편번호 = @우편번호,
-                    주소 = @주소,
-                    번지 = @번지,
-                    업태 = @업태,
-                    업종 = @업종,
-                    전화번호 = @전화번호,
-                    팩스번호 = @팩스번호,
-                    은행코드 = @은행코드,
-                    계좌번호 = @계좌번호,
-                    계산서발행여부 = @계산서발행여부,
-                    계산서발행율 = @계산서발행율,
-                    담당자명 = @담당자명,
-                    사용구분 = @사용구분,
-                    수정일자 = @수정일자,
-                    비고란 = @비고란,
-                    단가구분 = @단가구분
-                WHERE 매출처코드 = @매출처코드
-            `);
+      .input('비고란', sql.VarChar(100), 비고란 || '').query(`
+        UPDATE 매출처 SET
+          매출처명 = @매출처명,
+          사업자번호 = @사업자번호,
+          법인번호 = @법인번호,
+          대표자명 = @대표자명,
+          대표자주민번호 = @대표자주민번호,
+          개업일자 = @개업일자,
+          우편번호 = @우편번호,
+          주소 = @주소,
+          번지 = @번지,
+          업태 = @업태,
+          업종 = @업종,
+          전화번호 = @전화번호,
+          팩스번호 = @팩스번호,
+          은행코드 = @은행코드,
+          계좌번호 = @계좌번호,
+          담당자명 = @담당자명,
+          사용구분 = @사용구분,
+          수정일자 = @수정일자,
+          비고란 = @비고란
+        WHERE 매출처코드 = @매출처코드
+      `);
 
     res.json({
       success: true,
@@ -551,7 +510,7 @@ app.delete('/api/customers/:code', async (req, res) => {
 
 // ==================== 매입처 API ====================
 
-// 매입처 목록 조회
+// 매입처 리스트
 app.get('/api/suppliers', async (req, res) => {
   try {
     /**
@@ -636,8 +595,8 @@ app.get('/api/suppliers', async (req, res) => {
   }
 });
 
-// 매입처 상세 조회
-app.get('/api/suppliers/:code', async (req, res) => {
+// 매입처 코드 조회
+app.get('/api/suppliers_search_code/:code', async (req, res) => {
   try {
     const { code } = req.params;
 
@@ -663,8 +622,8 @@ app.get('/api/suppliers/:code', async (req, res) => {
   }
 });
 
-// 매입처 등록
-app.post('/api/suppliers', async (req, res) => {
+// 매입처 신규 등록
+app.post('/api/suppliers_new', async (req, res) => {
   try {
     const {
       사업장코드,
@@ -747,7 +706,7 @@ app.post('/api/suppliers', async (req, res) => {
 });
 
 // 매입처 수정
-app.put('/api/suppliers/:code', async (req, res) => {
+app.put('/api/suppliers_edit/:code', async (req, res) => {
   try {
     const { code } = req.params;
     const {
@@ -838,7 +797,7 @@ app.put('/api/suppliers/:code', async (req, res) => {
 });
 
 // 매입처 삭제
-app.delete('/api/suppliers/:code', async (req, res) => {
+app.delete('/api/suppliers_delete/:code', async (req, res) => {
   try {
     const { code } = req.params;
 
@@ -859,7 +818,7 @@ app.delete('/api/suppliers/:code', async (req, res) => {
 
 // ==================== 견적 API ====================
 
-// 견적 목록 조회
+// 견적 리스트
 app.get('/api/quotations', async (req, res) => {
   try {
     const { search, 사업장코드, 상태코드, startDate, endDate } = req.query;
@@ -960,8 +919,8 @@ app.get('/api/quotations/:date/:no', async (req, res) => {
   }
 });
 
-// 견적 등록
-app.post('/api/quotations', async (req, res) => {
+// 견적 신규 등록
+app.post('/api/quotations_add', async (req, res) => {
   try {
     const { master, details } = req.body;
 
@@ -1084,7 +1043,7 @@ app.post('/api/quotations', async (req, res) => {
 
 // ==================== 발주 API ====================
 
-// 발주 목록 조회
+// 발주 리스트
 app.get('/api/orders', async (req, res) => {
   try {
     const { search, 사업장코드, 상태코드, startDate, endDate } = req.query;
@@ -1185,7 +1144,7 @@ app.get('/api/orders/:date/:no', async (req, res) => {
   }
 });
 
-// 자재 목록 조회
+// 자재 리스트
 app.get('/api/materials', async (req, res) => {
   try {
     const { search, 분류코드 } = req.query;
@@ -1748,18 +1707,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// 서버 시작
-async function startServer() {
-  try {
-    await connectDB();
-    app.listen(PORT, () => {
-      console.log(`🚀 서버 실행 중: http://localhost:${PORT}`);
-    });
-  } catch (err) {
-    console.error('서버 시작 실패:', err);
-    process.exit(1);
-  }
-}
+// 서버 시작 - connectDB()에서 직접 처리하므로 별도 함수 불필요
+// (이미 53~63줄에서 connectDB().then(() => app.listen(...))으로 서버 시작)
 
 // 프로세스 종료시 연결 해제
 process.on('SIGINT', async () => {
@@ -1773,4 +1722,5 @@ process.on('SIGINT', async () => {
   }
 });
 
-startServer();
+// startServer(); // ❌ 중복 호출 제거 - 이미 53~63줄에서 connectDB()로 서버 시작됨
+// app.listen(8000, () => console.log('✅ Server running on http://127.0.0.1:8000')); // ❌ 중복 포트 바인딩 제거
