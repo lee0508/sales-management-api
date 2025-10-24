@@ -192,39 +192,39 @@ $(document).ready(function () {
   });
 
   // ✅ 견적 데이터 로드 함수
-  async function loadQuotations() {
-    console.log('✅ 견적 데이터 로드 시작');
+  // async function loadQuotations() {
+  //   console.log('✅ 견적 데이터 로드 시작');
 
-    try {
-      const start = document.getElementById('quotationStartDate')?.value.replace(/-/g, '');
-      const end = document.getElementById('quotationEndDate')?.value.replace(/-/g, '');
+  //   try {
+  //     const start = document.getElementById('quotationStartDate')?.value.replace(/-/g, '');
+  //     const end = document.getElementById('quotationEndDate')?.value.replace(/-/g, '');
 
-      const response = await fetch(`/quotations?start=${start}&end=${end}`);
-      const result = await response.json();
+  //     const response = await fetch(`/quotations?start=${start}&end=${end}`);
+  //     const result = await response.json();
 
-      console.log('✅ 견적 데이터 로드:', result);
+  //     console.log('✅ 견적 데이터 로드:', result);
 
-      if (result.success && result.data) {
-        // ✅ 견적 수 표시
-        const countEl = document.getElementById('quotationCount');
-        if (countEl) {
-          countEl.innerText = result.total || result.data.length;
-        } else {
-          console.warn('⚠️ quotationCount element not found in DOM');
-        }
+  //     if (result.success && result.data) {
+  //       // ✅ 견적 수 표시
+  //       const countEl = document.getElementById('quotationCount');
+  //       if (countEl) {
+  //         countEl.innerText = result.total || result.data.length;
+  //       } else {
+  //         console.warn('⚠️ quotationCount element not found in DOM');
+  //       }
 
-        // ✅ DataTable 업데이트
-        const table = $('#quotationTable').DataTable();
-        table.clear();
-        table.rows.add(result.data);
-        table.draw();
-      } else {
-        console.error('❌ 견적 데이터 로드 실패:', result);
-      }
-    } catch (error) {
-      console.error('❌ 견적 데이터 로드 중 오류 발생:', error);
-    }
-  }
+  //       // ✅ DataTable 업데이트
+  //       const table = $('#quotationTable').DataTable();
+  //       table.clear();
+  //       table.rows.add(result.data);
+  //       table.draw();
+  //     } else {
+  //       console.error('❌ 견적 데이터 로드 실패:', result);
+  //     }
+  //   } catch (error) {
+  //     console.error('❌ 견적 데이터 로드 중 오류 발생:', error);
+  //   }
+  // }
 
   // ✅ 모달 열기 함수
   async function openQuotationDetailModal(quotationNo) {
