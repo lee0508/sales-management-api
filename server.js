@@ -1033,18 +1033,32 @@ app.post('/api/quotations_add', async (req, res) => {
 });
 
 //---------------------------------------------
-// ✅ 견적 상세 품목 목록 조회
+// ✅ 견적 상세 품목 목록 조회 (일자 + 번호로 조회)
 //---------------------------------------------
-app.get('/api/quotation/:id/details', async (req, res) => {
+app.get('/api/quotations/:date/:no/details', async (req, res) => {
   try {
-    const { id } = req.params;
-    const query = `
-      SELECT 품목코드, 품명, 규격, 수량, 단가, (수량 * 단가) AS 금액
-      FROM 견적상세
-      WHERE 견적번호 = '${id}'
-      ORDER BY 품목코드;
-    `;
-    const result = await pool.request().query(query);
+    const { date, no } = req.params;
+
+    const result = await pool
+      .request()
+      .input('견적일자', sql.VarChar(8), date)
+      .input('견적번호', sql.Real, parseFloat(no))
+      .query(`
+        SELECT
+          qd.*,
+          (m.분류코드 + m.세부코드) as 자재코드,
+          m.자재명, m.규격, m.단위,
+          s.매입처명,
+          (qd.출고단가 * qd.수량) AS 금액
+        FROM 견적내역 qd
+        LEFT JOIN 자재 m ON qd.자재코드 = (m.분류코드 + m.세부코드)
+        LEFT JOIN 매입처 s ON qd.매입처코드 = s.매입처코드
+        WHERE qd.견적일자 = @견적일자
+          AND qd.견적번호 = @견적번호
+          AND qd.사용구분 = 0
+        ORDER BY qd.견적시간
+      `);
+
     res.json({ success: true, data: result.recordset });
   } catch (err) {
     console.error('❌ 견적 상세 조회 오류:', err);

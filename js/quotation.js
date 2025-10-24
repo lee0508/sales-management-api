@@ -186,87 +186,186 @@ $(document).ready(function () {
     openQuotationDetailModal(quotationNo);
   });
 
+  // ✅ 모달 닫기 함수
+  function closeQuotationDetailModal() {
+    const modal = document.getElementById('quotationDetailModal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+    // DataTable 정리 (메모리 누수 방지)
+    if (window.quotationDetailDataTable) {
+      window.quotationDetailDataTable.destroy();
+      window.quotationDetailDataTable = null;
+      $('#quotationDetailTable tbody').empty();
+      console.log('✅ 견적 상세 DataTable 정리 완료');
+    }
+  }
+
   // ✅ 모달 닫기 버튼
   $('#closeQuotationDetailModal').on('click', () => {
-    $('#quotationDetailModal').addClass('hidden');
+    closeQuotationDetailModal();
+  });
+
+  // ✅ 모달 배경 클릭시 닫기
+  $(document).on('click', '#quotationDetailModal', function (e) {
+    if (e.target.id === 'quotationDetailModal') {
+      closeQuotationDetailModal();
+    }
   });
 
   // ✅ 견적 데이터 로드 함수
-  // async function loadQuotations() {
-  //   console.log('✅ 견적 데이터 로드 시작');
-
-  //   try {
-  //     const start = document.getElementById('quotationStartDate')?.value.replace(/-/g, '');
-  //     const end = document.getElementById('quotationEndDate')?.value.replace(/-/g, '');
-
-  //     const response = await fetch(`/quotations?start=${start}&end=${end}`);
-  //     const result = await response.json();
-
-  //     console.log('✅ 견적 데이터 로드:', result);
-
-  //     if (result.success && result.data) {
-  //       // ✅ 견적 수 표시
-  //       const countEl = document.getElementById('quotationCount');
-  //       if (countEl) {
-  //         countEl.innerText = result.total || result.data.length;
-  //       } else {
-  //         console.warn('⚠️ quotationCount element not found in DOM');
-  //       }
-
-  //       // ✅ DataTable 업데이트
-  //       const table = $('#quotationTable').DataTable();
-  //       table.clear();
-  //       table.rows.add(result.data);
-  //       table.draw();
-  //     } else {
-  //       console.error('❌ 견적 데이터 로드 실패:', result);
-  //     }
-  //   } catch (error) {
-  //     console.error('❌ 견적 데이터 로드 중 오류 발생:', error);
-  //   }
-  // }
-
-  // ✅ 모달 열기 함수
-  async function openQuotationDetailModal(quotationNo) {
-    $('#quotationDetailModal').removeClass('hidden');
+  async function loadQuotations() {
+    console.log('✅ 견적 데이터 로드 시작');
 
     try {
-      // 견적 기본정보 조회
-      const infoRes = await fetch(`/api/quotation/${quotationNo}`);
-      const info = await infoRes.json();
+      // ✅ 로그인 날짜 기준으로 최근 1개월 자동 설정
+      const today = new Date();
+      const end = today.toISOString().slice(0, 10).replace(/-/g, '');
+      const startDateObj = new Date();
+      // startDateObj.setMonth(today.getMonth() - 1);
+      const start = startDateObj.toISOString().slice(0, 10).replace(/-/g, '');
 
-      $('#q_no').text(info.data.견적번호);
-      $('#q_date').text(info.data.견적일자);
-      $('#q_customer').text(info.data.매출처명);
-      $('#q_remark').text(info.data.비고 || '');
+      const response = await fetch(`/api/quotations?startDate=${start}&endDate=${end}`);
+      const result = await response.json();
 
-      // 견적 상세 품목 조회
-      const detailRes = await fetch(`/api/quotation/${quotationNo}/details`);
-      const detailData = await detailRes.json();
+      console.log('✅ 견적 데이터 로드:', result);
 
-      const tbody = $('#quotationDetailTable tbody');
-      tbody.empty();
+      if (result.success && result.data) {
+        // ✅ 해당 기간 건수 표시
+        const countEl = document.getElementById('quotationCount');
+        if (countEl) {
+          const periodCount = result.data.length;
+          countEl.innerText = `${periodCount.toLocaleString()}`;
+          console.log(`📊 최근 1개월 견적 수: ${periodCount}`);
+        }
 
-      detailData.data.forEach((item) => {
-        const row = `
-        <tr>
-          <td>${item.품목코드}</td>
-          <td>${item.품명}</td>
-          <td>${item.규격}</td>
-          <td style="text-align:right">${item.수량.toLocaleString()}</td>
-          <td style="text-align:right">${item.단가.toLocaleString()}</td>
-          <td style="text-align:right">${item.금액.toLocaleString()}</td>
-        </tr>`;
-        tbody.append(row);
+        // ✅ DataTable 업데이트
+        const table = $('#quotationTable').DataTable();
+        table.clear();
+        table.rows.add(result.data);
+        table.draw();
+      } else {
+        console.error('❌ 견적 데이터 로드 실패:', result);
+      }
+    } catch (error) {
+      console.error('❌ 견적 데이터 로드 중 오류 발생:', error);
+    }
+  }
+
+  // ✅ 모달 열기 함수 (견적일자, 견적번호로 조회)
+  async function openQuotationDetailModal(quotationDate, quotationNo) {
+    const modal = document.getElementById('quotationDetailModal');
+    if (modal) {
+      modal.style.display = 'block';
+    }
+
+    try {
+      // 견적 마스터+상세 조회 (기존 API 사용)
+      const masterRes = await fetch(`http://localhost:3000/api/quotations/${quotationDate}/${quotationNo}`);
+      const masterData = await masterRes.json();
+
+      if (!masterData.success || !masterData.data) {
+        throw new Error('견적 정보를 찾을 수 없습니다.');
+      }
+
+      const master = masterData.data.master;
+      const details = masterData.data.detail;
+
+      // 기본 정보 표시
+      $('#q_no').text(`${master.견적일자}-${master.견적번호}`);
+      $('#q_date').text(master.견적일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+      $('#q_customer').text(master.매출처명 || '-');
+      $('#q_remark').text(master.적요 || '-');
+
+      // ✅ DataTable이 이미 초기화되어 있으면 destroy 후 재생성
+      if (window.quotationDetailDataTable) {
+        window.quotationDetailDataTable.destroy();
+      }
+
+      // ✅ DataTable 초기화
+      window.quotationDetailDataTable = $('#quotationDetailTable').DataTable({
+        data: details || [],
+        columns: [
+          {
+            data: '자재코드',
+            defaultContent: '-',
+          },
+          {
+            data: '자재명',
+            defaultContent: '-',
+          },
+          {
+            data: '규격',
+            defaultContent: '-',
+          },
+          {
+            data: '수량',
+            defaultContent: 0,
+            render: function (data) {
+              return (data || 0).toLocaleString();
+            },
+            className: 'dt-right',
+          },
+          {
+            data: '출고단가',
+            defaultContent: 0,
+            render: function (data) {
+              return (data || 0).toLocaleString();
+            },
+            className: 'dt-right',
+          },
+          {
+            data: '금액',
+            defaultContent: 0,
+            render: function (data) {
+              return (data || 0).toLocaleString();
+            },
+            className: 'dt-right',
+          },
+        ],
+        language: {
+          lengthMenu: '페이지당 _MENU_ 개씩 보기',
+          zeroRecords: '상세 내역이 없습니다',
+          info: '전체 _TOTAL_개 중 _START_-_END_개 표시',
+          infoEmpty: '데이터 없음',
+          infoFiltered: '(전체 _MAX_개 중 검색결과)',
+          search: '검색:',
+          paginate: {
+            first: '처음',
+            last: '마지막',
+            next: '다음',
+            previous: '이전',
+          },
+        },
+        order: [[0, 'asc']], // 자재코드 오름차순
+        pageLength: 10,
+        lengthMenu: [5, 10, 25, 50],
+        responsive: true,
+        autoWidth: false,
+        searching: true,
+        paging: true,
+        info: true,
       });
+
+      console.log(`✅ 견적 상세 DataTable 초기화 완료 (${details ? details.length : 0}건)`);
+
+      // ✅ 합계 금액 계산
+      const totalAmount = (details || []).reduce((sum, item) => {
+        return sum + (item.금액 || 0);
+      }, 0);
+
+      // 합계 표시
+      $('#quotationDetailTotal').text(totalAmount.toLocaleString());
+      console.log(`✅ 견적 합계 금액: ${totalAmount.toLocaleString()}원`);
     } catch (err) {
       console.error('❌ 견적 상세 조회 오류:', err);
-      alert('견적 상세 정보를 불러오는 중 오류가 발생했습니다.');
+      alert('견적 상세 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
     }
   }
 
   // 전역 변수로 저장
   window.quotationTableInstance = quotationTable;
+  window.openQuotationDetailModal = openQuotationDetailModal;
 });
 
 // 필터링 함수
@@ -274,6 +373,50 @@ function filterQuotations() {
   if (window.quotationTableInstance) {
     window.quotationTableInstance.ajax.reload();
   }
+}
+
+// ✅ 견적 상세보기 함수 (DataTable 버튼에서 호출)
+function viewQuotationDetail(quotationDate, quotationNo) {
+  console.log(`✅ 견적 상세보기 호출: ${quotationDate}-${quotationNo}`);
+
+  // openQuotationDetailModal 함수 호출
+  if (typeof window.openQuotationDetailModal === 'function') {
+    window.openQuotationDetailModal(quotationDate, quotationNo);
+  } else {
+    console.error('❌ openQuotationDetailModal 함수를 찾을 수 없습니다.');
+    alert('견적 상세보기 기능을 사용할 수 없습니다.');
+  }
+}
+
+// ✅ 견적 수정 함수
+function editQuotation(quotationDate, quotationNo) {
+  console.log(`✅ 견적 수정: ${quotationDate}-${quotationNo}`);
+  alert('견적 수정 기능은 아직 구현되지 않았습니다.');
+  // TODO: 견적 수정 모달 열기
+}
+
+// ✅ 견적 삭제 함수
+function deleteQuotation(quotationDate, quotationNo) {
+  console.log(`✅ 견적 삭제: ${quotationDate}-${quotationNo}`);
+
+  if (!confirm('정말로 이 견적을 삭제하시겠습니까?')) {
+    return;
+  }
+
+  alert('견적 삭제 기능은 아직 구현되지 않았습니다.');
+  // TODO: 견적 삭제 API 호출
+}
+
+// ✅ 견적 승인 함수
+function approveQuotation(quotationDate, quotationNo) {
+  console.log(`✅ 견적 승인: ${quotationDate}-${quotationNo}`);
+
+  if (!confirm('이 견적을 승인하시겠습니까?')) {
+    return;
+  }
+
+  alert('견적 승인 기능은 아직 구현되지 않았습니다.');
+  // TODO: 견적 승인 API 호출 (상태코드 2로 변경)
 }
 
 console.log('✅ quotation.js 로드 완료');
