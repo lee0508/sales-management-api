@@ -1,28 +1,40 @@
 // server.js - 판매 관리 서버
+require('dotenv').config(); // 환경변수 로드
+
 const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const path = require('path');
 
+// CORS 설정 - 환경변수에서 허용 도메인 로드
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:3000'];
+
 // 미들웨어 설정
-app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname))); // index.html 및 css/js 제공
-// SQL Server 연결 설정 Dlehdgus0508@1
+
+// SQL Server 연결 설정 - 환경변수 사용
 const dbConfig = {
-  user: 'sa',
-  password: 'Dlehdgus0508@1',
-  server: 'localhost', // 또는 실제 서버 IP
-  database: 'YmhDB',
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_SERVER,
+  database: process.env.DB_DATABASE,
+  port: parseInt(process.env.DB_PORT) || 1433,
   options: {
-    encrypt: false,
-    // trustServerCertificate: true,
-    // enableArithAbort: true
+    encrypt: process.env.DB_ENCRYPT === 'true',
+    trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === 'true',
+    enableArithAbort: true
   },
   pool: {
     max: 10,
@@ -30,6 +42,13 @@ const dbConfig = {
     idleTimeoutMillis: 30000,
   },
 };
+
+// 환경변수 검증
+if (!process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_SERVER) {
+  console.error('❌ 필수 환경변수가 설정되지 않았습니다!');
+  console.error('DB_USER, DB_PASSWORD, DB_SERVER를 .env 파일에 설정해주세요.');
+  process.exit(1);
+}
 
 // 데이터베이스 연결 풀
 let pool;
@@ -262,12 +281,15 @@ app.get('/api/customer_new', async (req, res) => {
 });
 
 //---------------------------------------------
-// ✅ 매출처관리 - 고객 목록 조회 API
+// ✅ 매출처관리 - 고객 목록 조회 API (SQL Injection 수정)
 //---------------------------------------------
 app.get('/api/customers', async (req, res) => {
   try {
     const { page = 1, pageSize = 500, search = '' } = req.query;
     const offset = (page - 1) * pageSize;
+    const limit = Number(pageSize);
+
+    const request = pool.request();
 
     let query = `
       SELECT 매출처코드, 매출처명, 대표자명, 사업자번호, 전화번호, 사용구분, 수정일자
@@ -278,17 +300,21 @@ app.get('/api/customers', async (req, res) => {
         WHERE 1=1
     `;
 
-    // 검색어가 있으면 매출처명 또는 매출처코드로 검색
+    // 검색어가 있으면 매출처명 또는 매출처코드로 검색 (Parameterized Query 사용)
     if (search) {
-      query += ` AND (매출처명 LIKE '%${search}%' OR 매출처코드 LIKE '%${search}%')`;
+      request.input('search', sql.NVarChar, `%${search}%`);
+      query += ` AND (매출처명 LIKE @search OR 매출처코드 LIKE @search)`;
     }
 
     query += `
       ) AS T
-      WHERE RowNum BETWEEN ${offset + 1} AND ${offset + Number(pageSize)};
+      WHERE RowNum BETWEEN @startRow AND @endRow;
     `;
 
-    const result = await pool.request().query(query);
+    request.input('startRow', sql.Int, offset + 1);
+    request.input('endRow', sql.Int, offset + limit);
+
+    const result = await request.query(query);
 
     res.json({
       success: true,
@@ -539,28 +565,37 @@ app.get('/api/suppliers', async (req, res) => {
             data: result.recordset,
             total: result.recordset.length
         }); **/
-    // ✅ page, pageSize 파라미터 추가
+    // ✅ page, pageSize 파라미터 추가 (SQL Injection 수정)
     const { search = '', 사업장코드, page = 1, pageSize = 10 } = req.query;
     const offset = (page - 1) * pageSize;
+    const limit = Number(pageSize);
 
-    // ✅ 총 레코드 수 계산
+    // ✅ 총 레코드 수 계산 (Parameterized Query)
+    const countRequest = pool.request();
     let countQuery = `
             SELECT COUNT(*) AS totalCount
             FROM 매입처
             WHERE 1=1
         `;
 
-    if (사업장코드) countQuery += ` AND 사업장코드 = '${사업장코드}'`;
-    if (search) countQuery += ` AND (매입처명 LIKE '%${search}%' OR 사업자번호 LIKE '%${search}%')`;
+    if (사업장코드) {
+      countRequest.input('사업장코드', sql.VarChar(2), 사업장코드);
+      countQuery += ` AND 사업장코드 = @사업장코드`;
+    }
+    if (search) {
+      countRequest.input('search', sql.NVarChar, `%${search}%`);
+      countQuery += ` AND (매입처명 LIKE @search OR 사업자번호 LIKE @search)`;
+    }
 
-    const countResult = await pool.request().query(countQuery);
+    const countResult = await countRequest.query(countQuery);
     const totalCount = countResult.recordset[0].totalCount;
 
-    // ✅ ROW_NUMBER()로 효율적인 페이지네이션
+    // ✅ ROW_NUMBER()로 효율적인 페이지네이션 (Parameterized Query)
+    const dataRequest = pool.request();
     let query = `
             SELECT *
             FROM (
-                SELECT 
+                SELECT
                     ROW_NUMBER() OVER (ORDER BY 매입처코드 ASC) AS RowNum,
                     사업장코드, 매입처코드, 매입처명, 사업자번호,
                     대표자명, 전화번호, 사용구분, 수정일자, 담당자명, 비고란
@@ -568,16 +603,25 @@ app.get('/api/suppliers', async (req, res) => {
                 WHERE 1=1
         `;
 
-    if (사업장코드) query += ` AND 사업장코드 = '${사업장코드}'`;
-    if (search) query += ` AND (매입처명 LIKE '%${search}%' OR 사업자번호 LIKE '%${search}%')`;
+    if (사업장코드) {
+      dataRequest.input('사업장코드', sql.VarChar(2), 사업장코드);
+      query += ` AND 사업장코드 = @사업장코드`;
+    }
+    if (search) {
+      dataRequest.input('search', sql.NVarChar, `%${search}%`);
+      query += ` AND (매입처명 LIKE @search OR 사업자번호 LIKE @search)`;
+    }
 
     query += `
             ) AS Result
-            WHERE RowNum BETWEEN ${offset + 1} AND ${offset + Number(pageSize)}
+            WHERE RowNum BETWEEN @startRow AND @endRow
             ORDER BY RowNum
         `;
 
-    const result = await pool.request().query(query);
+    dataRequest.input('startRow', sql.Int, offset + 1);
+    dataRequest.input('endRow', sql.Int, offset + limit);
+
+    const result = await dataRequest.query(query);
 
     // ✅ 페이지네이션 정보와 함께 응답
     res.json({
