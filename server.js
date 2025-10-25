@@ -1042,8 +1042,7 @@ app.get('/api/quotations/:date/:no/details', async (req, res) => {
     const result = await pool
       .request()
       .input('견적일자', sql.VarChar(8), date)
-      .input('견적번호', sql.Real, parseFloat(no))
-      .query(`
+      .input('견적번호', sql.Real, parseFloat(no)).query(`
         SELECT
           qd.*,
           (m.분류코드 + m.세부코드) as 자재코드,
@@ -1063,6 +1062,166 @@ app.get('/api/quotations/:date/:no/details', async (req, res) => {
   } catch (err) {
     console.error('❌ 견적 상세 조회 오류:', err);
     res.status(500).json({ success: false, message: '견적 상세 조회 실패' });
+  }
+});
+
+//---------------------------------------------
+// ✅ 견적 삭제 (소프트 삭제 - 사용구분 변경)
+//---------------------------------------------
+app.delete('/api/quotations/:date/:no', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    // 마스터 삭제 (사용구분 = 1)
+    await pool
+      .request()
+      .input('견적일자', sql.VarChar(8), date)
+      .input('견적번호', sql.Real, parseFloat(no))
+      .input('수정일자', sql.VarChar(8), 수정일자).query(`
+        UPDATE 견적
+        SET 사용구분 = 1, 수정일자 = @수정일자
+        WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호
+      `);
+
+    // 디테일 삭제 (사용구분 = 1)
+    await pool
+      .request()
+      .input('견적일자', sql.VarChar(8), date)
+      .input('견적번호', sql.Real, parseFloat(no))
+      .input('수정일자', sql.VarChar(8), 수정일자).query(`
+        UPDATE 견적내역
+        SET 사용구분 = 1, 수정일자 = @수정일자
+        WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호
+      `);
+
+    res.json({
+      success: true,
+      message: '견적이 삭제되었습니다.',
+    });
+  } catch (err) {
+    console.error('견적 삭제 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+//---------------------------------------------
+// ✅ 견적 승인 (상태코드 변경: 1 -> 2)
+//---------------------------------------------
+app.put('/api/quotations/:date/:no/approve', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    await pool
+      .request()
+      .input('견적일자', sql.VarChar(8), date)
+      .input('견적번호', sql.Real, parseFloat(no))
+      .input('수정일자', sql.VarChar(8), 수정일자).query(`
+        UPDATE 견적
+        SET 상태코드 = 2, 수정일자 = @수정일자
+        WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호
+      `);
+
+    res.json({
+      success: true,
+      message: '견적이 승인되었습니다.',
+    });
+  } catch (err) {
+    console.error('견적 승인 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+//---------------------------------------------
+// ✅ 견적 수정 (마스터 정보만)
+//---------------------------------------------
+app.put('/api/quotations/:date/:no', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+    const { 매출처코드, 출고희망일자, 결제방법, 결제예정일자, 유효일수, 제목, 적요 } = req.body;
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    await pool
+      .request()
+      .input('견적일자', sql.VarChar(8), date)
+      .input('견적번호', sql.Real, parseFloat(no))
+      .input('매출처코드', sql.VarChar(8), 매출처코드 || '')
+      .input('출고희망일자', sql.VarChar(8), 출고희망일자 || '')
+      .input('결제방법', sql.TinyInt, 결제방법 || 0)
+      .input('결제예정일자', sql.VarChar(8), 결제예정일자 || '')
+      .input('유효일수', sql.Int, 유효일수 || 0)
+      .input('제목', sql.VarChar(30), 제목 || '')
+      .input('적요', sql.VarChar(50), 적요 || '')
+      .input('수정일자', sql.VarChar(8), 수정일자).query(`
+        UPDATE 견적
+        SET
+          매출처코드 = @매출처코드,
+          출고희망일자 = @출고희망일자,
+          결제방법 = @결제방법,
+          결제예정일자 = @결제예정일자,
+          유효일수 = @유효일수,
+          제목 = @제목,
+          적요 = @적요,
+          수정일자 = @수정일자
+        WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호
+      `);
+
+    res.json({
+      success: true,
+      message: '견적이 수정되었습니다.',
+    });
+  } catch (err) {
+    console.error('견적 수정 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+//------------------------------------------------------------
+// ✅ 견적내역 수정 API
+// PUT /api/quotations/:date/:no/details
+//------------------------------------------------------------
+app.put('/api/quotations/:date/:no/details', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+    const details = req.body; // [{ 자재코드, 수량, 출고단가, 금액, ... }]
+
+    if (!Array.isArray(details) || details.length === 0) {
+      return res.status(400).json({ success: false, message: '수정할 내역이 없습니다.' });
+    }
+
+    // 트랜잭션 시작
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    const request = new sql.Request(transaction);
+
+    // 기존 내역 삭제 후 재삽입 방식 (단순화)
+    await request
+      .input('견적일자', sql.VarChar(8), date)
+      .input('견적번호', sql.Int, no)
+      .query('DELETE FROM 견적내역 WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호');
+
+    // 새로운 내역 삽입
+    for (const item of details) {
+      await request
+        .input('견적일자', sql.VarChar(8), date)
+        .input('견적번호', sql.Int, no)
+        .input('자재코드', sql.VarChar(8), item.자재코드)
+        .input('수량', sql.Decimal(18, 2), item.수량)
+        .input('출고단가', sql.Decimal(18, 2), item.출고단가)
+        .input('금액', sql.Decimal(18, 2), item.금액).query(`
+          INSERT INTO 견적내역 (견적일자, 견적번호, 자재코드, 수량, 출고단가, 금액)
+          VALUES (@견적일자, @견적번호, @자재코드, @수량, @출고단가, @금액)
+        `);
+    }
+
+    await transaction.commit();
+
+    res.json({ success: true, message: '견적 내역이 수정되었습니다.' });
+  } catch (err) {
+    console.error('견적내역 수정 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
   }
 });
 
