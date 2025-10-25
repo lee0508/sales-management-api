@@ -266,15 +266,24 @@ app.get('/api/customer_new', async (req, res) => {
 //---------------------------------------------
 app.get('/api/customers', async (req, res) => {
   try {
-    const { page = 1, pageSize = 500 } = req.query;
+    const { page = 1, pageSize = 500, search = '' } = req.query;
     const offset = (page - 1) * pageSize;
 
-    const query = `
+    let query = `
       SELECT 매출처코드, 매출처명, 대표자명, 사업자번호, 전화번호, 사용구분, 수정일자
       FROM (
         SELECT ROW_NUMBER() OVER (ORDER BY 매출처코드) AS RowNum,
               매출처코드, 매출처명, 대표자명, 사업자번호, 전화번호, 사용구분, 수정일자
         FROM 매출처
+        WHERE 1=1
+    `;
+
+    // 검색어가 있으면 매출처명 또는 매출처코드로 검색
+    if (search) {
+      query += ` AND (매출처명 LIKE '%${search}%' OR 매출처코드 LIKE '%${search}%')`;
+    }
+
+    query += `
       ) AS T
       WHERE RowNum BETWEEN ${offset + 1} AND ${offset + Number(pageSize)};
     `;
@@ -877,9 +886,11 @@ app.get('/api/quotations/:date/:no', async (req, res) => {
       .request()
       .input('견적일자', sql.VarChar(8), date)
       .input('견적번호', sql.Real, parseFloat(no)).query(`
-                SELECT 
-                    qd.*, 
-                    (m.분류코드 + m.세부코드) as 자재코드,
+                SELECT
+                    qd.견적일자, qd.견적번호, qd.견적시간,
+                    qd.자재코드,
+                    qd.수량, qd.출고단가, qd.출고부가,
+                    (qd.수량 * qd.출고단가) as 금액,
                     m.자재명, m.규격, m.단위,
                     s.매입처명
                 FROM 견적내역 qd
@@ -1182,6 +1193,7 @@ app.put('/api/quotations/:date/:no', async (req, res) => {
 // PUT /api/quotations/:date/:no/details
 //------------------------------------------------------------
 app.put('/api/quotations/:date/:no/details', async (req, res) => {
+  let transaction;
   try {
     const { date, no } = req.params;
     const details = req.body; // [{ 자재코드, 수량, 출고단가, 금액, ... }]
@@ -1190,8 +1202,20 @@ app.put('/api/quotations/:date/:no/details', async (req, res) => {
       return res.status(400).json({ success: false, message: '수정할 내역이 없습니다.' });
     }
 
+    // 견적 마스터 정보 조회 (사업장코드, 매출처코드 가져오기)
+    const masterResult = await pool.request()
+      .input('견적일자', sql.VarChar(8), date)
+      .input('견적번호', sql.Int, no)
+      .query('SELECT 사업장코드, 매출처코드 FROM 견적 WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호');
+
+    if (masterResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '견적을 찾을 수 없습니다.' });
+    }
+
+    const { 사업장코드, 매출처코드 } = masterResult.recordset[0];
+
     // 트랜잭션 시작
-    const transaction = new sql.Transaction(pool);
+    transaction = new sql.Transaction(pool);
     await transaction.begin();
 
     const request = new sql.Request(transaction);
@@ -1202,17 +1226,48 @@ app.put('/api/quotations/:date/:no/details', async (req, res) => {
       .input('견적번호', sql.Int, no)
       .query('DELETE FROM 견적내역 WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호');
 
+    // 현재 시간 생성
+    const now = new Date();
+    const 수정일자 = now.toISOString().slice(0, 10).replace(/-/g, '');
+
     // 새로운 내역 삽입
-    for (const item of details) {
-      await request
+    for (let i = 0; i < details.length; i++) {
+      const item = details[i];
+      // 견적시간은 varchar(9)이므로 9자리로 제한 (HHMMSSmmm 형식)
+      const 견적시간 = now.toISOString().replace(/[-:]/g, '').replace('T', '').slice(8, 17);
+
+      const insertRequest = new sql.Request(transaction);
+      await insertRequest
+        .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('견적일자', sql.VarChar(8), date)
-        .input('견적번호', sql.Int, no)
-        .input('자재코드', sql.VarChar(8), item.자재코드)
-        .input('수량', sql.Decimal(18, 2), item.수량)
-        .input('출고단가', sql.Decimal(18, 2), item.출고단가)
-        .input('금액', sql.Decimal(18, 2), item.금액).query(`
-          INSERT INTO 견적내역 (견적일자, 견적번호, 자재코드, 수량, 출고단가, 금액)
-          VALUES (@견적일자, @견적번호, @자재코드, @수량, @출고단가, @금액)
+        .input('견적번호', sql.Real, parseFloat(no))
+        .input('견적시간', sql.VarChar(17), 견적시간)
+        .input('자재코드', sql.VarChar(18), item.자재코드)
+        .input('매입처코드', sql.VarChar(8), '')
+        .input('수량', sql.Real, parseFloat(item.수량) || 0)
+        .input('매출처코드', sql.VarChar(8), 매출처코드)
+        .input('계산서발행여부', sql.TinyInt, 1)
+        .input('입고단가', sql.Money, 0)
+        .input('입고부가', sql.Money, 0)
+        .input('출고단가', sql.Money, parseFloat(item.출고단가) || 0)
+        .input('출고부가', sql.Money, 0)
+        .input('적요', sql.VarChar(50), '')
+        .input('사용구분', sql.TinyInt, 0)
+        .input('수정일자', sql.VarChar(8), 수정일자)
+        .input('사용자코드', sql.VarChar(4), '')
+        .query(`
+          INSERT INTO 견적내역 (
+            사업장코드, 견적일자, 견적번호, 견적시간, 자재코드,
+            매입처코드, 수량, 매출처코드, 계산서발행여부, 입고단가,
+            입고부가, 출고단가, 출고부가, 상태코드, 입고일자, 출고일자,
+            적요, 사용구분, 수정일자, 사용자코드
+          )
+          VALUES (
+            @사업장코드, @견적일자, @견적번호, @견적시간, @자재코드,
+            @매입처코드, @수량, @매출처코드, @계산서발행여부, @입고단가,
+            @입고부가, @출고단가, @출고부가, 1, '', '',
+            @적요, @사용구분, @수정일자, @사용자코드
+          )
         `);
     }
 
@@ -1221,6 +1276,100 @@ app.put('/api/quotations/:date/:no/details', async (req, res) => {
     res.json({ success: true, message: '견적 내역이 수정되었습니다.' });
   } catch (err) {
     console.error('견적내역 수정 에러:', err);
+    if (transaction) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        console.error('트랜잭션 롤백 에러:', rollbackErr);
+      }
+    }
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+//------------------------------------------------------------
+// ✅ 자재 출고단가 이력 조회 API (자재입출내역 테이블 기반)
+// GET /api/materials/:materialCode/price-history/:customerCode
+//------------------------------------------------------------
+app.get('/api/materials/:materialCode/price-history/:customerCode', async (req, res) => {
+  try {
+    const { materialCode, customerCode } = req.params;
+
+    // 자재코드 분리 (분류코드 2자리 + 세부코드)
+    const 분류코드 = materialCode.substring(0, 2);
+    const 세부코드 = materialCode.substring(2);
+
+    // 자재입출내역 테이블에서 출고 이력 조회 (최근 10건)
+    const result = await pool.request()
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드)
+      .input('매출처코드', sql.VarChar(8), customerCode)
+      .query(`
+        SELECT TOP 10
+          입출고일자,
+          입출고시간,
+          출고수량,
+          출고단가,
+          출고부가,
+          (출고수량 * 출고단가) AS 금액,
+          적요
+        FROM 자재입출내역
+        WHERE 분류코드 = @분류코드
+          AND 세부코드 = @세부코드
+          AND 매출처코드 = @매출처코드
+          AND 입출고구분 = 2
+          AND 출고수량 > 0
+          AND 사용구분 = 0
+        ORDER BY 입출고일자 DESC, 입출고시간 DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length
+    });
+  } catch (err) {
+    console.error('출고단가 이력 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+//------------------------------------------------------------
+// ✅ 견적 제안가 이력 조회 API (견적내역 테이블 기반)
+// GET /api/materials/:materialCode/quotation-history/:customerCode
+//------------------------------------------------------------
+app.get('/api/materials/:materialCode/quotation-history/:customerCode', async (req, res) => {
+  try {
+    const { materialCode, customerCode } = req.params;
+
+    // 견적내역 + 견적 테이블에서 견적 이력 조회 (최근 10건)
+    const result = await pool.request()
+      .input('자재코드', sql.VarChar(18), materialCode)
+      .input('매출처코드', sql.VarChar(8), customerCode)
+      .query(`
+        SELECT TOP 10
+          q.견적일자,
+          q.견적번호,
+          qd.출고단가,
+          qd.수량,
+          (qd.수량 * qd.출고단가) AS 금액,
+          q.상태코드
+        FROM 견적내역 qd
+        INNER JOIN 견적 q ON qd.견적일자 = q.견적일자 AND qd.견적번호 = q.견적번호
+        WHERE qd.자재코드 = @자재코드
+          AND q.매출처코드 = @매출처코드
+          AND qd.사용구분 = 0
+          AND q.사용구분 = 0
+        ORDER BY q.견적일자 DESC, q.견적번호 DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length
+    });
+  } catch (err) {
+    console.error('견적 제안가 이력 조회 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
   }
 });
@@ -1334,13 +1483,15 @@ app.get('/api/materials', async (req, res) => {
     const { search, 분류코드 } = req.query;
 
     let query = `
-            SELECT 
+            SELECT
                 (m.분류코드 + m.세부코드) as 자재코드,
                 m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
                 m.바코드, m.과세구분, m.적요,
-                c.분류명
+                c.분류명,
+                ml.출고단가1, ml.출고단가2, ml.출고단가3
             FROM 자재 m
             LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
+            LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = '01'
             WHERE m.사용구분 = 0
         `;
 

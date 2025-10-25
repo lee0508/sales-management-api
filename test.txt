@@ -28,8 +28,125 @@
 
 
 
+const quotationModal = document.getElementById('quotationModal');
+console.log('견적서 작성 모달 z-index:', window.getComputedStyle(quotationModal).zIndex);
 
 
+quotation.js:2210 ✅ quotation.js 로드 완료
+sales-management-api/:1469 ✅ 로그인 날짜 자동 설정 완료: 2025-10-25
+supplier.js:67 ✅ 매입처 모달 이벤트 리스너 등록 완료
+quotation.js:15 ✅ 견적관리 DataTable 초기화 시작
+quotation.js:155 ✅ 견적관리 DataTable 초기화 완료
+quotation.js:36 ✅ 견적 데이터 로드: Object
+quotation.js:1583 ✅ 견적서 작성 모달 열기
+quotation.js:1701 ✅ 신규 견적서용 자재 추가 모달 열기 (모드: 신규 견적서)
+quotation.js:1702 모달 z-index: 9999
+quotation.js:1703 모달 display: block
+quotation.js:1704 모달 position: fixed
+
+quotation.js:2210 ✅ quotation.js 로드 완료
+sales-management-api/:1469 ✅ 로그인 날짜 자동 설정 완료: 2025-10-25
+supplier.js:67 ✅ 매입처 모달 이벤트 리스너 등록 완료
+quotation.js:15 ✅ 견적관리 DataTable 초기화 시작
+quotation.js:155 ✅ 견적관리 DataTable 초기화 완료
+quotation.js:36 ✅ 견적 데이터 로드: Object
+quotation.js:1583 ✅ 견적서 작성 모달 열기
+quotation.js:1701 ✅ 신규 견적서용 자재 추가 모달 열기 (모드: 신규 견적서)
+quotation.js:1702 모달 z-index: 9999
+quotation.js:1703 모달 display: block
+quotation.js:1704 모달 position: fixed
+경고: 이해하지 못했거나 직접 검토하지 않은 코드는 DevTools 콘솔에 붙여넣지 마세요. 이렇게 하면 공격자가 신원을 도용하거나 내 컴퓨터를 제어할 수 있습니다. 붙여넣기를 허용하려면 아래에 {PH1}을 입력하고 Enter 키를 누르세요.
+{PH1P 
+VM108:1 Uncaught SyntaxError: Unexpected end of input
+{PH1}
+VM124:1 Uncaught ReferenceError: PH1 is not defined
+    at <anonymous>:1:3
+(익명) @ VM124:1
+PH1
+VM132:1 Uncaught ReferenceError: PH1 is not defined
+    at <anonymous>:1:1
+(익명) @ VM132:1
+const quoationModal = document.getElementById('quotationModal');
+undefined
+console.log('견적서 작성 모달 z-index:',window.getComputerdStyle(quotationModal).zIndex);
+VM501:1 Uncaught TypeError: window.getComputerdStyle is not a function
+    at <anonymous>:1:41
+(익명) @ VM501:1
+const quotationModal = documentgetElementById('quotationModal');
+VM641:1 Uncaught ReferenceError: documentgetElementById is not defined
+    at <anonymous>:1:24
+(익명) @ VM641:1
+const a = 1 + 1;
+undefined
+console.log(a);
+VM723:1 2
+undefined
+http://127.0.0.1:8000/sales-management-api/ 주소로 이동했습니다.
+quotation.js:2210 ✅ quotation.js 로드 완료
+sales-management-api/:1469 ✅ 로그인 날짜 자동 설정 완료: 2025-10-25
+supplier.js:67 ✅ 매입처 모달 이벤트 리스너 등록 완료
+ API 호출 에러: TypeError: Failed to fetch
+apiCall @ sales-management-api/:1609
+await in apiCall
+loadWorkplaceInfo @ sales-management-api/:1638
+(익명) @ sales-management-api/:1651
+ 사업장 정보 로드 실패: TypeError: Failed to fetch
+loadWorkplaceInfo @ sales-management-api/:1645
+await in loadWorkplaceInfo
+(익명) @ sales-management-api/:1651
+http://127.0.0.1:8000/sales-management-api/ 주소로 이동했습니다.
+http://127.0.0.1:8000/sales-management-api/ 주소로 이동했습니다.
+quotation.js:2210 ✅ quotation.js 로드 완료
+sales-management-api/:1469 ✅ 로그인 날짜 자동 설정 완료: 2025-10-25
+supplier.js:67 ✅ 매입처 모달 이벤트 리스너 등록 완료
+quotation.js:15 ✅ 견적관리 DataTable 초기화 시작
+quotation.js:155 ✅ 견적관리 DataTable 초기화 완료
+quotation.js:36 ✅ 견적 데이터 로드: {success: true, data: Array(17), total: 17}
+http://127.0.0.1:8000/sales-management-api/ 주소로 이동했습니다.
+http://127.0.0.1:8000/sales-management-api/ 주소로 이동했습니다.
+quotation.js:2210 ✅ quotation.js 로드 완료
+sales-management-api/:1469 ✅ 로그인 날짜 자동 설정 완료: 2025-10-25
+supplier.js:67 ✅ 매입처 모달 이벤트 리스너 등록 완료
+quotation.js:15 ✅ 견적관리 DataTable 초기화 시작
+quotation.js:155 ✅ 견적관리 DataTable 초기화 완료
+quotation.js:36 ✅ 견적 데이터 로드: {success: true, data: Array(17), total: 17}
+quotation.js:1583 ✅ 견적서 작성 모달 열기
+quotation.js:1596 ✅ 매출처 검색 모달 열기
+quotation.js:1701 ✅ 신규 견적서용 자재 추가 모달 열기 (모드: 신규 견적서)
+quotation.js:1702 모달 z-index: 9999
+quotation.js:1703 모달 display: block
+quotation.js:1704 모달 position: fixed
+
+console.log('견적서 작성 모달 z-index:', window.getComputedStyle(quotationModal).zIndex);
+VM2960:1 견적서 작성 모달 z-index: 1050
+undefined
 
 
+const modal = document.getElementById('quotationDetailAddModal');
+const computed = window.getComputedStyle(modal);
+
+console.log('=== 품목 추가 모달 상태 ===');
+console.log('opacity:', computed.opacity);
+console.log('visibility:', computed.visibility);
+console.log('transform:', computed.transform);
+console.log('left:', computed.left);
+console.log('top:', computed.top);
+console.log('width:', computed.width);
+console.log('height:', computed.height);
+
+// 모달 컨텐츠 확인
+const modalContent = modal.querySelector('.modal-content');
+if (modalContent) {
+  const contentComputed = window.getComputedStyle(modalContent);
+  console.log('\n=== 모달 컨텐츠 상태 ===');
+  console.log('opacity:', contentComputed.opacity);
+  console.log('visibility:', contentComputed.visibility);
+  console.log('display:', contentComputed.display);
+}
+
+
+quotation.js:1594 ✅ 견적서 작성 모달 열기
+quotation.js:1716 ✅ 신규 견적서용 자재 추가 모달 열기 (모드: 신규 견적서)
+quotation.js:1717 견적서 작성 모달 z-index: 900
+quotation.js:1718 품목 추가 모달 z-index: 9999
 

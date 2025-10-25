@@ -1388,6 +1388,28 @@ input[type='checkbox'] {
   background: rgba(0, 0, 0, 0.4);
 }
 
+/* 견적서 작성 모달 & 견적 수정 모달 */
+#quotationModal,
+#quotationEditModal {
+  z-index: 1050 !important;
+}
+
+/* 견적서 작성/수정 시 사용되는 하위 모달들 (더 높은 z-index) */
+#quotationDetailAddModal,
+#quotationDetailEditModal,
+#quotationDetailDeleteModal,
+#customerSearchModal,
+#materialSearchModal,
+#priceHistoryModal,
+#newQuotationMaterialModal {
+  z-index: 9999 !important;
+}
+
+/* 신규 견적서 전용 단가 이력 모달 (가장 높은 z-index) */
+#newQuotationPriceHistoryModal {
+  z-index: 10000 !important;
+}
+
 .modal-content {
   background: #fff;
   margin: 5% auto;

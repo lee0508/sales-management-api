@@ -22,7 +22,7 @@
   <script src="js/postoffice.js" defer></script>
   <!-- <script src="js/transaction.js" defer></script> -->
 
-  <link rel="stylesheet" href="css/onstyles.css" />
+  <link rel="stylesheet" href="css/onstyles.css?v=5" />
   <!-- <link rel="stylesheet" href="css/default.css" /> -->
 </head>
 
@@ -603,12 +603,13 @@
                     <th>수량</th>
                     <th>단가</th>
                     <th>금액</th>
+                    <th style="width: 80px;">관리</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
                 <tfoot>
                   <tr style="background: #f9fafb; font-weight: bold;">
-                    <td colspan="7" style="text-align: right; padding-right: 20px; color: #1f2937;">합계</td>
+                    <td colspan="8" style="text-align: right; padding-right: 20px; color: #1f2937;">합계</td>
                     <td id="quotationEditDetailTotal" style="text-align: right; color: #2563eb; font-size: 16px;">0</td>
                   </tr>
                 </tfoot>
@@ -802,6 +803,465 @@
               " onmouseover="this.style.background='#1d4ed8';"
                  onmouseout="this.style.background='#2563eb';">
                 승인하기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 견적 품목 추가 모달 -->
+        <div id="quotationDetailAddModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 600px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">품목 추가</h2>
+              <button id="closeQuotationDetailAddModal" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                 onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- ✅ 자재 검색 영역 -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">자재 검색</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="materialSearchInput" style="
+                    flex: 1;
+                    padding: 10px 12px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " placeholder="자재명 또는 품목코드로 검색" />
+                  <button onclick="searchMaterials()" style="
+                    padding: 10px 20px;
+                    background: #3b82f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                    white-space: nowrap;
+                  " onmouseover="this.style.background='#2563eb';"
+                     onmouseout="this.style.background='#3b82f6';">
+                    검색
+                  </button>
+                </div>
+              </div>
+
+              <!-- ✅ 검색 결과 테이블 -->
+              <div id="materialSearchResults" style="display: none;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">검색 결과 (클릭하여 선택)</label>
+                <div style="max-height: 200px; overflow-y: auto; border: 2px solid #e5e7eb; border-radius: 8px;">
+                  <table id="materialSearchTable" style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #f9fafb; position: sticky; top: 0;">
+                      <tr>
+                        <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 13px;">품목코드</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 13px;">품명</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 13px;">규격</th>
+                      </tr>
+                    </thead>
+                    <tbody id="materialSearchTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- ✅ 선택된 자재 정보 -->
+              <div id="selectedMaterialInfo" style="display: none; background: #f0f9ff; padding: 12px; border-radius: 8px; border: 2px solid #bfdbfe;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <div style="font-size: 12px; color: #3b82f6; font-weight: 600; margin-bottom: 4px;">선택된 자재</div>
+                    <div style="font-weight: 600; color: #1e40af;" id="selectedMaterialName">-</div>
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 2px;" id="selectedMaterialCode">-</div>
+                  </div>
+                  <button onclick="clearSelectedMaterial()" style="
+                    padding: 6px 12px;
+                    background: #ef4444;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                  ">취소</button>
+                </div>
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">수량</label>
+                <input type="number" id="addDetailQuantity" style="
+                  width: 100%;
+                  padding: 10px 12px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                " placeholder="수량 입력" value="1" min="0" step="0.01" />
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">출고단가</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="number" id="addDetailPrice" style="
+                    flex: 1;
+                    padding: 10px 12px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " placeholder="단가 입력" value="0" min="0" step="0.01" />
+                  <button onclick="showPriceHistory()" style="
+                    padding: 10px 16px;
+                    background: #8b5cf6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                    white-space: nowrap;
+                  " onmouseover="this.style.background='#7c3aed';"
+                     onmouseout="this.style.background='#8b5cf6';">
+                    이전 단가
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">금액 (자동계산)</label>
+                <input type="text" id="addDetailAmount" style="
+                  width: 100%;
+                  padding: 10px 12px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  background: #f9fafb;
+                " readonly value="0" />
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; padding-top: 24px; border-top: 2px solid #e5e7eb;">
+              <button onclick="closeQuotationDetailAddModal()" style="
+                padding: 12px 24px;
+                background: #f3f4f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: #374151;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button onclick="confirmQuotationDetailAdd()" style="
+                padding: 12px 24px;
+                background: #10b981;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#059669';"
+                 onmouseout="this.style.background='#10b981';">
+                추가하기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 견적 품목 수정 모달 -->
+        <div id="quotationDetailEditModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">품목 수정</h2>
+              <button id="closeQuotationDetailEditModal" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                 onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-weight: 500; color: #6b7280;">품목코드:</span>
+                <span id="editDetailCode" style="color: #1f2937; font-weight: 600;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-weight: 500; color: #6b7280;">품명:</span>
+                <span id="editDetailName" style="color: #1f2937;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="font-weight: 500; color: #6b7280;">규격:</span>
+                <span id="editDetailSpec" style="color: #1f2937;">-</span>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">수량</label>
+                <input type="number" id="editDetailQuantity" style="
+                  width: 100%;
+                  padding: 10px 12px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                " min="0" step="0.01" />
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">출고단가</label>
+                <input type="number" id="editDetailPrice" style="
+                  width: 100%;
+                  padding: 10px 12px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                " min="0" step="0.01" />
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">금액 (자동계산)</label>
+                <input type="text" id="editDetailAmount" style="
+                  width: 100%;
+                  padding: 10px 12px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  background: #f9fafb;
+                " readonly />
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; padding-top: 24px; border-top: 2px solid #e5e7eb;">
+              <button onclick="closeQuotationDetailEditModal()" style="
+                padding: 12px 24px;
+                background: #f3f4f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: #374151;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button onclick="confirmQuotationDetailEdit()" style="
+                padding: 12px 24px;
+                background: #3b82f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#2563eb';"
+                 onmouseout="this.style.background='#3b82f6';">
+                수정하기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 견적 품목 삭제 확인 모달 -->
+        <div id="quotationDetailDeleteModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 400px;">
+            <div style="text-align: center; padding: 20px;">
+              <div style="
+                width: 64px;
+                height: 64px;
+                background: #fee2e2;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 20px;
+              ">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </div>
+
+              <h2 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #1f2937;">품목 삭제</h2>
+              <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">이 품목을 삭제하시겠습니까?</p>
+              <p id="deleteDetailInfo" style="margin: 0; color: #374151; font-weight: 600; font-size: 14px;">-</p>
+            </div>
+
+            <div style="display: flex; gap: 12px; padding: 0 20px 20px;">
+              <button onclick="closeQuotationDetailDeleteModal()" style="
+                flex: 1;
+                padding: 12px 24px;
+                background: #f3f4f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: #374151;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button onclick="confirmQuotationDetailDelete()" style="
+                flex: 1;
+                padding: 12px 24px;
+                background: #ef4444;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#dc2626';"
+                 onmouseout="this.style.background='#ef4444';">
+                삭제하기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 출고단가 이력 모달 -->
+        <div id="priceHistoryModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 700px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-top: 2px solid #e5e7eb;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">출고단가 이력</h2>
+              <button id="closePriceHistoryModal" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                 onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <!-- 자재 정보 -->
+            <div style="background: #fef3c7; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 2px solid #fbbf24;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 12px; color: #92400e; font-weight: 600; margin-bottom: 4px;">선택된 자재</div>
+                  <div style="font-weight: 600; color: #78350f;" id="priceHistoryMaterialName">-</div>
+                  <div style="font-size: 12px; color: #92400e; margin-top: 2px;" id="priceHistoryMaterialCode">-</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ✅ 탭 메뉴 -->
+            <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <button id="tabActualPrice" onclick="switchPriceHistoryTab('actual')" style="
+                padding: 12px 20px;
+                background: #3b82f6;
+                border: none;
+                border-bottom: 3px solid #3b82f6;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s;
+                flex: 1;
+              ">
+                실제 출고가
+              </button>
+              <button id="tabQuotationPrice" onclick="switchPriceHistoryTab('quotation')" style="
+                padding: 12px 20px;
+                background: transparent;
+                border: none;
+                border-bottom: 3px solid transparent;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                color: #6b7280;
+                transition: all 0.2s;
+                flex: 1;
+              " onmouseover="if(this.id !== 'tabActualPrice' || this.style.background === 'transparent') this.style.color='#1f2937';"
+                 onmouseout="if(this.style.background === 'transparent') this.style.color='#6b7280';">
+                견적 제안가
+              </button>
+            </div>
+
+            <!-- 이력 테이블 -->
+            <div style="margin-bottom: 16px;">
+              <label id="priceHistoryLabel" style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
+                이 거래처에 실제 출고한 이력 (클릭하여 단가 선택)
+              </label>
+              <div style="max-height: 300px; overflow-y: auto; border: 2px solid #e5e7eb; border-radius: 8px;">
+                <table id="priceHistoryTable" style="width: 100%; border-collapse: collapse;">
+                  <thead id="priceHistoryTableHead" style="background: #f9fafb; position: sticky; top: 0;">
+                    <tr>
+                      <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고일자</th>
+                      <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고단가</th>
+                      <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고수량</th>
+                      <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">적요</th>
+                    </tr>
+                  </thead>
+                  <tbody id="priceHistoryTableBody">
+                    <tr>
+                      <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
+                        이력이 없습니다
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 2px solid #e5e7eb;">
+              <button onclick="closePriceHistoryModal()" style="
+                padding: 12px 24px;
+                background: #f3f4f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: #374151;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">
+                닫기
               </button>
             </div>
           </div>
@@ -2949,7 +3409,7 @@
   <div id="quotationModal" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 1200px; max-height: 90vh; overflow-y: auto;">
       <!-- 헤더 -->
-      <div style="
+      <div id="quotationModalHeader" style="
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -2960,6 +3420,7 @@
             padding: 0 0 16px 0;
             border-bottom: 2px solid var(--border);
             z-index: 10;
+            user-select: none;
           ">
         <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: var(--text-dark)" id="quotationModalTitle">
           견적서 작성
@@ -3165,29 +3626,122 @@
     </div>
   </div>
 
-  <!-- 견적 수정 모달 -->
-  <div id="quotationEditModal" class="modal hidden">
-    <div class="modal-content">
-      <h3>견적 내역 수정</h3>
-      <table id="editDetailTable">
-        <thead>
-          <tr>
-            <th>자재코드</th>
-            <th>수량</th>
-            <th>출고단가</th>
-            <th>금액</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div class="modal-actions">
-        <button onclick="saveQuotationDetails()">저장</button>
-        <button onclick="closeQuotationEditModal()">취소</button>
+
+  <!-- ✅ 매출처 검색 모달 -->
+  <div id="customerSearchModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 800px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0;">매출처 검색</h3>
+        <button onclick="closeCustomerSearchModal()" style="
+          background: #f0f0f0;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+        ">×</button>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+        <input type="text" id="customerSearchInput" placeholder="매출처명 또는 코드 검색"
+          onkeypress="if(event.key === 'Enter') searchCustomers()" style="
+          flex: 1;
+          padding: 10px 12px;
+          border: 2px solid #e5e7eb;
+          border-radius: 6px;
+        " />
+        <button onclick="searchCustomers()" style="
+          padding: 10px 20px;
+          background: #007bff;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+        ">검색</button>
+      </div>
+
+      <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px;">
+        <table id="customerSearchTable" style="width: 100%; border-collapse: collapse;">
+          <thead style="background: #f8f9fa; position: sticky; top: 0;">
+            <tr>
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb;">코드</th>
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb;">매출처명</th>
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb;">전화번호</th>
+              <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb;">선택</th>
+            </tr>
+          </thead>
+          <tbody id="customerSearchTableBody">
+            <tr>
+              <td colspan="4" style="padding: 40px; text-align: center; color: #999;">
+                검색 버튼을 클릭하여 매출처를 검색하세요
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 
-  <!-- ✅ 자재 선택 모달 -->
+  <!-- ✅ 자재 선택 모달 (견적서 작성용) -->
+  <div id="materialSearchModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 900px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0;">자재 검색 및 추가</h3>
+        <button onclick="closeMaterialSearchModal()" style="
+          background: #f0f0f0;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+        ">×</button>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+        <input type="text" id="materialSearchInput2" placeholder="자재명 또는 코드 검색"
+          onkeypress="if(event.key === 'Enter') searchMaterialsForQuotation()" style="
+          flex: 1;
+          padding: 10px 12px;
+          border: 2px solid #e5e7eb;
+          border-radius: 6px;
+        " />
+        <button onclick="searchMaterialsForQuotation()" style="
+          padding: 10px 20px;
+          background: #007bff;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+        ">검색</button>
+      </div>
+
+      <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px;">
+        <table id="materialSearchTable" style="width: 100%; border-collapse: collapse;">
+          <thead style="background: #f8f9fa; position: sticky; top: 0;">
+            <tr>
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb;">자재코드</th>
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb;">자재명</th>
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb;">규격</th>
+              <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb;">출고단가</th>
+              <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb;">이전단가</th>
+              <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb;">선택</th>
+            </tr>
+          </thead>
+          <tbody id="materialSearchTableBody">
+            <tr>
+              <td colspan="6" style="padding: 40px; text-align: center; color: #999;">
+                검색 버튼을 클릭하여 자재를 검색하세요
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ 자재 선택 모달 (기존 - 견적 수정용) -->
   <div id="materialSelectModal" class="modal hidden">
     <div class="modal-content large">
       <span id="closeMaterialModal" class="close">&times;</span>
@@ -3212,7 +3766,318 @@
       </table>
     </div>
   </div>
-  
+
+  <!-- 테스트용 간단한 모달 -->
+  <div id="testSimpleModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0;">자재 목록 (테스트)</h3>
+        <button onclick="closeTestSimpleModal()" style="
+          background: #f0f0f0;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+        ">×</button>
+      </div>
+      <div style="padding: 40px; text-align: center; color: #666;">
+        테스트용 간단한 모달입니다.
+      </div>
+    </div>
+  </div>
+
+  <!-- 신규 견적서용 품목 추가 모달 -->
+  <div id="newQuotationMaterialModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">품목 추가</h2>
+        <button onclick="closeNewQuotationMaterialModal()" style="
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: #f3f4f6;
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          color: #6b7280;
+          transition: all 0.2s;
+        " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+           onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+          &times;
+        </button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <!-- 자재 검색 영역 -->
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">자재 검색</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="newMaterialSearchInput" style="
+              flex: 1;
+              padding: 10px 12px;
+              border: 2px solid #e5e7eb;
+              border-radius: 8px;
+              font-size: 14px;
+            " placeholder="자재명 또는 품목코드로 검색" onkeypress="if(event.key === 'Enter') searchNewMaterials()" />
+            <button onclick="searchNewMaterials()" style="
+              padding: 10px 20px;
+              background: #3b82f6;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+              color: white;
+              transition: all 0.2s;
+              white-space: nowrap;
+            " onmouseover="this.style.background='#2563eb';"
+               onmouseout="this.style.background='#3b82f6';">
+              검색
+            </button>
+          </div>
+        </div>
+
+        <!-- 검색 결과 테이블 -->
+        <div id="newMaterialSearchResults" style="display: none;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">검색 결과 (클릭하여 선택)</label>
+          <div style="max-height: 200px; overflow-y: auto; border: 2px solid #e5e7eb; border-radius: 8px;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead style="background: #f9fafb; position: sticky; top: 0;">
+                <tr>
+                  <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 13px;">품목코드</th>
+                  <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 13px;">품명</th>
+                  <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 13px;">규격</th>
+                </tr>
+              </thead>
+              <tbody id="newMaterialSearchTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 선택된 자재 정보 -->
+        <div id="newSelectedMaterialInfo" style="display: none; background: #f0f9ff; padding: 12px; border-radius: 8px; border: 2px solid #bfdbfe;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 12px; color: #3b82f6; font-weight: 600; margin-bottom: 4px;">선택된 자재</div>
+              <div style="font-weight: 600; color: #1e40af;" id="newSelectedMaterialName">-</div>
+              <div style="font-size: 12px; color: #6b7280; margin-top: 2px;" id="newSelectedMaterialCode">-</div>
+            </div>
+            <button onclick="clearNewSelectedMaterial()" style="
+              padding: 6px 12px;
+              background: #ef4444;
+              border: none;
+              border-radius: 6px;
+              font-size: 12px;
+              font-weight: 500;
+              cursor: pointer;
+              color: white;
+            ">취소</button>
+          </div>
+        </div>
+
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">수량</label>
+          <input type="number" id="newDetailQuantity" style="
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+          " placeholder="수량 입력" value="1" min="0" step="0.01" />
+        </div>
+
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">출고단가</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="number" id="newDetailPrice" style="
+              flex: 1;
+              padding: 10px 12px;
+              border: 2px solid #e5e7eb;
+              border-radius: 8px;
+              font-size: 14px;
+            " placeholder="단가 입력" value="0" min="0" step="0.01" />
+            <button onclick="showNewPriceHistory()" style="
+              padding: 10px 16px;
+              background: #8b5cf6;
+              border: none;
+              border-radius: 8px;
+              font-size: 13px;
+              font-weight: 500;
+              cursor: pointer;
+              color: white;
+              transition: all 0.2s;
+              white-space: nowrap;
+            " onmouseover="this.style.background='#7c3aed';"
+               onmouseout="this.style.background='#8b5cf6';">
+              이전 단가
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">금액 (자동계산)</label>
+          <input type="text" id="newDetailAmount" style="
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #f9fafb;
+          " readonly value="0" />
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; padding-top: 24px; border-top: 2px solid #e5e7eb;">
+        <button onclick="closeNewQuotationMaterialModal()" style="
+          padding: 12px 24px;
+          background: #f3f4f6;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          color: #374151;
+          transition: all 0.2s;
+        " onmouseover="this.style.background='#e5e7eb';"
+           onmouseout="this.style.background='#f3f4f6';">
+          취소
+        </button>
+        <button onclick="confirmNewQuotationMaterialAdd()" style="
+          padding: 12px 24px;
+          background: #10b981;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          color: white;
+          transition: all 0.2s;
+        " onmouseover="this.style.background='#059669';"
+           onmouseout="this.style.background='#10b981';">
+          추가하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 신규 견적서 전용 단가 이력 모달 -->
+  <div id="newQuotationPriceHistoryModal" class="modal" style="display: none; position: fixed; z-index: 10000;">
+    <div class="modal-content" style="max-width: 700px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-top: 2px solid #e5e7eb;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">출고단가 이력</h2>
+        <button id="closeNewPriceHistoryModal" onclick="closeNewPriceHistoryModal()" style="
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: #f3f4f6;
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          color: #6b7280;
+          transition: all 0.2s;
+        " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+           onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+          &times;
+        </button>
+      </div>
+
+      <!-- 자재 정보 -->
+      <div style="background: #fef3c7; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 2px solid #fbbf24;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 12px; color: #92400e; font-weight: 600; margin-bottom: 4px;">선택된 자재</div>
+            <div style="font-weight: 600; color: #78350f;" id="newPriceHistoryMaterialName">-</div>
+            <div style="font-size: 12px; color: #92400e; margin-top: 2px;" id="newPriceHistoryMaterialCode">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ✅ 탭 메뉴 -->
+      <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+        <button id="newTabActualPrice" onclick="switchNewPriceHistoryTab('actual')" style="
+          padding: 12px 20px;
+          background: #3b82f6;
+          border: none;
+          border-bottom: 3px solid #3b82f6;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          color: white;
+          transition: all 0.2s;
+          flex: 1;
+        ">
+          실제 출고가
+        </button>
+        <button id="newTabQuotationPrice" onclick="switchNewPriceHistoryTab('quotation')" style="
+          padding: 12px 20px;
+          background: transparent;
+          border: none;
+          border-bottom: 3px solid transparent;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          color: #6b7280;
+          transition: all 0.2s;
+          flex: 1;
+        " onmouseover="if(this.id !== 'newTabActualPrice' || this.style.background === 'transparent') this.style.color='#1f2937';"
+           onmouseout="if(this.style.background === 'transparent') this.style.color='#6b7280';">
+          견적 제안가
+        </button>
+      </div>
+
+      <!-- 이력 테이블 -->
+      <div style="margin-bottom: 16px;">
+        <label id="newPriceHistoryLabel" style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
+          이 거래처에 실제 출고한 이력 (클릭하여 단가 선택)
+        </label>
+        <div style="max-height: 300px; overflow-y: auto; border: 2px solid #e5e7eb; border-radius: 8px;">
+          <table id="newPriceHistoryTable" style="width: 100%; border-collapse: collapse;">
+            <thead id="newPriceHistoryTableHead" style="background: #f9fafb; position: sticky; top: 0;">
+              <tr>
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고일자</th>
+                <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고단가</th>
+                <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고수량</th>
+                <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">적요</th>
+              </tr>
+            </thead>
+            <tbody id="newPriceHistoryTableBody">
+              <tr>
+                <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
+                  이력이 없습니다
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 2px solid #e5e7eb;">
+        <button onclick="closeNewPriceHistoryModal()" style="
+          padding: 12px 24px;
+          background: #f3f4f6;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          color: #374151;
+          transition: all 0.2s;
+        " onmouseover="this.style.background='#e5e7eb';"
+           onmouseout="this.style.background='#f3f4f6';">
+          닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 매입처 신규등록 모달 -->
   <div id="supplierModal" style="
         display: none;
