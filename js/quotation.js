@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 $(document).ready(function () {
+  let table;
   console.log('✅ 견적관리 DataTable 초기화 시작');
 
   // DataTable 초기화
@@ -153,6 +154,11 @@ $(document).ready(function () {
   });
 
   console.log('✅ 견적관리 DataTable 초기화 완료');
+  // 총 발주 수 업데이트
+  quotationTable.on('draw', function () {
+    const info = quotationTable.page.info();
+    $('#orderCount').text(info.recordsDisplay);
+  });
 
   // 전체 선택 체크박스
   $('#selectAllQuotations').on('change', function () {
@@ -267,6 +273,24 @@ $(document).ready(function () {
 
   // ✅ 견적 데이터 로드 함수
   async function loadQuotations() {
+    // 이미 DataTable이 존재하면 파괴
+    if (table) {
+      table.destroy();
+    }
+    // 날짜 필터 값 가져오기
+    const startDate = document.getElementById('quotationStartDate').value.replace(/-/g, '');
+    const endDate = document.getElementById('quotationEndDate').value.replace(/-/g, '');
+    const status = document.getElementById('quotationStatusFilter').value;
+
+    // API URL 구성
+    let apiUrl = 'http://localhost:3000/api/quotations?';
+    if (status) {
+      apiUrl += `상태코드=${status}&`;
+    }
+    if (startDate && endDate) {
+      apiUrl += `startDate=${startDate}&endDate=${endDate}&`;
+    }
+
     console.log('✅ 견적 데이터 로드 시작');
 
     try {
@@ -286,9 +310,10 @@ $(document).ready(function () {
         // ✅ 해당 기간 건수 표시
         const countEl = document.getElementById('quotationCount');
         if (countEl) {
-          const periodCount = result.data.length;
+          const periodCount = result.total;
+          console.log(`📊 최근 1개월 견적 건수: ${periodCount}`);
           countEl.innerText = `${periodCount.toLocaleString()}`;
-          console.log(`📊 최근 1개월 견적 수: ${periodCount}`);
+          // console.log(`📊 최근 1개월 견적 수: ${periodCount}`);
         }
 
         // ✅ DataTable 업데이트
@@ -418,6 +443,7 @@ $(document).ready(function () {
   }
 
   // 전역 변수로 저장
+  window.loadQuotations = loadQuotations;
   window.quotationTableInstance = quotationTable;
   window.openQuotationDetailModal = openQuotationDetailModal;
   window.openQuotationEditModal = openQuotationEditModal;
@@ -2119,7 +2145,7 @@ async function submitQuotation(event) {
         적요,
         상태코드: 1, // 작성중
       },
-      details: newQuotationDetails.map(detail => ({
+      details: newQuotationDetails.map((detail) => ({
         자재코드: detail.자재코드,
         수량: detail.수량,
         출고단가: detail.단가, // '단가' 필드를 '출고단가'로 변환
@@ -2349,8 +2375,12 @@ async function searchNewMaterials() {
 
       tr.innerHTML = `
         <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${자재코드}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${m.자재명}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${m.규격 || '-'}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${
+          m.자재명
+        }</td>
+        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${
+          m.규격 || '-'
+        }</td>
       `;
 
       tbody.appendChild(tr);
@@ -2371,7 +2401,9 @@ function selectNewMaterial(material) {
   const 자재코드 = material.분류코드 + material.세부코드;
 
   document.getElementById('newSelectedMaterialName').textContent = material.자재명;
-  document.getElementById('newSelectedMaterialCode').textContent = `[${자재코드}] ${material.규격 || ''}`;
+  document.getElementById('newSelectedMaterialCode').textContent = `[${자재코드}] ${
+    material.규격 || ''
+  }`;
   document.getElementById('newSelectedMaterialInfo').style.display = 'block';
 
   document.getElementById('newMaterialSearchResults').style.display = 'none';
@@ -2450,7 +2482,7 @@ function confirmNewQuotationMaterialAdd() {
 }
 
 // 금액 자동 계산
-$(document).ready(function() {
+$(document).ready(function () {
   $('#newDetailQuantity, #newDetailPrice').on('input', function () {
     const 수량 = parseFloat($('#newDetailQuantity').val()) || 0;
     const 단가 = parseFloat($('#newDetailPrice').val()) || 0;

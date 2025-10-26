@@ -4,6 +4,8 @@ require('dotenv').config(); // 환경변수 로드
 const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
+const bcrypt = require('bcrypt');
+const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,12 +18,29 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : ['http://localhost:3000'];
 
 // 미들웨어 설정
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// 세션 설정
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production', // HTTPS에서만 true
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24시간
+    },
+  }),
+);
+
 app.use(express.static(path.join(__dirname))); // index.html 및 css/js 제공
 
 // SQL Server 연결 설정 - 환경변수 사용
@@ -34,7 +53,7 @@ const dbConfig = {
   options: {
     encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === 'true',
-    enableArithAbort: true
+    enableArithAbort: true,
   },
   pool: {
     max: 10,
@@ -81,6 +100,49 @@ connectDB()
     process.exit(1);
   });
 
+// ==================== 인증 미들웨어 ====================
+
+/**
+ * 인증 확인 미들웨어
+ * 로그인된 사용자만 API에 접근할 수 있도록 제한
+ */
+function requireAuth(req, res, next) {
+  if (req.session && req.session.user) {
+    return next();
+  }
+  return res.status(401).json({
+    success: false,
+    message: '로그인이 필요합니다.',
+  });
+}
+
+/**
+ * 권한 확인 미들웨어
+ * @param {string|string[]} allowedRoles - 허용된 권한 (예: 'admin' 또는 ['admin', 'manager'])
+ */
+function requireRole(allowedRoles) {
+  return (req, res, next) => {
+    if (!req.session || !req.session.user) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
+
+    const userRole = req.session.user.사용자권한;
+    const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+
+    if (!roles.includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: '권한이 없습니다.',
+      });
+    }
+
+    next();
+  };
+}
+
 // ==================== 인증 API ====================
 
 // 로그인
@@ -95,54 +157,76 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // 사용자 테이블에서 인증
-    const result = await pool
-      .request()
-      .input('사용자코드', sql.VarChar(4), userId)
-      .input('로그인비밀번호', sql.VarChar(4), password).query(`
-                SELECT 
-                    u.사용자코드, u.사용자명, u.사용자권한, u.사업장코드,
+    // 사용자 정보 조회 (비밀번호 포함)
+    const userResult = await pool.request().input('사용자코드', sql.VarChar(4), userId).query(`
+                SELECT
+                    u.사용자코드, u.사용자명, u.사용자권한, u.사업장코드, u.로그인비밀번호,
                     s.사업장명, s.사업자번호, s.대표자명
                 FROM 사용자 u
                 LEFT JOIN 사업장 s ON u.사업장코드 = s.사업장코드
-                WHERE u.사용자코드 = @사용자코드 
-                AND u.로그인비밀번호 = @로그인비밀번호
+                WHERE u.사용자코드 = @사용자코드
                 AND u.사용구분 = 0
             `);
 
-    if (result.recordset.length > 0) {
-      const user = result.recordset[0];
-
-      // 로그인 시간 업데이트
-      const 시작일시 = new Date().toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
-
-      await pool
-        .request()
-        .input('사용자코드', sql.VarChar(4), userId)
-        .input('시작일시', sql.VarChar(17), 시작일시).query(`
-                    UPDATE 사용자 
-                    SET 시작일시 = @시작일시, 로그인여부 = 'Y'
-                    WHERE 사용자코드 = @사용자코드
-                `);
-
-      res.json({
-        success: true,
-        message: '로그인 성공',
-        data: {
-          사용자코드: user.사용자코드,
-          사용자명: user.사용자명,
-          사용자권한: user.사용자권한,
-          사업장코드: user.사업장코드,
-          사업장명: user.사업장명,
-          token: 'jwt-token-' + userId, // 실제로는 JWT 토큰 생성
-        },
-      });
-    } else {
-      res.status(401).json({
+    if (userResult.recordset.length === 0) {
+      return res.status(401).json({
         success: false,
         message: '아이디 또는 비밀번호가 올바르지 않습니다.',
       });
     }
+
+    const user = userResult.recordset[0];
+    const storedPassword = user.로그인비밀번호;
+    let isPasswordValid = false;
+
+    // 비밀번호 검증: bcrypt 해시 또는 평문 지원 (하위 호환성)
+    if (storedPassword.startsWith('$2b$') || storedPassword.startsWith('$2a$')) {
+      // bcrypt 해시된 비밀번호
+      isPasswordValid = await bcrypt.compare(password, storedPassword);
+    } else {
+      // 평문 비밀번호 (레거시 지원)
+      isPasswordValid = password === storedPassword;
+    }
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: '아이디 또는 비밀번호가 올바르지 않습니다.',
+      });
+    }
+
+    // 로그인 시간 업데이트
+    const 시작일시 = new Date().toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
+
+    await pool
+      .request()
+      .input('사용자코드', sql.VarChar(4), userId)
+      .input('시작일시', sql.VarChar(17), 시작일시).query(`
+                UPDATE 사용자
+                SET 시작일시 = @시작일시, 로그인여부 = 'Y'
+                WHERE 사용자코드 = @사용자코드
+            `);
+
+    // 세션에 사용자 정보 저장
+    req.session.user = {
+      사용자코드: user.사용자코드,
+      사용자명: user.사용자명,
+      사용자권한: user.사용자권한,
+      사업장코드: user.사업장코드,
+      사업장명: user.사업장명,
+    };
+
+    res.json({
+      success: true,
+      message: '로그인 성공',
+      data: {
+        사용자코드: user.사용자코드,
+        사용자명: user.사용자명,
+        사용자권한: user.사용자권한,
+        사업장코드: user.사업장코드,
+        사업장명: user.사업장명,
+      },
+    });
   } catch (err) {
     console.error('로그인 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류' });
@@ -152,7 +236,14 @@ app.post('/api/auth/login', async (req, res) => {
 // 로그아웃
 app.post('/api/auth/logout', async (req, res) => {
   try {
-    const { userId } = req.body;
+    const userId = req.body.userId || (req.session.user && req.session.user.사용자코드);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: '사용자 정보가 없습니다.',
+      });
+    }
 
     const 종료일시 = new Date().toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
 
@@ -160,10 +251,17 @@ app.post('/api/auth/logout', async (req, res) => {
       .request()
       .input('사용자코드', sql.VarChar(4), userId)
       .input('종료일시', sql.VarChar(17), 종료일시).query(`
-                UPDATE 사용자 
+                UPDATE 사용자
                 SET 종료일시 = @종료일시, 로그인여부 = 'N'
                 WHERE 사용자코드 = @사용자코드
             `);
+
+    // 세션 삭제
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('세션 삭제 에러:', err);
+      }
+    });
 
     res.json({
       success: true,
@@ -637,7 +735,34 @@ app.get('/api/suppliers', async (req, res) => {
   }
 });
 
-// 매입처 코드 조회
+// 매입처 상세 조회 (REST API 표준)
+app.get('/api/suppliers/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    const result = await pool
+      .request()
+      .input('매입처코드', sql.VarChar(8), code)
+      .query('SELECT * FROM 매입처 WHERE 매입처코드 = @매입처코드');
+
+    if (result.recordset.length > 0) {
+      res.json({
+        success: true,
+        data: result.recordset[0],
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: '매입처를 찾을 수 없습니다.',
+      });
+    }
+  } catch (err) {
+    console.error('매입처 상세 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 매입처 코드 조회 (하위 호환성)
 app.get('/api/suppliers_search_code/:code', async (req, res) => {
   try {
     const { code } = req.params;
@@ -664,7 +789,90 @@ app.get('/api/suppliers_search_code/:code', async (req, res) => {
   }
 });
 
-// 매입처 신규 등록
+// 매입처 신규 등록 (REST API 표준)
+app.post('/api/suppliers', async (req, res) => {
+  try {
+    const {
+      사업장코드,
+      매입처코드,
+      매입처명,
+      사업자번호,
+      법인번호,
+      대표자명,
+      대표자주민번호,
+      개업일자,
+      우편번호,
+      주소,
+      번지,
+      업태,
+      업종,
+      전화번호,
+      팩스번호,
+      은행코드,
+      계좌번호,
+      계산서발행여부,
+      계산서발행율,
+      담당자명,
+      사용구분,
+      비고란,
+      단가구분,
+    } = req.body;
+
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드 || '')
+      .input('매입처코드', sql.VarChar(8), 매입처코드)
+      .input('매입처명', sql.VarChar(30), 매입처명)
+      .input('사업자번호', sql.VarChar(14), 사업자번호 || '')
+      .input('법인번호', sql.VarChar(14), 법인번호 || '')
+      .input('대표자명', sql.VarChar(30), 대표자명 || '')
+      .input('대표자주민번호', sql.VarChar(14), 대표자주민번호 || '')
+      .input('개업일자', sql.VarChar(8), 개업일자 || '')
+      .input('우편번호', sql.VarChar(7), 우편번호 || '')
+      .input('주소', sql.VarChar(60), 주소 || '')
+      .input('번지', sql.VarChar(60), 번지 || '')
+      .input('업태', sql.VarChar(30), 업태 || '')
+      .input('업종', sql.VarChar(30), 업종 || '')
+      .input('전화번호', sql.VarChar(20), 전화번호 || '')
+      .input('팩스번호', sql.VarChar(14), 팩스번호 || '')
+      .input('은행코드', sql.VarChar(2), 은행코드 || '')
+      .input('계좌번호', sql.VarChar(20), 계좌번호 || '')
+      .input('계산서발행여부', sql.TinyInt, 계산서발행여부 || 1)
+      .input('계산서발행율', sql.Money, 계산서발행율 || 100)
+      .input('담당자명', sql.VarChar(30), 담당자명 || '')
+      .input('사용구분', sql.TinyInt, 사용구분 || 0)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), '')
+      .input('비고란', sql.VarChar(100), 비고란 || '')
+      .input('단가구분', sql.TinyInt, 단가구분 || 1).query(`
+                INSERT INTO 매입처 (
+                    사업장코드, 매입처코드, 매입처명, 사업자번호, 법인번호,
+                    대표자명, 대표자주민번호, 개업일자, 우편번호, 주소, 번지,
+                    업태, 업종, 전화번호, 팩스번호, 은행코드, 계좌번호,
+                    계산서발행여부, 계산서발행율, 담당자명, 사용구분,
+                    수정일자, 사용자코드, 비고란, 단가구분
+                ) VALUES (
+                    @사업장코드, @매입처코드, @매입처명, @사업자번호, @법인번호,
+                    @대표자명, @대표자주민번호, @개업일자, @우편번호, @주소, @번지,
+                    @업태, @업종, @전화번호, @팩스번호, @은행코드, @계좌번호,
+                    @계산서발행여부, @계산서발행율, @담당자명, @사용구분,
+                    @수정일자, @사용자코드, @비고란, @단가구분
+                )
+            `);
+
+    res.json({
+      success: true,
+      message: '매입처가 등록되었습니다.',
+    });
+  } catch (err) {
+    console.error('매입처 등록 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 매입처 신규 등록 (하위 호환성)
 app.post('/api/suppliers_new', async (req, res) => {
   try {
     const {
@@ -838,7 +1046,118 @@ app.put('/api/suppliers_edit/:code', async (req, res) => {
   }
 });
 
-// 매입처 삭제
+// 매입처 수정 (REST API 표준)
+app.put('/api/suppliers/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const {
+      매입처명,
+      사업자번호,
+      법인번호,
+      대표자명,
+      대표자주민번호,
+      개업일자,
+      우편번호,
+      주소,
+      번지,
+      업태,
+      업종,
+      전화번호,
+      팩스번호,
+      은행코드,
+      계좌번호,
+      계산서발행여부,
+      계산서발행율,
+      담당자명,
+      사용구분,
+      비고란,
+      단가구분,
+    } = req.body;
+
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    await pool
+      .request()
+      .input('매입처코드', sql.VarChar(8), code)
+      .input('매입처명', sql.VarChar(30), 매입처명)
+      .input('사업자번호', sql.VarChar(14), 사업자번호 || '')
+      .input('법인번호', sql.VarChar(14), 법인번호 || '')
+      .input('대표자명', sql.VarChar(30), 대표자명 || '')
+      .input('대표자주민번호', sql.VarChar(14), 대표자주민번호 || '')
+      .input('개업일자', sql.VarChar(8), 개업일자 || '')
+      .input('우편번호', sql.VarChar(7), 우편번호 || '')
+      .input('주소', sql.VarChar(60), 주소 || '')
+      .input('번지', sql.VarChar(60), 번지 || '')
+      .input('업태', sql.VarChar(30), 업태 || '')
+      .input('업종', sql.VarChar(30), 업종 || '')
+      .input('전화번호', sql.VarChar(20), 전화번호 || '')
+      .input('팩스번호', sql.VarChar(14), 팩스번호 || '')
+      .input('은행코드', sql.VarChar(2), 은행코드 || '')
+      .input('계좌번호', sql.VarChar(20), 계좌번호 || '')
+      .input('계산서발행여부', sql.TinyInt, 계산서발행여부 || 1)
+      .input('계산서발행율', sql.Money, 계산서발행율 || 100)
+      .input('담당자명', sql.VarChar(30), 담당자명 || '')
+      .input('사용구분', sql.TinyInt, 사용구분 || 0)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('비고란', sql.VarChar(100), 비고란 || '')
+      .input('단가구분', sql.TinyInt, 단가구분 || 1).query(`
+                UPDATE 매입처 SET
+                    매입처명 = @매입처명,
+                    사업자번호 = @사업자번호,
+                    법인번호 = @법인번호,
+                    대표자명 = @대표자명,
+                    대표자주민번호 = @대표자주민번호,
+                    개업일자 = @개업일자,
+                    우편번호 = @우편번호,
+                    주소 = @주소,
+                    번지 = @번지,
+                    업태 = @업태,
+                    업종 = @업종,
+                    전화번호 = @전화번호,
+                    팩스번호 = @팩스번호,
+                    은행코드 = @은행코드,
+                    계좌번호 = @계좌번호,
+                    계산서발행여부 = @계산서발행여부,
+                    계산서발행율 = @계산서발행율,
+                    담당자명 = @담당자명,
+                    사용구분 = @사용구분,
+                    수정일자 = @수정일자,
+                    비고란 = @비고란,
+                    단가구분 = @단가구분
+                WHERE 매입처코드 = @매입처코드
+            `);
+
+    res.json({
+      success: true,
+      message: '매입처가 수정되었습니다.',
+    });
+  } catch (err) {
+    console.error('매입처 수정 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 매입처 삭제 (REST API 표준)
+app.delete('/api/suppliers/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    await pool
+      .request()
+      .input('매입처코드', sql.VarChar(8), code)
+      .query('DELETE FROM 매입처 WHERE 매입처코드 = @매입처코드');
+
+    res.json({
+      success: true,
+      message: '매입처가 삭제되었습니다.',
+    });
+  } catch (err) {
+    console.error('매입처 삭제 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 매입처 삭제 (하위 호환성)
 app.delete('/api/suppliers_delete/:code', async (req, res) => {
   try {
     const { code } = req.params;
@@ -863,12 +1182,12 @@ app.delete('/api/suppliers_delete/:code', async (req, res) => {
 // 견적 리스트
 app.get('/api/quotations', async (req, res) => {
   try {
-    const { search, 사업장코드, 상태코드 } = req.query;
-    const startDate = req.query.startDate || req.query.start;
-    const endDate = req.query.endDate || req.query.end;
+    const { search, 사업장코드, 상태코드, startDate, endDate } = req.query;
+    //const startDate = req.query.startDate || req.query.start;
+    //const endDate = req.query.endDate || req.query.end;
 
     let query = `
-            SELECT 
+            SELECT
                 q.사업장코드, q.견적일자, q.견적번호, q.매출처코드,
                 c.매출처명, q.출고희망일자, q.제목, q.적요, q.상태코드,
                 q.수정일자, u.사용자명
@@ -878,25 +1197,32 @@ app.get('/api/quotations', async (req, res) => {
             WHERE q.사용구분 = 0
         `;
 
+    const request = pool.request();
+
     if (사업장코드) {
-      query += ` AND q.사업장코드 = '${사업장코드}'`;
+      request.input('사업장코드', sql.VarChar(2), 사업장코드);
+      query += ` AND q.사업장코드 = @사업장코드`;
     }
 
     if (상태코드) {
-      query += ` AND q.상태코드 = ${상태코드}`;
+      request.input('상태코드', sql.Int, parseInt(상태코드));
+      query += ` AND q.상태코드 = @상태코드`;
     }
 
     if (startDate && endDate) {
-      query += ` AND q.견적일자 BETWEEN '${startDate}' AND '${endDate}'`;
+      request.input('startDate', sql.VarChar(8), startDate);
+      request.input('endDate', sql.VarChar(8), endDate);
+      query += ` AND q.견적일자 BETWEEN @startDate AND @endDate`;
     }
 
     if (search) {
-      query += ` AND (c.매출처명 LIKE '%${search}%' OR q.제목 LIKE '%${search}%')`;
+      request.input('search', sql.NVarChar, `%${search}%`);
+      query += ` AND (c.매출처명 LIKE @search OR q.제목 LIKE @search)`;
     }
 
     query += ` ORDER BY q.견적일자 DESC, q.견적번호 DESC`;
 
-    const result = await pool.request().query(query);
+    const result = await request.query(query);
 
     res.json({
       success: true,
@@ -1247,10 +1573,13 @@ app.put('/api/quotations/:date/:no/details', async (req, res) => {
     }
 
     // 견적 마스터 정보 조회 (사업장코드, 매출처코드 가져오기)
-    const masterResult = await pool.request()
+    const masterResult = await pool
+      .request()
       .input('견적일자', sql.VarChar(8), date)
       .input('견적번호', sql.Int, no)
-      .query('SELECT 사업장코드, 매출처코드 FROM 견적 WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호');
+      .query(
+        'SELECT 사업장코드, 매출처코드 FROM 견적 WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호',
+      );
 
     if (masterResult.recordset.length === 0) {
       return res.status(404).json({ success: false, message: '견적을 찾을 수 없습니다.' });
@@ -1298,8 +1627,7 @@ app.put('/api/quotations/:date/:no/details', async (req, res) => {
         .input('적요', sql.VarChar(50), '')
         .input('사용구분', sql.TinyInt, 0)
         .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), '')
-        .query(`
+        .input('사용자코드', sql.VarChar(4), '').query(`
           INSERT INTO 견적내역 (
             사업장코드, 견적일자, 견적번호, 견적시간, 자재코드,
             매입처코드, 수량, 매출처코드, 계산서발행여부, 입고단가,
@@ -1344,11 +1672,11 @@ app.get('/api/materials/:materialCode/price-history/:customerCode', async (req, 
     const 세부코드 = materialCode.substring(2);
 
     // 자재입출내역 테이블에서 출고 이력 조회 (최근 10건)
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input('분류코드', sql.VarChar(2), 분류코드)
       .input('세부코드', sql.VarChar(16), 세부코드)
-      .input('매출처코드', sql.VarChar(8), customerCode)
-      .query(`
+      .input('매출처코드', sql.VarChar(8), customerCode).query(`
         SELECT TOP 10
           입출고일자,
           입출고시간,
@@ -1370,7 +1698,7 @@ app.get('/api/materials/:materialCode/price-history/:customerCode', async (req, 
     res.json({
       success: true,
       data: result.recordset,
-      total: result.recordset.length
+      total: result.recordset.length,
     });
   } catch (err) {
     console.error('출고단가 이력 조회 에러:', err);
@@ -1387,10 +1715,10 @@ app.get('/api/materials/:materialCode/quotation-history/:customerCode', async (r
     const { materialCode, customerCode } = req.params;
 
     // 견적내역 + 견적 테이블에서 견적 이력 조회 (최근 10건)
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input('자재코드', sql.VarChar(18), materialCode)
-      .input('매출처코드', sql.VarChar(8), customerCode)
-      .query(`
+      .input('매출처코드', sql.VarChar(8), customerCode).query(`
         SELECT TOP 10
           q.견적일자,
           q.견적번호,
@@ -1410,7 +1738,7 @@ app.get('/api/materials/:materialCode/quotation-history/:customerCode', async (r
     res.json({
       success: true,
       data: result.recordset,
-      total: result.recordset.length
+      total: result.recordset.length,
     });
   } catch (err) {
     console.error('견적 제안가 이력 조회 에러:', err);
@@ -1426,7 +1754,7 @@ app.get('/api/orders', async (req, res) => {
     const { search, 사업장코드, 상태코드, startDate, endDate } = req.query;
 
     let query = `
-            SELECT 
+            SELECT
                 o.사업장코드, o.발주일자, o.발주번호, o.매입처코드,
                 s.매입처명, o.입고희망일자, o.제목, o.적요, o.상태코드,
                 o.수정일자, u.사용자명
@@ -1436,25 +1764,32 @@ app.get('/api/orders', async (req, res) => {
             WHERE o.사용구분 = 0
         `;
 
+    const request = pool.request();
+
     if (사업장코드) {
-      query += ` AND o.사업장코드 = '${사업장코드}'`;
+      request.input('사업장코드', sql.VarChar(2), 사업장코드);
+      query += ` AND o.사업장코드 = @사업장코드`;
     }
 
     if (상태코드) {
-      query += ` AND o.상태코드 = ${상태코드}`;
+      request.input('상태코드', sql.Int, parseInt(상태코드));
+      query += ` AND o.상태코드 = @상태코드`;
     }
 
     if (startDate && endDate) {
-      query += ` AND o.발주일자 BETWEEN '${startDate}' AND '${endDate}'`;
+      request.input('startDate', sql.VarChar(8), startDate);
+      request.input('endDate', sql.VarChar(8), endDate);
+      query += ` AND o.발주일자 BETWEEN @startDate AND @endDate`;
     }
 
     if (search) {
-      query += ` AND (s.매입처명 LIKE '%${search}%' OR o.제목 LIKE '%${search}%')`;
+      request.input('search', sql.NVarChar, `%${search}%`);
+      query += ` AND (s.매입처명 LIKE @search OR o.제목 LIKE @search)`;
     }
 
     query += ` ORDER BY o.발주일자 DESC, o.발주번호 DESC`;
 
-    const result = await pool.request().query(query);
+    const result = await request.query(query);
 
     res.json({
       success: true,
@@ -1521,6 +1856,196 @@ app.get('/api/orders/:date/:no', async (req, res) => {
   }
 });
 
+// 발주 생성 (마스터 + 디테일)
+app.post('/api/orders', async (req, res) => {
+  const transaction = pool.transaction();
+
+  try {
+    const { master, details } = req.body;
+
+    await transaction.begin();
+
+    // 1. 발주번호 생성 (로그 테이블에서 최종번호 조회)
+    const logResult = await transaction
+      .request()
+      .input('테이블명', sql.VarChar(20), '발주')
+      .input('베이스코드', sql.VarChar(20), master.발주일자).query(`
+        SELECT 최종로그
+        FROM 로그
+        WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
+      `);
+
+    let 발주번호 = 1;
+    if (logResult.recordset.length > 0) {
+      발주번호 = logResult.recordset[0].최종로그 + 1;
+    }
+
+    // 2. 로그 테이블 업데이트 또는 삽입
+    if (logResult.recordset.length > 0) {
+      await transaction
+        .request()
+        .input('테이블명', sql.VarChar(20), '발주')
+        .input('베이스코드', sql.VarChar(20), master.발주일자)
+        .input('최종로그', sql.Real, 발주번호).query(`
+          UPDATE 로그
+          SET 최종로그 = @최종로그
+          WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
+        `);
+    } else {
+      await transaction
+        .request()
+        .input('테이블명', sql.VarChar(20), '발주')
+        .input('베이스코드', sql.VarChar(20), master.발주일자)
+        .input('최종로그', sql.Real, 발주번호).query(`
+          INSERT INTO 로그 (테이블명, 베이스코드, 최종로그)
+          VALUES (@테이블명, @베이스코드, @최종로그)
+        `);
+    }
+
+    // 3. 발주 마스터 삽입
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const 사용자코드 = '0001'; // TODO: 세션에서 가져오기
+
+    await transaction
+      .request()
+      .input('사업장코드', sql.VarChar(2), master.사업장코드)
+      .input('발주일자', sql.VarChar(8), master.발주일자)
+      .input('발주번호', sql.Real, 발주번호)
+      .input('매입처코드', sql.VarChar(8), master.매입처코드)
+      .input('입고희망일자', sql.VarChar(8), master.입고희망일자)
+      .input('결제방법', sql.VarChar(20), master.결제방법)
+      .input('제목', sql.VarChar(100), master.제목)
+      .input('적요', sql.VarChar(200), master.적요)
+      .input('상태코드', sql.Int, master.상태코드 || 0)
+      .input('사용구분', sql.Int, 0)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+        INSERT INTO 발주 (
+          사업장코드, 발주일자, 발주번호, 매입처코드, 입고희망일자, 결제방법,
+          제목, 적요, 상태코드, 사용구분, 수정일자, 사용자코드
+        )
+        VALUES (
+          @사업장코드, @발주일자, @발주번호, @매입처코드, @입고희망일자, @결제방법,
+          @제목, @적요, @상태코드, @사용구분, @수정일자, @사용자코드
+        )
+      `);
+
+    // 4. 발주 디테일 삽입
+    for (let i = 0; i < details.length; i++) {
+      const detail = details[i];
+      const 발주시간 = Date.now().toString().slice(-10); // 타임스탬프 기반 고유값
+
+      await transaction
+        .request()
+        .input('사업장코드', sql.VarChar(2), master.사업장코드)
+        .input('발주일자', sql.VarChar(8), master.발주일자)
+        .input('발주번호', sql.Real, 발주번호)
+        .input('발주시간', sql.VarChar(10), 발주시간 + i)
+        .input('자재코드', sql.VarChar(18), detail.자재코드)
+        .input('매입처코드', sql.VarChar(8), master.매입처코드)
+        .input('발주량', sql.Real, detail.발주량 || 0)
+        .input('입고단가', sql.Real, detail.입고단가 || 0)
+        .input('출고단가', sql.Real, detail.출고단가 || 0)
+        .input('상태코드', sql.Int, 0)
+        .input('사용구분', sql.Int, 0)
+        .input('수정일자', sql.VarChar(8), 수정일자)
+        .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+          INSERT INTO 발주내역 (
+            사업장코드, 발주일자, 발주번호, 발주시간, 자재코드, 매입처코드,
+            발주량, 입고단가, 출고단가, 상태코드, 사용구분, 수정일자, 사용자코드
+          )
+          VALUES (
+            @사업장코드, @발주일자, @발주번호, @발주시간, @자재코드, @매입처코드,
+            @발주량, @입고단가, @출고단가, @상태코드, @사용구분, @수정일자, @사용자코드
+          )
+        `);
+    }
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: '발주가 생성되었습니다.',
+      data: { 발주일자: master.발주일자, 발주번호 },
+    });
+  } catch (err) {
+    await transaction.rollback();
+    console.error('발주 생성 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 발주 수정 (마스터만 - 디테일은 별도 API로 관리)
+app.put('/api/orders/:date/:no', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+    const { 입고희망일자, 결제방법, 제목, 적요, 상태코드 } = req.body;
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    await pool
+      .request()
+      .input('발주일자', sql.VarChar(8), date)
+      .input('발주번호', sql.Real, parseFloat(no))
+      .input('입고희망일자', sql.VarChar(8), 입고희망일자)
+      .input('결제방법', sql.VarChar(20), 결제방법)
+      .input('제목', sql.VarChar(100), 제목)
+      .input('적요', sql.VarChar(200), 적요)
+      .input('상태코드', sql.Int, 상태코드)
+      .input('수정일자', sql.VarChar(8), 수정일자).query(`
+        UPDATE 발주
+        SET 입고희망일자 = @입고희망일자,
+            결제방법 = @결제방법,
+            제목 = @제목,
+            적요 = @적요,
+            상태코드 = @상태코드,
+            수정일자 = @수정일자
+        WHERE 발주일자 = @발주일자 AND 발주번호 = @발주번호
+      `);
+
+    res.json({ success: true, message: '발주가 수정되었습니다.' });
+  } catch (err) {
+    console.error('발주 수정 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 발주 삭제 (마스터 + 디테일)
+app.delete('/api/orders/:date/:no', async (req, res) => {
+  const transaction = pool.transaction();
+
+  try {
+    const { date, no } = req.params;
+
+    await transaction.begin();
+
+    // 1. 발주 디테일 삭제
+    await transaction
+      .request()
+      .input('발주일자', sql.VarChar(8), date)
+      .input('발주번호', sql.Real, parseFloat(no)).query(`
+        DELETE FROM 발주내역
+        WHERE 발주일자 = @발주일자 AND 발주번호 = @발주번호
+      `);
+
+    // 2. 발주 마스터 삭제
+    await transaction
+      .request()
+      .input('발주일자', sql.VarChar(8), date)
+      .input('발주번호', sql.Real, parseFloat(no)).query(`
+        DELETE FROM 발주
+        WHERE 발주일자 = @발주일자 AND 발주번호 = @발주번호
+      `);
+
+    await transaction.commit();
+
+    res.json({ success: true, message: '발주가 삭제되었습니다.' });
+  } catch (err) {
+    await transaction.rollback();
+    console.error('발주 삭제 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
 // 자재 리스트
 app.get('/api/materials', async (req, res) => {
   try {
@@ -1539,17 +2064,21 @@ app.get('/api/materials', async (req, res) => {
             WHERE m.사용구분 = 0
         `;
 
+    const request = pool.request();
+
     if (분류코드) {
-      query += ` AND m.분류코드 = '${분류코드}'`;
+      request.input('분류코드', sql.VarChar(2), 분류코드);
+      query += ` AND m.분류코드 = @분류코드`;
     }
 
     if (search) {
-      query += ` AND (m.자재명 LIKE '%${search}%' OR m.규격 LIKE '%${search}%')`;
+      request.input('search', sql.NVarChar, `%${search}%`);
+      query += ` AND (m.자재명 LIKE @search OR m.규격 LIKE @search)`;
     }
 
     query += ` ORDER BY m.분류코드, m.세부코드`;
 
-    const result = await pool.request().query(query);
+    const result = await request.query(query);
 
     res.json({
       success: true,
