@@ -8,23 +8,55 @@ Korean-language sales management system with Node.js/Express REST API backend an
 
 ## Database Connection
 
-**Technology**: mssql package (node-mssql)
-**Server**: MS SQL Server (localhost)
+**Technology**: mssql package (node-mssql) v12.0.0
+**Server**: MS SQL Server
 **Database**: YmhDB
-**Connection**: Connection pooling configured in server.js lines 14-30
+**Connection**: Connection pooling configured in server.js (lines 46-63)
 
-The database credentials are hardcoded in server.js:
-- User: `sa`
-- Password: `Dlehdgus0508@1` (WARNING: This should be moved to .env file)
+Database credentials are stored in `.env` file (see `.env.template` for setup):
+```bash
+DB_USER=sa
+DB_PASSWORD=your_password
+DB_SERVER=localhost
+DB_DATABASE=YmhDB
+DB_PORT=1433
+DB_ENCRYPT=false
+DB_TRUST_SERVER_CERTIFICATE=true
+```
+
+Connection pool settings:
+- Max connections: 10
+- Min connections: 0
+- Idle timeout: 30 seconds
 
 ## Starting the Server
 
+### Initial Setup
 ```bash
+# Copy environment template
+cp .env.template .env
+
+# Edit .env with your database credentials
+# Then install dependencies
+npm install
+
+# Test database connection
+node scripts/test-db.js
+
+# Start server
 npm start                    # Starts server on port 3000
-node server.js              # Alternative method
 ```
 
 Server runs on `http://localhost:3000`
+
+### Utility Scripts
+Located in `/scripts` directory:
+- **test-db.js**: Tests database connection and verifies environment setup
+- **hash-password.js**: Generates bcrypt hash for a password
+  ```bash
+  node scripts/hash-password.js "mypassword"
+  ```
+- **migrate-passwords.js**: Batch migrates plaintext passwords to bcrypt (requires backup first)
 
 ## Key Database Schema Patterns
 
@@ -84,10 +116,12 @@ GET `/api/customers` supports pagination:
 - Returns: `currentPage`, `totalPages`, `total` in response
 
 ### Authentication
-Simple session-based auth (no JWT yet, see TODO at line 106):
-- POST `/api/auth/login` - Sets `시작일시`, `로그인여부='Y'`
+Session-based authentication with bcrypt password hashing:
+- POST `/api/auth/login` - Verifies password with bcrypt, sets `시작일시`, `로그인여부='Y'`
 - POST `/api/auth/logout` - Sets `종료일시`, `로그인여부='N'`
-- No middleware protection on routes (security gap)
+- Middleware available: `requireAuth()`, `requireRole(roleCode)` (defined but not widely used)
+- Supports both bcrypt hashed and legacy plaintext passwords during migration
+- Session cookie expires after 24 hours
 
 ### Main Endpoint Groups
 
@@ -134,76 +168,179 @@ Simple session-based auth (no JWT yet, see TODO at line 106):
 **Dashboard**: `/api/dashboard/stats`
 - GET `/api/dashboard/stats?사업장코드=01` - Sales & inventory stats
 
-## SQL Injection Vulnerability
+**Transactions (거래명세서)**: `/api/transactions`
+- GET `/api/transactions` - List transaction statements (from 자재입출내역 table)
+- GET `/api/transactions/:date/:no` - Get by date & number (composite key: 거래일자 + 거래번호)
+- GET `/api/transactions/price-history` - Pricing history lookup
+- POST `/api/transactions` - Create transaction statement
+- PUT `/api/transactions/:date/:no` - Update
+- DELETE `/api/transactions/:date/:no` - Delete
 
-**CRITICAL**: Many queries use string interpolation instead of parameterized queries:
-- Lines 217-218, 236-237: Customer search vulnerable
-- Lines 532-537: Supplier search vulnerable
-- Similar issues in quotations/orders list endpoints
+**Material History**: `/api/materials/*`
+- GET `/api/materials/:materialCode/purchase-price-history/:supplierCode` - Last 10 input price records from inventory transactions
+- GET `/api/materials/:materialCode/order-history/:supplierCode` - Last 10 purchase order records for material/supplier pair
 
-**Good pattern** (parameterized):
+## SQL Query Patterns
+
+### Safe Pattern (Parameterized Queries)
+Always use parameterized queries to prevent SQL injection:
 ```javascript
 await pool.request()
   .input('매출처코드', sql.VarChar(8), code)
-  .query('SELECT * FROM 매출처 WHERE 매출처코드 = @매출처코드')
+  .input('사업장코드', sql.VarChar(2), workplaceCode)
+  .query('SELECT * FROM 매출처 WHERE 매출처코드 = @매출처코드 AND 사업장코드 = @사업장코드')
 ```
 
-**Bad pattern** (vulnerable):
+### Unsafe Pattern (AVOID)
+String interpolation creates SQL injection vulnerabilities:
 ```javascript
-query += ` AND 사업장코드 = '${사업장코드}'`  // SQL injection risk
+query += ` AND 사업장코드 = '${사업장코드}'`  // VULNERABLE - Do not use!
 ```
 
-When fixing security issues, convert all string interpolation to `.input()` parameters.
+### Known Vulnerable Endpoints
+Several endpoints still use string interpolation and need to be fixed:
+- Supplier search endpoints
+- Some quotation/order list filters
+- When fixing, convert all dynamic values to `.input()` parameters
 
 ## Frontend Architecture
 
-Single-page application (SPA) in `index.html`:
-- Vanilla JavaScript (no framework)
-- Page switching via `showPage()` function
-- API calls through `apiCall()` helper (lines 1109-1165)
-- Korean UI labels throughout
-- Login page transitions to dashboard on successful auth
+Single-page application (SPA) in `index.html` (~5,800 lines):
+- **Framework**: Vanilla JavaScript + jQuery 3.7.1
+- **UI Library**: DataTables for tabular data display
+- **External APIs**: Daum PostCode API for Korean address lookup
+- **Styling**: Single CSS file (`css/onstyles.css`)
+
+### Frontend File Structure
+```
+js/
+├── jquery-3.7.1.min.js      (jQuery library)
+├── dataTableInit.js         (DataTable helper wrapper)
+├── customer.js              (Customer management logic)
+├── supplier.js              (Supplier management logic)
+├── quotation.js             (Quotation management - 2,787 lines)
+├── order.js                 (Purchase order management - 2,798 lines)
+├── transaction.js           (Transaction statement logic)
+├── transaction2.js          (Alternate version - not in use)
+├── transaction3.js          (Alternate version - not in use)
+└── postoffice.js            (Postal code API integration)
+```
+
+### Page Routing
+- Page switching via `showPage(pageName)` function
+- `pageMap` object defines routes with:
+  - `element`: HTML element ID
+  - `title`: Page title
+  - `menu`: Parent menu section
+  - `loadFunc`: Optional data loading function
+- Login page transitions to dashboard on successful authentication
+- Sidebar menu with collapsible sections
+
+### Modular JavaScript Files
+Complex features are extracted to separate files in `/js`:
+- **dataTableInit.js**: Reusable wrapper for DataTable initialization with Korean localization
+- **customer.js**: Customer management - DataTable setup, CRUD event handlers
+- **supplier.js**: Supplier management - similar pattern to customer.js
+- **quotation.js**: Quotation management - complex form handling, line item management, master-detail operations
+- **order.js**: Purchase order management - draggable modals, material selection with price history lookup, explicit selection buttons
+- **transaction.js**: Transaction statement management - DataTable implementation with date/status filtering, CSV export, modal detail view
+- **postoffice.js**: Daum PostCode API integration for address lookup
+
+These files are loaded via `<script>` tags and depend on jQuery and DataTables being available.
+
+### Recent UI Patterns
+- **Material Selection**: Explicit "선택" (Select) button pattern instead of row clicks for better UX
+- **Price History Integration**: Material search results include purchase unit price, auto-populate input/output prices
+- **DataTable Filtering**: Date range and status filtering with toolbar controls
+- **Draggable Modals**: Some modals support drag functionality for better positioning
+- **CSV Export**: Export to Google Sheets functionality for transaction statements
 
 ## Code Organization Notes
 
-- **server.js** (1428 lines): Monolithic - all routes, no separation of concerns
-- **server2.js**: Appears to be alternate/test version with CONCAT syntax changes for MySQL compatibility
-- No modularization (routes, controllers, models in one file)
-- No environment variables (.env) - credentials hardcoded
-- No test files found
+### Backend
+- **server.js** (~2,964 lines): Monolithic - all routes, controllers, and database logic in one file
+- **server2.js**: Alternate version with MySQL compatibility (not in use)
+- No modularization (no routes/, controllers/, models/ directories)
+- Environment variables configured via `.env` file (dotenv package)
+- No test files or testing framework
 - No build process or transpilation
+
+### Frontend
+- **index.html** (~5,826 lines): Single-file SPA with all pages and logic
+- **index2.html, index_copy.html, index_update.html**: Alternate/backup versions (not in use)
+- Separate JavaScript files in `/js` for specific features
+- No module bundler (no webpack/rollup)
+- No transpilation or minification
+
+### Dependencies
+```json
+{
+  "express": "^5.1.0",           // Web framework
+  "mssql": "^12.0.0",            // SQL Server driver
+  "bcrypt": "^6.0.0",            // Password hashing
+  "express-session": "^1.18.2",  // Session management
+  "cors": "^2.8.5",              // CORS handling
+  "dotenv": "^17.2.3",           // Environment config
+  "mysql": "^2.18.1"             // Unused (legacy)
+}
+```
 
 ## Common Development Tasks
 
 ### Adding a new entity endpoint
-1. Define routes in server.js following the CRUD pattern (GET list, GET :id, POST, PUT, DELETE)
-2. Use parameterized queries with `.input()` to prevent SQL injection
-3. Update frontend index.html with new page content
-4. Add menu item and page switching logic
-5. Create load function and wire to `showPage()` in pageMap
+1. **Backend** (in server.js):
+   - Define routes following CRUD pattern (GET list, GET :id, POST, PUT, DELETE)
+   - Use parameterized queries with `.input()` to prevent SQL injection
+   - Follow standardized response format: `{ success, message?, data?, total? }`
 
-### Debugging database queries
-```javascript
-console.error('Error details:', err);  // Already present in catch blocks
+2. **Frontend** (in index.html):
+   - Add page HTML in main content area with unique ID
+   - Add menu item in sidebar navigation
+   - Register page in `pageMap` object
+   - Create load function if needed
+   - Consider extracting complex logic to separate JS file in `/js` directory
+
+3. **Optional**: Create separate JavaScript file for complex logic (like quotation.js, order.js)
+
+### Working with Master-Detail Tables
+When working with entities like quotations or purchase orders:
+1. Use transactions for atomic insert/update of master + details
+2. Composite key pattern: `일자 + 번호` (date + number)
+3. Use `로그` table to generate sequential numbers
+4. Frontend typically uses modal for adding/editing detail line items
+
+### Testing Database Connection
+```bash
+node scripts/test-db.js
 ```
 
-### Testing API endpoints
-Use tools like Postman or curl:
+### Testing API Endpoints
 ```bash
+# Login
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"userId":"0001","password":"1234"}'
+
+# Get customers with pagination
+curl "http://localhost:3000/api/customers?page=1&pageSize=25"
 ```
 
-## Security Improvements Needed
+## Security Considerations
 
-1. Move database credentials to `.env` file
-2. Implement JWT or session middleware for route protection
-3. Fix all SQL injection vulnerabilities (use parameterized queries)
-4. Add input validation middleware (express-validator)
-5. Implement CORS restrictions (currently accepts all origins: `origin: '*'`)
-6. Hash passwords (currently stored in plain text)
-7. Add rate limiting on auth endpoints
+### Current Security Measures
+- Database credentials stored in `.env` file (not in code)
+- Bcrypt password hashing implemented (with legacy plaintext support)
+- CORS configured with allowed origins (via `ALLOWED_ORIGINS` env var)
+- Session-based authentication with 24-hour expiry
+- Authentication middleware available: `requireAuth()`, `requireRole()`
+
+### Known Security Issues (Priority Order)
+1. **CRITICAL**: SQL injection vulnerabilities in some endpoints (use string interpolation instead of parameterized queries)
+2. **HIGH**: Authentication middleware not applied to most routes - endpoints are publicly accessible
+3. **HIGH**: No input validation middleware (express-validator)
+4. **MEDIUM**: No rate limiting on authentication endpoints
+5. **MEDIUM**: Some legacy passwords still in plaintext (use migration script)
+6. **LOW**: No request size limits configured
 
 ## Performance Considerations
 

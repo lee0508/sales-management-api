@@ -682,7 +682,7 @@ app.get('/api/suppliers', async (req, res) => {
     }
     if (search) {
       countRequest.input('search', sql.NVarChar, `%${search}%`);
-      countQuery += ` AND (매입처명 LIKE @search OR 사업자번호 LIKE @search)`;
+      countQuery += ` AND (매입처코드 LIKE @search OR 매입처명 LIKE @search OR 사업자번호 LIKE @search)`;
     }
 
     const countResult = await countRequest.query(countQuery);
@@ -707,7 +707,7 @@ app.get('/api/suppliers', async (req, res) => {
     }
     if (search) {
       dataRequest.input('search', sql.NVarChar, `%${search}%`);
-      query += ` AND (매입처명 LIKE @search OR 사업자번호 LIKE @search)`;
+      query += ` AND (매입처코드 LIKE @search OR 매입처명 LIKE @search OR 사업자번호 LIKE @search)`;
     }
 
     query += `
@@ -1746,6 +1746,93 @@ app.get('/api/materials/:materialCode/quotation-history/:customerCode', async (r
   }
 });
 
+//------------------------------------------------------------
+// ✅ 발주 입고단가 이력 조회 API (자재입출내역 테이블 기반 - 매입처 기준)
+// GET /api/materials/:materialCode/purchase-price-history/:supplierCode
+//------------------------------------------------------------
+app.get('/api/materials/:materialCode/purchase-price-history/:supplierCode', async (req, res) => {
+  try {
+    const { materialCode, supplierCode } = req.params;
+
+    // 자재코드 분리 (분류코드 2자리 + 세부코드)
+    const 분류코드 = materialCode.substring(0, 2);
+    const 세부코드 = materialCode.substring(2);
+
+    // 자재입출내역 테이블에서 입고 이력 조회 (최근 10건)
+    const result = await pool
+      .request()
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드)
+      .input('매입처코드', sql.VarChar(8), supplierCode).query(`
+        SELECT TOP 10
+          입출고일자,
+          입출고시간,
+          입고수량,
+          입고단가,
+          입고부가,
+          (입고수량 * 입고단가) AS 금액,
+          적요
+        FROM 자재입출내역
+        WHERE 분류코드 = @분류코드
+          AND 세부코드 = @세부코드
+          AND 매입처코드 = @매입처코드
+          AND 입출고구분 = 1
+          AND 입고수량 > 0
+          AND 사용구분 = 0
+        ORDER BY 입출고일자 DESC, 입출고시간 DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('입고단가 이력 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+//------------------------------------------------------------
+// ✅ 발주 제안가 이력 조회 API (발주내역 테이블 기반 - 매입처 기준)
+// GET /api/materials/:materialCode/order-history/:supplierCode
+//------------------------------------------------------------
+app.get('/api/materials/:materialCode/order-history/:supplierCode', async (req, res) => {
+  try {
+    const { materialCode, supplierCode } = req.params;
+
+    // 발주내역 + 발주 테이블에서 발주 이력 조회 (최근 10건)
+    const result = await pool
+      .request()
+      .input('자재코드', sql.VarChar(18), materialCode)
+      .input('매입처코드', sql.VarChar(8), supplierCode).query(`
+        SELECT TOP 10
+          o.발주일자,
+          o.발주번호,
+          od.입고단가,
+          od.발주량,
+          (od.발주량 * od.입고단가) AS 금액,
+          o.상태코드
+        FROM 발주내역 od
+        INNER JOIN 발주 o ON od.발주일자 = o.발주일자 AND od.발주번호 = o.발주번호
+        WHERE od.자재코드 = @자재코드
+          AND o.매입처코드 = @매입처코드
+          AND od.사용구분 = 0
+          AND o.사용구분 = 0
+        ORDER BY o.발주일자 DESC, o.발주번호 DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('발주 제안가 이력 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
 // ==================== 발주 API ====================
 
 // 발주 리스트
@@ -1823,10 +1910,19 @@ app.get('/api/orders/:date/:no', async (req, res) => {
       .request()
       .input('발주일자', sql.VarChar(8), date)
       .input('발주번호', sql.Real, parseFloat(no)).query(`
-                SELECT 
-                    od.*, 
-                    (m.분류코드 + m.세부코드) as 자재코드,
-                    m.자재명, m.규격, m.단위,
+                SELECT
+                    od.발주일자,
+                    od.발주번호,
+                    od.발주시간,
+                    od.자재코드,
+                    od.매입처코드,
+                    od.발주량,
+                    od.입고단가,
+                    od.출고단가,
+                    od.사용구분,
+                    m.자재명,
+                    m.규격,
+                    m.단위,
                     s.매입처명
                 FROM 발주내역 od
                 LEFT JOIN 자재 m ON od.자재코드 = (m.분류코드 + m.세부코드)
@@ -1912,10 +2008,10 @@ app.post('/api/orders', async (req, res) => {
       .input('발주일자', sql.VarChar(8), master.발주일자)
       .input('발주번호', sql.Real, 발주번호)
       .input('매입처코드', sql.VarChar(8), master.매입처코드)
-      .input('입고희망일자', sql.VarChar(8), master.입고희망일자)
-      .input('결제방법', sql.VarChar(20), master.결제방법)
-      .input('제목', sql.VarChar(100), master.제목)
-      .input('적요', sql.VarChar(200), master.적요)
+      .input('입고희망일자', sql.VarChar(8), master.입고희망일자 || '')
+      .input('결제방법', sql.VarChar(20), master.결제방법 || '')
+      .input('제목', sql.VarChar(30), master.제목 || '')
+      .input('적요', sql.VarChar(50), master.적요 || '')
       .input('상태코드', sql.Int, master.상태코드 || 0)
       .input('사용구분', sql.Int, 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
@@ -1933,14 +2029,15 @@ app.post('/api/orders', async (req, res) => {
     // 4. 발주 디테일 삽입
     for (let i = 0; i < details.length; i++) {
       const detail = details[i];
-      const 발주시간 = Date.now().toString().slice(-10); // 타임스탬프 기반 고유값
+      const 발주시간기본 = Date.now().toString().slice(-9); // 타임스탬프 마지막 9자리
+      const 발주시간 = (parseInt(발주시간기본) + i).toString().slice(-9);
 
       await transaction
         .request()
         .input('사업장코드', sql.VarChar(2), master.사업장코드)
         .input('발주일자', sql.VarChar(8), master.발주일자)
         .input('발주번호', sql.Real, 발주번호)
-        .input('발주시간', sql.VarChar(10), 발주시간 + i)
+        .input('발주시간', sql.VarChar(9), 발주시간)
         .input('자재코드', sql.VarChar(18), detail.자재코드)
         .input('매입처코드', sql.VarChar(8), master.매입처코드)
         .input('발주량', sql.Real, detail.발주량 || 0)
@@ -1975,21 +2072,57 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
-// 발주 수정 (마스터만 - 디테일은 별도 API로 관리)
+// 발주 수정 (마스터 + 품목)
 app.put('/api/orders/:date/:no', async (req, res) => {
+  const transaction = pool.transaction();
+
   try {
     const { date, no } = req.params;
-    const { 입고희망일자, 결제방법, 제목, 적요, 상태코드 } = req.body;
-    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const { 입고희망일자, 결제방법, 제목, 적요, 상태코드, details } = req.body;
 
-    await pool
+    console.log('📝 발주 수정 요청:', {
+      date,
+      no,
+      입고희망일자: 입고희망일자,
+      입고희망일자길이: 입고희망일자?.length,
+      결제방법: 결제방법,
+      결제방법길이: 결제방법?.length,
+      제목: 제목,
+      제목길이: 제목?.length,
+      적요: 적요,
+      적요길이: 적요?.length,
+      상태코드,
+      품목수: details?.length
+    });
+
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const 발주시간기본 = Date.now().toString().slice(-9); // 타임스탬프 마지막 9자리
+
+    await transaction.begin();
+
+    // 0. 기존 마스터 정보 조회 (사업장코드, 매입처코드 필요)
+    const masterInfo = await transaction
+      .request()
+      .input('발주일자', sql.VarChar(8), date)
+      .input('발주번호', sql.Real, parseFloat(no)).query(`
+        SELECT 사업장코드, 매입처코드
+        FROM 발주
+        WHERE 발주일자 = @발주일자 AND 발주번호 = @발주번호
+      `);
+
+    const 사업장코드 = masterInfo.recordset[0]?.사업장코드 || '01';
+    const 매입처코드 = masterInfo.recordset[0]?.매입처코드 || '';
+    const 사용자코드 = '0001'; // TODO: 세션에서 가져오기
+
+    // 1. 마스터 정보 수정
+    await transaction
       .request()
       .input('발주일자', sql.VarChar(8), date)
       .input('발주번호', sql.Real, parseFloat(no))
       .input('입고희망일자', sql.VarChar(8), 입고희망일자)
-      .input('결제방법', sql.VarChar(20), 결제방법)
-      .input('제목', sql.VarChar(100), 제목)
-      .input('적요', sql.VarChar(200), 적요)
+      .input('결제방법', sql.TinyInt, 결제방법 ? parseInt(결제방법) : 0)
+      .input('제목', sql.VarChar(30), 제목)
+      .input('적요', sql.VarChar(50), 적요)
       .input('상태코드', sql.Int, 상태코드)
       .input('수정일자', sql.VarChar(8), 수정일자).query(`
         UPDATE 발주
@@ -2002,10 +2135,90 @@ app.put('/api/orders/:date/:no', async (req, res) => {
         WHERE 발주일자 = @발주일자 AND 발주번호 = @발주번호
       `);
 
+    // 2. 품목 정보가 전달된 경우, 기존 품목 삭제 후 재등록
+    if (details && Array.isArray(details)) {
+      // 2-1. 기존 품목 삭제
+      await transaction
+        .request()
+        .input('발주일자', sql.VarChar(8), date)
+        .input('발주번호', sql.Real, parseFloat(no)).query(`
+          DELETE FROM 발주내역
+          WHERE 발주일자 = @발주일자 AND 발주번호 = @발주번호
+        `);
+
+      // 2-2. 새로운 품목 등록
+      for (let i = 0; i < details.length; i++) {
+        const detail = details[i];
+
+        // 자재코드 검증 및 문자열 변환 (배열인 경우 첫 번째 값 사용)
+        let 자재코드 = detail.자재코드;
+        if (Array.isArray(자재코드)) {
+          자재코드 = 자재코드[0];
+        }
+        자재코드 = 자재코드 ? String(자재코드).trim() : '';
+
+        console.log(`🔍 품목 ${i + 1}:`, {
+          원본자재코드: detail.자재코드,
+          변환된자재코드: 자재코드,
+          자재코드길이: 자재코드.length,
+          자재코드타입: typeof 자재코드,
+          발주량: detail.발주량,
+          입고단가: detail.입고단가,
+          출고단가: detail.출고단가,
+        });
+
+        if (!자재코드 || 자재코드 === '') {
+          console.warn('⚠️ 자재코드가 없는 품목 건너뜀:', detail);
+          continue;
+        }
+
+        // 각 품목마다 고유한 발주시간 생성 (9자리)
+        const 발주시간 = (parseInt(발주시간기본) + i).toString().slice(-9);
+
+        await transaction
+          .request()
+          .input('사업장코드', sql.VarChar(2), 사업장코드)
+          .input('발주일자', sql.VarChar(8), date)
+          .input('발주번호', sql.Real, parseFloat(no))
+          .input('발주시간', sql.VarChar(9), 발주시간)
+          .input('자재코드', sql.VarChar(18), 자재코드)
+          .input('매입처코드', sql.VarChar(8), 매입처코드)
+          .input('발주량', sql.Real, parseFloat(detail.발주량) || 0)
+          .input('입고단가', sql.Real, parseFloat(detail.입고단가) || 0)
+          .input('출고단가', sql.Real, parseFloat(detail.출고단가) || 0)
+          .input('상태코드', sql.Int, 0)
+          .input('사용구분', sql.Int, 0)
+          .input('수정일자', sql.VarChar(8), 수정일자)
+          .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+            INSERT INTO 발주내역 (
+              사업장코드, 발주일자, 발주번호, 발주시간, 자재코드, 매입처코드,
+              발주량, 입고단가, 출고단가, 상태코드, 사용구분, 수정일자, 사용자코드
+            )
+            VALUES (
+              @사업장코드, @발주일자, @발주번호, @발주시간, @자재코드, @매입처코드,
+              @발주량, @입고단가, @출고단가, @상태코드, @사용구분, @수정일자, @사용자코드
+            )
+          `);
+      }
+
+      console.log(`✅ 발주 수정: ${date}-${no}, 품목 ${details.length}건 저장`);
+    }
+
+    await transaction.commit();
     res.json({ success: true, message: '발주가 수정되었습니다.' });
   } catch (err) {
-    console.error('발주 수정 에러:', err);
-    res.status(500).json({ success: false, message: '서버 오류' });
+    try {
+      await transaction.rollback();
+    } catch (rollbackErr) {
+      console.error('❌ 롤백 오류 (무시):', rollbackErr.message);
+    }
+    console.error('❌ 발주 수정 에러:', err);
+    console.error('에러 상세:', {
+      message: err.message,
+      code: err.code,
+      stack: err.stack,
+    });
+    res.status(500).json({ success: false, message: `서버 오류: ${err.message}` });
   }
 });
 
@@ -2316,44 +2529,161 @@ app.get('/api/transactions', async (req, res) => {
   try {
     // const { startDate, endDate, customerCode } = req.query;
 
-    const { startDate, endDate, customerCode, transactionNo } = req.query;
+    // const { startDate, endDate, customerCode, transactionNo } = req.query;
+
+    // const { startDate, endDate, status } = req.query;
 
     // 기본 WHERE 조건 (출고, 사용구분=0)
     // SQL Server 2008에서는 파라미터를 사용해 안전하게 쿼리 실행
-    let sqlQuery = `
-      SELECT 
-        i.입출고일자, i.입출고번호, c.매출처명,
-        SUM(i.출고수량 * i.출고단가) AS 공급가액,
-        SUM(i.출고부가) AS 부가세,
-        SUM(i.출고수량 * i.출고단가) + SUM(i.출고부가) AS 합계금액
-      FROM 자재입출내역 i
-      LEFT JOIN 매출처 c ON i.매출처코드 = c.매출처코드
-      WHERE i.입출고구분 = 2 AND i.사용구분 = 0
+    // let sqlQuery = `
+    //   SELECT
+    //     i.입출고일자, i.입출고번호, c.매출처명,
+    //     SUM(i.출고수량 * i.출고단가) AS 공급가액,
+    //     SUM(i.출고부가) AS 부가세,
+    //     SUM(i.출고수량 * i.출고단가) + SUM(i.출고부가) AS 합계금액
+    //   FROM 자재입출내역 i
+    //   LEFT JOIN 매출처 c ON i.매출처코드 = c.매출처코드
+    //   WHERE i.입출고구분 = 2 AND i.사용구분 = 0
+    // `;
+
+    // if (transactionNo) {
+    //   sqlQuery += ` AND i.입출고번호 = @transactionNo`;
+    // } else {
+    //   if (startDate && endDate) sqlQuery += ` AND i.입출고일자 BETWEEN @startDate AND @endDate`;
+    //   if (customerCode) sqlQuery += ` AND i.매출처코드 = @customerCode`;
+    // }
+
+    // sqlQuery += `
+    //   GROUP BY i.입출고일자, i.입출고번호, c.매출처명
+    //   ORDER BY i.입출고일자 DESC, i.입출고번호 DESC
+    // `;
+
+    // const request = pool.request();
+    // if (startDate) request.input('startDate', sql.VarChar(8), startDate);
+    // if (endDate) request.input('endDate', sql.VarChar(8), endDate);
+    // if (customerCode) request.input('customerCode', sql.VarChar(8), customerCode);
+    // if (transactionNo) request.input('transactionNo', sql.Int, transactionNo);
+
+    // const result = await request.query(sqlQuery);
+    // res.json({ success: true, data: result.recordset });
+
+    const { startDate, endDate, customerCode, transactionNo, status } = req.query;
+
+    let query = `
+      SELECT
+        t.사업장코드,
+        t.거래일자,
+        t.매출처코드,
+        c.매출처명,
+        SUM(ISNULL(t.입고수량,0) * ISNULL(t.입고단가,0)) AS 입고금액,
+        SUM(ISNULL(t.입고부가,0)) AS 입고부가세,
+        SUM(ISNULL(t.출고수량,0) * ISNULL(t.출고단가,0)) AS 출고금액,
+        SUM(ISNULL(t.출고부가,0)) AS 출고부가세,
+        (ISNULL(t.거래일자,'') + '-' + CAST(t.거래번호 AS VARCHAR(10))) AS 명세서번호,
+        MAX(t.적요) AS 적요,
+        MAX(t.사용자코드) AS 작성자
+      FROM 자재입출내역 t
+      LEFT JOIN 매출처 c ON t.매출처코드 = c.매출처코드
+      WHERE t.사용구분 = 0
     `;
 
-    if (transactionNo) {
-      sqlQuery += ` AND i.입출고번호 = @transactionNo`;
+    // ✅ 날짜 조건
+    if (startDate && endDate) {
+      query += ` AND t.거래일자 BETWEEN '${startDate.replace(/-/g, '')}' AND '${endDate.replace(
+        /-/g,
+        '',
+      )}'`;
     } else {
-      if (startDate && endDate) sqlQuery += ` AND i.입출고일자 BETWEEN @startDate AND @endDate`;
-      if (customerCode) sqlQuery += ` AND i.매출처코드 = @customerCode`;
+      query += ` AND t.거래일자 >= CONVERT(VARCHAR(8), DATEADD(MONTH, -1, GETDATE()), 112)`;
     }
 
-    sqlQuery += `
-      GROUP BY i.입출고일자, i.입출고번호, c.매출처명
-      ORDER BY i.입출고일자 DESC, i.입출고번호 DESC
+    // ✅ 매출처 코드 필터
+    if (customerCode) {
+      query += ` AND t.매출처코드 = '${customerCode}'`;
+    }
+
+    // ✅ 명세서번호(거래번호) 필터
+    if (transactionNo) {
+      query += ` AND CAST(t.거래번호 AS VARCHAR(10)) = '${transactionNo}'`;
+    }
+
+    // ✅ 상태 필터 (예: 입출고구분)
+    if (status) {
+      query += ` AND CAST(t.입출고구분 AS VARCHAR(10)) = '${status}'`;
+    }
+
+    query += `
+      GROUP BY t.사업장코드, t.거래일자, t.매출처코드, c.매출처명, t.거래번호
+      ORDER BY t.거래일자 DESC, t.거래번호 ASC
     `;
 
-    const request = pool.request();
-    if (startDate) request.input('startDate', sql.VarChar(8), startDate);
-    if (endDate) request.input('endDate', sql.VarChar(8), endDate);
-    if (customerCode) request.input('customerCode', sql.VarChar(8), customerCode);
-    if (transactionNo) request.input('transactionNo', sql.Int, transactionNo);
+    // console.log('✅ 거래명세서 조회 쿼리 실행:\n', query);
 
-    const result = await request.query(sqlQuery);
+    const result = await pool.request().query(query);
     res.json({ success: true, data: result.recordset });
   } catch (err) {
     console.error('거래명세서 조회 오류:', err);
     res.status(500).json({ success: false, message: 'DB 조회 실패' });
+  }
+});
+
+// ✅ 거래명세서 상세 조회
+app.get('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [작성년도, 책번호, 일련번호] = id.split('-');
+
+    // 🟩 마스터 조회
+    const masterQuery = `
+      SELECT 
+        t.사업장코드,
+        t.작성일자 AS 거래일자,
+        t.매출처코드,
+        c.매출처명,
+        SUM(t.공급가액) AS 공급가액,
+        SUM(t.세액) AS 세액,
+        SUM(t.공급가액 + t.세액) AS 합계금액,
+        t.작성구분 AS 상태,
+        u.사용자명 AS 작성자
+      FROM 매출세금계산서장부 t
+      LEFT JOIN 매출처 c ON t.매출처코드 = c.매출처코드
+      LEFT JOIN 사용자 u ON t.사용자코드 = u.사용자코드
+      WHERE t.작성년도 = '${작성년도}' AND t.책번호 = '${책번호}' AND t.일련번호 = '${일련번호}'
+      GROUP BY t.사업장코드, t.작성일자, t.매출처코드, c.매출처명, t.작성구분, u.사용자명
+    `;
+
+    const masterResult = await pool.request().query(masterQuery);
+    if (masterResult.recordset.length === 0)
+      return res.json({ success: false, message: '명세서를 찾을 수 없습니다.' });
+
+    // 🟦 상세 내역 조회
+    const detailQuery = `
+      SELECT 
+        t.품목및규격 AS 품명,
+        t.수량,
+        t.공급가액 / NULLIF(t.수량, 0) AS 단가,
+        t.공급가액,
+        t.세액,
+        (t.공급가액 + t.세액) AS 합계
+      FROM 매출세금계산서장부 t
+      WHERE t.작성년도 = '${작성년도}' 
+        AND t.책번호 = '${책번호}' 
+        AND t.일련번호 = '${일련번호}'
+      ORDER BY t.작성일자, t.품목및규격
+    `;
+
+    const detailResult = await pool.request().query(detailQuery);
+
+    res.json({
+      success: true,
+      data: {
+        master: masterResult.recordset[0],
+        details: detailResult.recordset,
+      },
+    });
+  } catch (err) {
+    console.error('거래명세서 상세 조회 오류:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
 
