@@ -3,12 +3,11 @@
  */
 document.addEventListener('DOMContentLoaded', () => {
   const today = new Date();
-  const endDate = today.toISOString().slice(0, 10);
-  const startDate = new Date(today);
-  startDate.setMonth(today.getMonth() - 1);
+  const todayStr = today.toISOString().slice(0, 10);
 
-  document.getElementById('quotationStartDate').value = startDate.toISOString().slice(0, 10);
-  document.getElementById('quotationEndDate').value = endDate;
+  // 시작일과 종료일 모두 오늘 날짜로 설정
+  document.getElementById('quotationStartDate').value = todayStr;
+  document.getElementById('quotationEndDate').value = todayStr;
 });
 
 $(document).ready(function () {

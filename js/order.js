@@ -14,18 +14,11 @@ $(document).ready(function () {
     const dd = String(today.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
 
-    // 시작일: 한 달 전
-    const monthAgo = new Date(today);
-    monthAgo.setMonth(monthAgo.getMonth() - 1);
-    const startYyyy = monthAgo.getFullYear();
-    const startMm = String(monthAgo.getMonth() + 1).padStart(2, '0');
-    const startDd = String(monthAgo.getDate()).padStart(2, '0');
-    const monthAgoStr = `${startYyyy}-${startMm}-${startDd}`;
-
-    document.getElementById('orderStartDate').value = monthAgoStr;
+    // 시작일과 종료일 모두 오늘 날짜로 설정
+    document.getElementById('orderStartDate').value = todayStr;
     document.getElementById('orderEndDate').value = todayStr;
 
-    console.log(`✅ 발주관리 날짜 자동 설정: ${monthAgoStr} ~ ${todayStr}`);
+    console.log(`✅ 발주관리 날짜 자동 설정: ${todayStr} ~ ${todayStr}`);
   }
 
   // 발주 목록 로드 (DataTable 초기화)
@@ -177,28 +170,25 @@ $(document).ready(function () {
       .off('change')
       .on('change', function () {
         const isChecked = $(this).prop('checked');
-        $('.orderCheckbox').prop('checked', isChecked).trigger('change');
+        $('.orderCheckbox').prop('checked', isChecked);
+
+        // 모든 체크박스에 대해 버튼 표시/숨김 처리
+        $('.orderCheckbox').each(function() {
+          const orderDate = $(this).data('date');
+          const orderNo = $(this).data('no');
+          const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
+
+          if (isChecked) {
+            actionDiv.find('.btn-view').hide();
+            actionDiv.find('.btn-edit').show();
+            actionDiv.find('.btn-delete').show();
+          } else {
+            actionDiv.find('.btn-view').show();
+            actionDiv.find('.btn-edit').hide();
+            actionDiv.find('.btn-delete').hide();
+          }
+        });
       });
-
-    // 개별 체크박스 이벤트 (견적관리와 동일한 패턴)
-    $(document).on('change', '.orderCheckbox', function () {
-      const orderDate = $(this).data('date');
-      const orderNo = $(this).data('no');
-      const isChecked = $(this).prop('checked');
-      const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
-
-      if (isChecked) {
-        // 체크박스 선택 시: 상세 버튼 숨김, 수정/삭제 버튼 표시
-        actionDiv.find('.btn-view').hide();
-        actionDiv.find('.btn-edit').show();
-        actionDiv.find('.btn-delete').show();
-      } else {
-        // 체크박스 해제 시: 상세 버튼 표시, 수정/삭제 버튼 숨김
-        actionDiv.find('.btn-view').show();
-        actionDiv.find('.btn-edit').hide();
-        actionDiv.find('.btn-delete').hide();
-      }
-    });
 
     // 총 발주 수 업데이트
     table.on('draw', function () {
@@ -206,6 +196,26 @@ $(document).ready(function () {
       $('#orderCount').text(info.recordsDisplay);
     });
   }
+
+  // 개별 체크박스 이벤트 (전역으로 한 번만 등록)
+  $(document).off('change', '.orderCheckbox').on('change', '.orderCheckbox', function () {
+    const orderDate = $(this).data('date');
+    const orderNo = $(this).data('no');
+    const isChecked = $(this).prop('checked');
+    const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
+
+    if (isChecked) {
+      // 체크박스 선택 시: 상세 버튼 숨김, 수정/삭제 버튼 표시
+      actionDiv.find('.btn-view').hide();
+      actionDiv.find('.btn-edit').show();
+      actionDiv.find('.btn-delete').show();
+    } else {
+      // 체크박스 해제 시: 상세 버튼 표시, 수정/삭제 버튼 숨김
+      actionDiv.find('.btn-view').show();
+      actionDiv.find('.btn-edit').hide();
+      actionDiv.find('.btn-delete').hide();
+    }
+  });
 
   // 페이지 로드 시 실행
   setDefaultDates(); // 날짜 자동 설정

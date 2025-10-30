@@ -2,14 +2,20 @@
 // 주석: DataTables 공통 초기화(initDataTable) 사용 + 서버 응답 스키마 호환 + 상대경로 사용
 $(document).ready(function () {
   let table;
+  let currentSearchKeyword = ''; // 현재 검색 키워드 저장
 
-  function loadCustomers() {
+  function loadCustomers(searchKeyword = '') {
     // 기존 인스턴스가 있으면 파괴 후 재생성
     if (table) table.destroy();
 
+    // API URL에 검색 파라미터 추가
+    let apiUrl = API_BASE_URL + '/customers';
+    if (searchKeyword) {
+      apiUrl += `?search=${encodeURIComponent(searchKeyword)}`;
+    }
+
     // ✅ 공통 초기화 함수 사용 (dataTableInit.js) — server.js의 {data:[...]} 스키마와 호환
-    // ✅ 절대 경로 사용하여 포트 3000 서버로 요청
-    table = initDataTable('customerTable', 'http://localhost:3000/api/customers', [
+    table = initDataTable('customerTable', apiUrl, [
       {
         // 선택 체크박스
         data: null,
@@ -123,4 +129,30 @@ $(document).ready(function () {
       actionDiv.find('.btn-delete').hide();
     }
   });
+
+  // Enter 키 이벤트 처리
+  $('#customerSearchInput').on('keypress', function (e) {
+    if (e.which === 13) { // Enter key
+      e.preventDefault();
+      searchCustomers();
+    }
+  });
+
+  // 검색 함수를 전역으로 노출
+  window.searchCustomers = function () {
+    const keyword = $('#customerSearchInput').val().trim();
+    console.log('🔍 매출처 검색:', keyword);
+    currentSearchKeyword = keyword;
+    loadCustomers(keyword);
+  };
+
+  // 검색 초기화 함수를 전역으로 노출
+  window.resetCustomerSearch = function () {
+    console.log('🔄 매출처 검색 초기화');
+    $('#customerSearchInput').val('');
+    currentSearchKeyword = '';
+    loadCustomers('');
+  };
 });
+
+console.log('✅ customer.js 로드 완료');

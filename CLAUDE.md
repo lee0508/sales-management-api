@@ -82,19 +82,148 @@ Uses `사용구분` (usage flag) field:
 - 0 = active/in-use
 - 1 = deleted/inactive
 
-### Auto-Incrementing Numbers
-The `로그` table manages sequential numbering:
-- Stores last used number per table/date combination
-- Fields: `테이블명`, `베이스코드`, `최종로그`
-- See quotation creation in server.js lines 846-949
+### Auto-Incrementing Numbers (로그 Table)
+
+**IMPORTANT**: The `로그` table is NOT for login logs - it's a **sequence number generator** for document numbering.
+
+#### Purpose:
+Manages auto-incrementing sequential numbers for documents (quotations, purchase orders, transactions) on a per-date basis.
+
+#### Table Structure:
+```sql
+CREATE TABLE 로그 (
+  테이블명 VARCHAR(50),      -- Table name: "견적", "발주", "거래명세서"
+  베이스코드 VARCHAR(50),     -- Base code: 사업장코드 + 일자 (e.g., "0120251029")
+  최종로그 REAL,             -- Last used number for this date
+  최종로그1 REAL,            -- Reserved field
+  수정일자 VARCHAR(8),       -- Modification date
+  사용자코드 VARCHAR(4)      -- User code
+)
+```
+
+#### How It Works:
+
+1. **Generate Base Code**: `사업장코드 + 일자`
+   - Example: "01" + "20251029" = "0120251029"
+
+2. **Query for Last Number**:
+   ```sql
+   SELECT 최종로그 FROM 로그
+   WHERE 테이블명 = '견적' AND 베이스코드 = '0120251029'
+   ```
+
+3. **Generate New Number**:
+   - If record exists: `새번호 = 최종로그 + 1`
+   - If no record: `새번호 = 1`
+
+4. **Update or Insert**:
+   ```sql
+   -- Update existing
+   UPDATE 로그 SET 최종로그 = @새번호
+   WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
+
+   -- Insert new
+   INSERT INTO 로그 (테이블명, 베이스코드, 최종로그)
+   VALUES (@테이블명, @베이스코드, @새번호)
+   ```
+
+#### Example Usage:
+
+**Scenario**: Creating quotation on 2025-10-29
+```javascript
+// Step 1: Generate base code
+const 베이스코드 = '01' + '20251029'; // "0120251029"
+
+// Step 2: Query log table
+const result = await query(`
+  SELECT 최종로그 FROM 로그
+  WHERE 테이블명 = '견적' AND 베이스코드 = '0120251029'
+`);
+
+// Step 3: Calculate new number
+let 견적번호 = 1;
+if (result.length > 0) {
+  견적번호 = result[0].최종로그 + 1;
+}
+
+// Result: First quotation of the day = 1, second = 2, etc.
+```
+
+#### Document Numbering Format:
+- **Quotation**: `YYYYMMDD-번호` (e.g., "20251029-1", "20251029-2")
+- **Purchase Order**: `YYYYMMDD-번호`
+- **Transaction**: `YYYYMMDD-번호`
+
+#### Implementation Locations:
+- Quotation creation: server.js lines ~1390-1402
+- Purchase order creation: server.js lines ~1991-1998
+- Transaction creation: server.js lines ~2982-2989
 
 ### Date Format
 Dates stored as VARCHAR(8) in YYYYMMDD format (e.g., "20251022")
 Timestamps as VARCHAR(17) in YYYYMMDDHHMMSSmmm format
 
-### Material Code Structure
-Materials use composite key: `분류코드` (2 chars) + `세부코드` (16 chars)
-Concatenated in queries as `(분류코드 + 세부코드)` or `CONCAT(분류코드, 세부코드)`
+### Material Code Structure (CRITICAL)
+
+**IMPORTANT**: Material codes are stored differently across tables. Understanding this structure is crucial for correct data handling.
+
+#### Table-Specific Storage Patterns:
+
+1. **자재 (Materials) Table**:
+   - `분류코드`: 2 characters (category code) - e.g., "01"
+   - `세부코드`: 18 characters = **"01" (사업장코드) + actual 세부코드** - e.g., "01MOFS105"
+   - **Note**: The 세부코드 field includes the workplace code as a prefix!
+
+2. **자재입출내역 (Inventory Transactions) Table**:
+   - `사업장코드`: 2 characters (workplace code) - e.g., "01"
+   - `분류코드`: 2 characters (category code) - e.g., "01"
+   - `세부코드`: 16 characters (pure detail code) - e.g., "MOFS105"
+   - **Note**: Three separate fields
+
+3. **자재시세 (Material Pricing) Table**:
+   - `사업장코드`: 2 characters (workplace code)
+   - `분류코드`: 2 characters (category code)
+   - `세부코드`: 16 characters (pure detail code)
+   - **Note**: Three separate fields
+
+4. **자재원장 (Material Ledger) Table**:
+   - `사업장코드`: 2 characters (workplace code)
+   - `분류코드`: 2 characters (category code)
+   - `세부코드`: 16 characters (pure detail code)
+   - **Note**: Three separate fields
+
+#### Full Material Code Composition:
+When displaying or concatenating material codes:
+- **Full code**: `사업장코드 (2) + 분류코드 (2) + 세부코드 (16)` = 20 characters total
+- **Example**: "01" + "01" + "MOFS105" = "0101MOFS105"
+
+#### Display Logic:
+When showing material codes to users:
+- Remove `사업장코드` (first 2 chars)
+- Remove `분류코드` (next 2 chars)
+- **Display only**: `세부코드` (last 16 chars)
+- **Example**: "0101MOFS105" → display "MOFS105"
+
+#### Query Pattern:
+When querying from 자재 table:
+```sql
+-- 자재코드 = 분류코드 + 세부코드
+-- BUT 세부코드 already contains 사업장코드!
+SELECT (분류코드 + 세부코드) as 자재코드 FROM 자재
+-- Returns: "01" + "01MOFS105" = "010101MOFS105" (WRONG!)
+
+-- Correct approach:
+-- Remove first 2 chars from 세부코드 before concatenating
+SELECT (분류코드 + SUBSTRING(세부코드, 3, 16)) as 자재코드 FROM 자재
+-- Returns: "01" + "MOFS105" = "01MOFS105" (CORRECT!)
+```
+
+#### Frontend Display:
+Always use `substring(4)` to display only the pure detail code:
+```javascript
+// For full material code: "0101MOFS105"
+const displayCode = materialCode.substring(4); // "MOFS105"
+```
 
 ## API Architecture
 
@@ -254,6 +383,50 @@ These files are loaded via `<script>` tags and depend on jQuery and DataTables b
 - **DataTable Filtering**: Date range and status filtering with toolbar controls
 - **Draggable Modals**: Some modals support drag functionality for better positioning
 - **CSV Export**: Export to Google Sheets functionality for transaction statements
+
+### JavaScript Function Naming Conventions
+
+**IMPORTANT**: Follow these naming rules consistently across all modules to distinguish between create/edit operations:
+
+#### Create/New Operations
+Functions for creating new records or opening creation modals:
+- **Pattern**: `open` + EntityName + `Modal` or `new` + EntityName
+- **Examples**:
+  - Quotations: `openQuotationModal()` - Opens modal for creating new quotation
+  - Orders: `openOrderModal()` - Opens modal for creating new purchase order
+  - Transactions: `openTransactionModal()` - Opens modal for creating new transaction
+  - Customers: `openCustomerModal()` or `newCustomer()` - Opens modal for new customer registration
+
+- **Related variables**: Use `new` prefix for data arrays
+  - `newQuotationDetails[]` - Array of line items for new quotation
+  - `newOrderDetails[]` - Array of line items for new order
+  - `newTransactionItems[]` - Array of items for new transaction
+
+#### Edit/Update Operations
+Functions for editing existing records:
+- **Pattern**: `edit` + EntityName
+- **Examples**:
+  - Quotations: `editQuotation(date, no)` - Opens modal to edit existing quotation
+  - Orders: `editOrder(date, no)` - Opens modal to edit existing order
+  - Transactions: `editTransaction(date, no)` - Opens modal to edit existing transaction
+  - Customers: `editCustomer(code)` - Opens modal to edit existing customer
+
+#### Delete Operations
+Functions for deleting records:
+- **Pattern**: `delete` + EntityName
+- **Examples**:
+  - Quotations: `deleteQuotation(date, no)`
+  - Orders: `deleteOrder(date, no)`
+  - Transactions: `deleteTransaction(date, no)`
+
+#### View/Detail Operations
+Functions for viewing record details (read-only):
+- **Pattern**: `open` + EntityName + `DetailModal` or `view` + EntityName
+- **Examples**:
+  - `openQuotationDetailModal(date, no)` - View quotation details
+  - `openTransactionDetailModal(transactionNo)` - View transaction details
+
+**Why This Matters**: Clear naming prevents confusion between creating new records vs editing existing ones, especially important in Korean UI where buttons may say "작성" (create) vs "수정" (edit).
 
 ## Code Organization Notes
 

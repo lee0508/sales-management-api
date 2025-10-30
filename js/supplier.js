@@ -1,13 +1,20 @@
 // ✅ DataTables 초기화 (매입처관리)
 $(document).ready(function () {
   let table;
+  let currentSearchKeyword = ''; // 현재 검색 키워드 저장
 
-  function loadSuppliers() {
+  function loadSuppliers(searchKeyword = '') {
     // 기존 인스턴스가 있으면 파괴 후 재생성
     if (table) table.destroy();
 
+    // API URL에 검색 파라미터 추가
+    let apiUrl = API_BASE_URL + '/suppliers';
+    if (searchKeyword) {
+      apiUrl += `?search=${encodeURIComponent(searchKeyword)}`;
+    }
+
     // ✅ 공통 초기화 함수 사용 (dataTableInit.js)
-    table = initDataTable('supplierTable', 'http://localhost:3000/api/suppliers', [
+    table = initDataTable('supplierTable', apiUrl, [
       {
         // 선택 체크박스
         data: null,
@@ -121,6 +128,30 @@ $(document).ready(function () {
       actionDiv.find('.btn-delete').hide();
     }
   });
+
+  // Enter 키 이벤트 처리
+  $('#supplierSearchInput').on('keypress', function (e) {
+    if (e.which === 13) { // Enter key
+      e.preventDefault();
+      searchSuppliers();
+    }
+  });
+
+  // 검색 함수를 전역으로 노출
+  window.searchSuppliers = function () {
+    const keyword = $('#supplierSearchInput').val().trim();
+    console.log('🔍 매입처 검색:', keyword);
+    currentSearchKeyword = keyword;
+    loadSuppliers(keyword);
+  };
+
+  // 검색 초기화 함수를 전역으로 노출
+  window.resetSupplierSearch = function () {
+    console.log('🔄 매입처 검색 초기화');
+    $('#supplierSearchInput').val('');
+    currentSearchKeyword = '';
+    loadSuppliers('');
+  };
 });
 
 // 매입처 신규등록 모달 열기
