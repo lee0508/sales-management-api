@@ -260,7 +260,7 @@ function closePurchaseStatementDetailModal() {
 }
 
 // ✅ 매입전표 작성 모달 열기
-function openPurchaseStatementModal() {
+function openNewPurchaseStatementModal() {
   // 품목 목록 초기화
   newPurchaseStatementDetails = [];
 
@@ -330,8 +330,105 @@ function updateNewPurchaseStatementDetailsTable() {
 
 // ✅ 신규 매입전표 자재 추가 모달 열기
 function openNewPurchaseStatementDetailAddModal() {
-  alert('자재 추가 기능은 거래명세서관리의 자재 추가 모달을 참조하여 구현 예정입니다.');
-  // TODO: 자재 검색 모달 구현 (transaction.js의 newTransactionDetailAddModal 참조)
+  document.getElementById('purchaseStatementMaterialSearchModal').style.display = 'block';
+  document.getElementById('purchaseStatementMaterialSearchInput').value = '';
+  console.log('✅ 자재 검색 모달 열기 (매입전표용)');
+}
+
+// ✅ 자재 검색 모달 닫기
+function closePurchaseStatementMaterialSearchModal() {
+  document.getElementById('purchaseStatementMaterialSearchModal').style.display = 'none';
+}
+
+// ✅ 자재 검색 (매입전표 작성 모달용)
+async function searchPurchaseStatementMaterials() {
+  try {
+    const searchText = document.getElementById('purchaseStatementMaterialSearchInput').value.trim();
+
+    const response = await fetch(
+      `http://localhost:3000/api/materials?search=${encodeURIComponent(searchText)}`,
+    );
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '자재 조회 실패');
+    }
+
+    const tbody = document.getElementById('purchaseStatementMaterialSearchTableBody');
+
+    if (!result.data || result.data.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="padding: 40px; text-align: center; color: #6b7280;">
+            검색 결과가 없습니다
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = result.data
+      .map(
+        (material) => `
+      <tr style="border-bottom: 1px solid #e5e7eb;">
+        <td style="padding: 12px;">${material.자재코드}</td>
+        <td style="padding: 12px;">${material.자재명}</td>
+        <td style="padding: 12px;">${material.규격 || '-'}</td>
+        <td style="padding: 12px; text-align: right;">${(material.입고단가1 || 0).toLocaleString()}</td>
+        <td style="padding: 12px; text-align: center;">
+          <button onclick='selectPurchaseStatementMaterial(${JSON.stringify(material).replace(/'/g, '&apos;')})' style="
+            padding: 6px 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+          " onmouseover="this.style.background='#1d4ed8';"
+             onmouseout="this.style.background='#2563eb';">선택</button>
+        </td>
+      </tr>
+    `,
+      )
+      .join('');
+
+    console.log('✅ 자재 검색 완료:', result.data.length, '건');
+  } catch (err) {
+    console.error('❌ 자재 검색 오류:', err);
+    alert('자재 검색 중 오류가 발생했습니다.');
+  }
+}
+
+// ✅ 자재 선택 및 추가 (매입전표용 - 입고)
+function selectPurchaseStatementMaterial(material) {
+  const 수량 = prompt(`${material.자재명}\n수량을 입력하세요:`, '1');
+
+  if (!수량 || isNaN(수량) || parseFloat(수량) <= 0) {
+    alert('유효한 수량을 입력해주세요.');
+    return;
+  }
+
+  const 단가 = prompt(`${material.자재명}\n입고단가를 입력하세요:`, material.입고단가1 || '0');
+
+  if (!단가 || isNaN(단가) || parseFloat(단가) < 0) {
+    alert('유효한 단가를 입력해주세요.');
+    return;
+  }
+
+  // 상세내역 추가
+  newPurchaseStatementDetails.push({
+    자재코드: material.자재코드,
+    자재명: material.자재명,
+    규격: material.규격,
+    수량: parseFloat(수량),
+    단가: parseFloat(단가),
+  });
+
+  updateNewPurchaseStatementDetailsTable();
+  closePurchaseStatementMaterialSearchModal();
+
+  console.log('✅ 자재 추가 (매입):', material);
 }
 
 // ✅ 신규 매입전표 품목 수정
@@ -350,8 +447,81 @@ function deleteNewPurchaseStatementDetail(index) {
 
 // ✅ 매입처 검색 모달 열기
 function openPurchaseStatementSupplierSearchModal() {
-  alert('매입처 검색 모달은 매입처관리 페이지의 DataTable을 재사용하여 구현 예정입니다.');
-  // TODO: 매입처 검색 모달 구현 (supplier.js의 DataTable 재사용)
+  document.getElementById('purchaseStatementSupplierSearchModal').style.display = 'block';
+  document.getElementById('purchaseStatementSupplierSearchInput').value = '';
+  console.log('✅ 매입처 검색 모달 열기');
+}
+
+// ✅ 매입처 검색 모달 닫기
+function closePurchaseStatementSupplierSearchModal() {
+  document.getElementById('purchaseStatementSupplierSearchModal').style.display = 'none';
+}
+
+// ✅ 매입처 검색 (매입전표 작성 모달용)
+async function searchPurchaseStatementSuppliers() {
+  try {
+    const searchText = document.getElementById('purchaseStatementSupplierSearchInput').value.trim();
+
+    const response = await fetch(
+      `http://localhost:3000/api/suppliers?search=${encodeURIComponent(searchText)}`,
+    );
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '매입처 조회 실패');
+    }
+
+    const tbody = document.getElementById('purchaseStatementSupplierSearchTableBody');
+
+    if (!result.data || result.data.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" style="padding: 40px; text-align: center; color: #6b7280;">
+            검색 결과가 없습니다
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = result.data
+      .map(
+        (supplier) => `
+      <tr style="border-bottom: 1px solid #e5e7eb;">
+        <td style="padding: 12px;">${supplier.매입처코드}</td>
+        <td style="padding: 12px;">${supplier.매입처명}</td>
+        <td style="padding: 12px;">${supplier.전화번호 || '-'}</td>
+        <td style="padding: 12px; text-align: center;">
+          <button onclick='selectPurchaseStatementSupplier(${JSON.stringify(supplier).replace(/'/g, '&apos;')})' style="
+            padding: 6px 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+          " onmouseover="this.style.background='#1d4ed8';"
+             onmouseout="this.style.background='#2563eb';">선택</button>
+        </td>
+      </tr>
+    `,
+      )
+      .join('');
+
+    console.log('✅ 매입처 검색 완료:', result.data.length, '건');
+  } catch (err) {
+    console.error('❌ 매입처 검색 오류:', err);
+    alert('매입처 검색 중 오류가 발생했습니다.');
+  }
+}
+
+// ✅ 매입처 선택
+function selectPurchaseStatementSupplier(supplier) {
+  document.getElementById('purchaseStatementCreateSupplierCode').value = supplier.매입처코드;
+  document.getElementById('purchaseStatementCreateSupplierName').value = supplier.매입처명;
+  closePurchaseStatementSupplierSearchModal();
+  console.log('✅ 매입처 선택:', supplier.매입처명);
 }
 
 // ✅ 매입전표 작성 제출
@@ -383,6 +553,7 @@ async function submitPurchaseStatementCreate(event) {
     const res = await fetch(`${API_BASE_URL}/purchase-statements`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // 세션 쿠키 포함
       body: JSON.stringify({
         거래일자,
         입출고구분: parseInt(입출고구분),

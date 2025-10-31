@@ -130,7 +130,7 @@ $(document).ready(function () {
   });
 
   // Enter 키 이벤트 처리
-  $('#supplierSearchInput').on('keypress', function (e) {
+  $('#supplierListSearchInput').on('keypress', function (e) {
     if (e.which === 13) { // Enter key
       e.preventDefault();
       searchSuppliers();
@@ -139,7 +139,7 @@ $(document).ready(function () {
 
   // 검색 함수를 전역으로 노출
   window.searchSuppliers = function () {
-    const keyword = $('#supplierSearchInput').val().trim();
+    const keyword = $('#supplierListSearchInput').val().trim();
     console.log('🔍 매입처 검색:', keyword);
     currentSearchKeyword = keyword;
     loadSuppliers(keyword);
@@ -148,7 +148,7 @@ $(document).ready(function () {
   // 검색 초기화 함수를 전역으로 노출
   window.resetSupplierSearch = function () {
     console.log('🔄 매입처 검색 초기화');
-    $('#supplierSearchInput').val('');
+    $('#supplierListSearchInput').val('');
     currentSearchKeyword = '';
     loadSuppliers('');
   };

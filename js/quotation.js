@@ -46,11 +46,13 @@ $(document).ready(function () {
           return `<input type="checkbox" class="quotationCheckbox" data-date="${row.견적일자}" data-no="${row.견적번호}" />`;
         },
       },
-      // 2. 순번
+      // 2. 순번 (역순: 가장 오래된 데이터 = 1, 최신 데이터 = 마지막 번호)
       {
         data: null,
         render: function (data, type, row, meta) {
-          return meta.row + 1;
+          const table = $('#quotationTable').DataTable();
+          const info = table.page.info();
+          return info.recordsDisplay - meta.row;
         },
       },
       // 3. 견적번호 (일자-번호)
@@ -145,7 +147,7 @@ $(document).ready(function () {
         previous: '이전',
       },
     },
-    order: [[4, 'desc']], // 견적일자 내림차순
+    order: [], // 백엔드에서 제공하는 등록 순서 유지 (최신 등록이 맨 위)
     pageLength: 10,
     lengthMenu: [10, 25, 50, 100],
     responsive: true,
@@ -1366,6 +1368,7 @@ async function submitQuotationEdit() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // 세션 쿠키 포함
         body: JSON.stringify({
           매출처코드: modal.dataset.매출처코드,
           출고희망일자: 출고희망일자,
@@ -1425,6 +1428,7 @@ async function submitQuotationEdit() {
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include', // 세션 쿠키 포함
           body: JSON.stringify(detailPayload),
         },
       );
@@ -1614,12 +1618,20 @@ async function openQuotationEditModal(quotationDate, quotationNo) {
 let newQuotationDetails = [];
 
 // ✅ 견적서 작성 모달 열기
-function openQuotationModal() {
+function openNewQuotationModal() {
   // 모달 제목 설정
   document.getElementById('quotationModalTitle').textContent = '견적서 작성';
 
   // 폼 초기화
   document.getElementById('quotationForm').reset();
+
+  // 매출처 정보 초기화
+  document.getElementById('selectedCustomerCode').value = '';
+  document.getElementById('selectedCustomerName').value = '';
+  const infoDiv = document.getElementById('selectedCustomerInfo');
+  if (infoDiv) {
+    infoDiv.style.display = 'none';
+  }
 
   // 견적일자를 오늘 날짜로 설정
   const today = new Date().toISOString().split('T')[0];
@@ -1649,9 +1661,18 @@ function closeQuotationModal() {
 
 // ✅ 매출처 검색 모달 열기
 function openCustomerSearchModal() {
+  // 입력 필드의 값을 검색 모달로 가져가기
+  const searchValue = document.getElementById('selectedCustomerName').value.trim();
+
   document.getElementById('customerSearchModal').style.display = 'block';
-  document.getElementById('customerSearchInput').value = '';
-  console.log('✅ 매출처 검색 모달 열기');
+  document.getElementById('quotationCustomerSearchInput').value = searchValue;
+
+  // 값이 있으면 자동으로 검색 실행
+  if (searchValue) {
+    searchQuotationCustomers();
+  }
+
+  console.log('✅ 매출처 검색 모달 열기, 검색어:', searchValue);
 }
 
 // ✅ 매출처 검색 모달 닫기
@@ -1659,13 +1680,14 @@ function closeCustomerSearchModal() {
   document.getElementById('customerSearchModal').style.display = 'none';
 }
 
-// ✅ 매출처 검색
-async function searchCustomers() {
+// ✅ 견적서용 매출처 검색
+async function searchQuotationCustomers() {
   try {
-    const searchText = document.getElementById('customerSearchInput').value.trim();
+    const searchText = document.getElementById('quotationCustomerSearchInput').value.trim();
 
     const response = await fetch(
       `http://localhost:3000/api/customers?search=${encodeURIComponent(searchText)}`,
+      { credentials: 'include' } // 세션 쿠키 포함
     );
     const result = await response.json();
 
@@ -1693,6 +1715,14 @@ async function searchCustomers() {
       tr.style.cursor = 'pointer';
       tr.onmouseover = () => (tr.style.background = '#f8f9fa');
       tr.onmouseout = () => (tr.style.background = 'white');
+
+      // 행 클릭 시 매출처 선택
+      tr.onclick = (e) => {
+        // 선택 버튼 클릭은 버튼의 onclick 이벤트가 처리하므로 제외
+        if (e.target.tagName !== 'BUTTON') {
+          selectCustomer(customer);
+        }
+      };
 
       tr.innerHTML = `
         <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${customer.매출처코드}</td>
@@ -1727,8 +1757,18 @@ async function searchCustomers() {
 
 // ✅ 매출처 선택
 function selectCustomer(customer) {
+  // 매출처 코드와 이름 설정
   document.getElementById('selectedCustomerCode').value = customer.매출처코드;
   document.getElementById('selectedCustomerName').value = customer.매출처명;
+
+  // 선택된 매출처 정보 표시
+  const infoDiv = document.getElementById('selectedCustomerInfo');
+  const displaySpan = document.getElementById('selectedCustomerDisplay');
+  if (infoDiv && displaySpan) {
+    displaySpan.textContent = `[${customer.매출처코드}] ${customer.매출처명}`;
+    infoDiv.style.display = 'block';
+  }
+
   closeCustomerSearchModal();
   console.log('✅ 매출처 선택:', customer);
 }
@@ -2136,7 +2176,6 @@ async function submitQuotation(event) {
     // API 호출 데이터 구성
     const quotationData = {
       master: {
-        사업장코드: '01', // 기본 사업장 코드
         견적일자,
         출고희망일자,
         매출처코드,
@@ -2159,6 +2198,7 @@ async function submitQuotation(event) {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // 세션 쿠키 포함
       body: JSON.stringify(quotationData),
     });
 

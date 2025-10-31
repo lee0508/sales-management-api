@@ -1,0 +1,158 @@
+QUOTATION vs ORDER MODAL - QUICK REFERENCE
+===========================================
+
+Both modals are structured IDENTICALLY with only field-specific differences.
+
+MODAL LOCATIONS
+===============
+Quotation Modal:  Line 5246 - id="quotationModal"
+Order Modal:      Line 6368 - id="orderModal"
+
+FIELD COMPARISON TABLE
+======================
+
+Field Name          Quotation ID              Order ID                  Difference
+─────────────────────────────────────────────────────────────────────────────────────
+Container           quotationModal            orderModal                ID only
+Form                quotationForm             orderForm                 ID only
+Modal Title         견적서 작성               발주서 작성               Label only
+
+Date Field          quotationDate             orderDate                 Label + ID
+Delivery Date       deliveryDate              orderDeliveryDate         Label + ID
+
+Customer/Supplier   selectedCustomerCode      selectedSupplierCode      Label + ID
+Code (hidden)
+Customer/Supplier   selectedCustomerName      selectedSupplierName      Label + ID
+Name (input)
+
+Search Modal        customerSearchModal       supplierSearchModal       Function only
+Search Function     openCustomerSearchModal() openSupplierSearchModal()  Function only
+
+★ Payment Method    N/A                       orderPaymentMethod        ORDER ONLY
+★ Status            N/A                       orderStatus               ORDER ONLY
+
+Title               quotationTitle            orderTitle                ID only
+
+Remarks             quotationRemark           orderRemarks              ID only
+(Note pluralization)
+
+Detail Table        quotationDetailTable      orderDetailTable          ID only
+Detail Body         quotationDetailTableBody  newOrderDetailTableBody   Naming pattern
+(Important: Order uses "new" prefix!)
+
+Section Header      "견적 상세내역"            "발주 상세내역"            Label only
+Material Search     openMaterialSearchModal() openOrderMaterialSearchModal() Function
+
+Supply Price Total  totalSupplyPrice          orderTotalSupplyPrice     ID prefix
+VAT Total           totalVat                  orderTotalVat             ID prefix
+Grand Total         grandTotal                orderGrandTotal           ID prefix
+
+Cancel Button       closeQuotationModal()     closeOrderModal()         Function only
+Submit Button       "견적서 등록"             "저장"                     Text only
+Submit Function     submitQuotation()         submitNewOrder()          Function only
+
+
+CRITICAL DIFFERENCES (Only 3 main ones)
+========================================
+
+1. PAYMENT METHOD & STATUS DROPDOWNS (ORDER ONLY)
+   Order modal has 2 extra dropdown fields that quotation does not have:
+   - Payment Method (결제방법) - options: 현금, 계좌이체, 어음, 카드
+   - Status (상태) - options: 작성중, 발주완료, 입고완료
+   
+   These appear between supplier selection and title field in the 2-column grid.
+   Quotation modal doesn't have these fields.
+
+2. TABLE BODY ID NAMING PATTERN
+   Quotation: "quotationDetailTableBody" (simple pattern)
+   Order:     "newOrderDetailTableBody" (includes "new" prefix)
+   
+   This is inconsistent with the pattern used for other IDs in order modal.
+
+3. SUBMIT BUTTON TEXT
+   Quotation: "견적서 등록"
+   Order:     "저장"
+   
+   Consider standardizing to one pattern.
+
+
+STYLING & LAYOUT (IDENTICAL)
+=============================
+Both modals use:
+- Max width: 1200px
+- Max height: 90vh
+- Sticky header with flex layout
+- 2-column grid for form fields (gap: 16px)
+- Background: #f8f9fa for sections
+- Identical padding, borders, border-radius
+- Identical table styling
+- Identical button styling
+
+The layout is functionally identical. Only content/IDs differ.
+
+
+IF YOU WANT TO STANDARDIZE
+===========================
+
+Option 1: Add fields to Quotation
+   Add payment method and status dropdowns to quotation modal
+   (if these fields are needed for quotations)
+
+Option 2: Remove fields from Order
+   Remove payment method and status from order modal
+   (if these aren't necessary for order processing)
+
+Option 3: Standardize ID naming
+   Rename "newOrderDetailTableBody" to "orderDetailTableBody"
+   Make prefix naming consistent across both modals
+
+Option 4: Align button text
+   Use "등록" instead of "저장" or vice versa
+
+
+SEARCH DIALOGS
+==============
+Quotation:
+  - customerSearchModal (id="customerSearchModal")
+  - materialSearchModal (id="materialSearchModal")
+
+Order:
+  - supplierSearchModal (id="supplierSearchModal")
+  - newOrderMaterialModal (id="newOrderMaterialModal")
+
+All follow identical dialog structure with search input + results table.
+
+
+FORM SUBMISSION
+===============
+Quotation: <form id="quotationForm" onsubmit="submitQuotation(event)">
+Order:     <form id="orderForm" onsubmit="submitNewOrder(event)">
+
+Both use submit event handlers in their respective JS files.
+
+
+TABLE STRUCTURE
+===============
+Both use identical 9-column table:
+1. 순번 (row number)
+2. 자재코드 (material code)
+3. 자재명 (material name)
+4. 규격 (specification)
+5. 수량 (quantity)
+6. 단가 (unit price)
+7. 공급가 (supply price)
+8. 부가세 (VAT)
+9. 삭제 (delete button)
+
+Footer shows totals for supply price, VAT, and grand total.
+
+
+RECOMMENDATIONS
+===============
+1. Document the purpose of payment method and status fields
+2. Consider if quotation modal also needs these fields
+3. Standardize ID naming patterns across both modals
+4. Consider standardizing submit button text
+
+The HTML structure and styling are already identical.
+The differences are purely data-driven field additions.

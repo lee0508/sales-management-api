@@ -1,0 +1,221 @@
+QUOTATION vs ORDER CREATION - DETAILED LOGIC COMPARISON
+=======================================================
+
+CRITICAL FINDINGS
+=================
+
+1. TRANSACTION HANDLING DIFFERENCE
+   - Quotation CREATE: NO transaction
+   - Order CREATE: NO transaction  
+   - Order UPDATE: YES transaction (has rollback)
+   - ASYMMETRY: Order UPDATE safe but Order CREATE is NOT
+   - RISK: Partial inserts possible if detail fails after master
+
+2. SESSION VALIDATION DIFFERENCE (SECURITY ISSUE)
+   - Quotation: STRICT - rejects if user NOT in session (401 error)
+   - Order: PERMISSIVE - defaults to user code '8080' if missing
+   - SECURITY RISK: Order allows unauthenticated requests
+
+3. WORKPLACE CODE SOURCE DIFFERENCE (SECURITY ISSUE)
+   - Quotation: From req.session?.user?.사업장코드 (session)
+   - Order: From master.사업장코드 (request body)
+   - SECURITY RISK: Order allows user to specify arbitrary workplace
+
+4. DETAIL TABLE SUPPLIER CODE DIFFERENCE
+   - Quotation: Per-line supplier code (detail.매입처코드)
+   - Order: Single supplier from master (master.매입처코드)
+   - LOGIC: Different business models - which is correct?
+
+5. TAX INFORMATION STORAGE DIFFERENCE
+   - Quotation: Stores 입고부가, 출고부가 per detail line
+   - Order: Stores NO tax information
+   - QUESTION: Why different? Same domain or different?
+
+6. FIELD TYPE INCONSISTENCIES
+   - 결제방법: Quotation=TinyInt, Order=VarChar(20)
+   - 상태코드: Quotation=TinyInt, Order=Int
+   - FLAG: Database schema or deliberate difference?
+
+7. LOG TABLE INSERT INCOMPLETENESS
+   - Quotation: INSERT 최종로그1 = 0
+   - Order: Does NOT include 最終로그1 field
+   - ISSUE: Relies on table default, missing explicit value
+
+BACKEND DIFFERENCES
+===================
+
+SESSION/USER VALIDATION
+- Quotation line 1508-1516:
+  if (!사용자코드 || !사업장코드) { return 401 }
+  
+- Order line 2231-2232:
+  const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+  const 사업장코드 = master.사업장코드;  // FROM REQUEST BODY!
+
+LOG TABLE QUERY (IDENTICAL)
+- Both use same pattern to query and increment
+
+MASTER INSERT DIFFERENCES
+- Field count: Quotation=14, Order=11
+- Types: 결제방법 TinyInt vs VarChar(20)
+- Types: 상태코드 TinyInt vs Int
+- 입고일자/출고일자: Quotation hardcodes '', Order omits
+- 사용구분: Quotation relies on default, Order explicit
+
+DETAIL INSERT DIFFERENCES
+- Loop: Quotation for...of, Order traditional for with index
+- 매입처코드: Quotation from detail line, Order from master
+- 수량: Quotation uses sql.Money, Order uses sql.Real
+- Quotation stores tax info (입고부가, 출고부가), Order doesn't
+- Field count: Quotation=19, Order=12
+
+LOG TABLE UPDATE
+- Quotation INSERT: includes 最終로그1 = 0
+- Order INSERT: omits 最終로그1 field
+
+ERROR HANDLING
+- Quotation: Generic error response
+- Order: Includes error.message in response
+- Neither: Has transaction rollback
+
+RESPONSE FORMAT (IDENTICAL)
+- Both return same structure with date, number, user, customer/supplier names
+
+FRONTEND DIFFERENCES
+====================
+
+API CALLING METHOD
+- Quotation: Direct fetch() call
+  fetch('http://localhost:3000/api/quotations_add', {...})
+  
+- Order: Uses apiCall() helper
+  apiCall('/orders', 'POST', requestData)
+  
+  ADVANTAGE: Order uses centralized helper with base URL
+
+INPUT FIELDS COLLECTED
+- Quotation: 견적일자, 출고희망일자, 매출처코드, 제목, 적요 (5 fields)
+- Order: 사업장코드, 매입처코드, 발주일자, 입고희망일자, 결제방법, 상태코드, 제목, 적요 (8 fields)
+- Quotation missing: 결제방법, 결제예정일자, 유효일수 (form fields not sent)
+
+DETAIL LINE ITEMS
+- Quotation: {자재코드, 수량, 출고단가}
+- Order: {자재코드, 발주량, 입고단가, 출고단가} with parseFloat()
+- Order has type conversion and defaults; Quotation does not
+
+DATA REFRESH AFTER SUCCESS
+- Quotation: $('#quotationTable').DataTable().ajax.reload()
+- Order: window.loadOrders() function call
+- Different patterns for reloading
+
+INPUT VALIDATION
+- Both: Only check for mandatory fields (supplier/customer, detail count)
+- Neither: Date format validation
+- Neither: Numeric range validation
+- Backend also lacks validation
+
+KEY ARCHITECTURAL QUESTIONS
+===========================
+
+1. WHY does Quotation accept per-line supplier codes?
+   - 견적내역 table has 매입처코드 field
+   - But 견적 master also has supplier reference?
+   - Or is this a bug - should always use master supplier?
+
+2. WHY do they have different field types?
+   - 결제방법: TinyInt vs VarChar(20)
+   - Deliberate schema difference or copy-paste error?
+
+3. WHY Order doesn't store tax information?
+   - 발주내역 table has no tax fields
+   - Is 발주 pre-tax, while 견적 includes tax calculation?
+   - Business process difference?
+
+4. WHY Order allows workplace override?
+   - Could user specify wrong workplace?
+   - Should default to session workplace like quotation?
+
+5. WHY no transactions in CREATE?
+   - Only Order UPDATE has transaction
+   - Risk of partial inserts in CREATE
+   - Was this overlooked?
+
+SECURITY ISSUES IDENTIFIED
+==========================
+
+HIGH PRIORITY:
+1. Order endpoint accessible without authentication (user defaults to '8080')
+2. Order workplace code from request body (user can specify arbitrary workspace)
+3. No input validation on either endpoint
+
+MEDIUM PRIORITY:
+1. SQL injection possible if fields not properly parameterized
+2. No error message sanitization (could leak database details)
+
+CODE QUALITY ISSUES
+===================
+
+1. Inconsistent API calling: quotation uses fetch(), order uses apiCall()
+2. Hardcoded URLs in quotation frontend
+3. No transaction support in quotation CREATE or order CREATE
+4. Incomplete log table INSERT in order (missing 최終로그1)
+5. Field type inconsistencies suggest database schema issues
+6. Different detail storage models (tax info vs no tax info)
+
+RECOMMENDATIONS
+===============
+
+CRITICAL (Fix immediately):
+1. Add transaction wrapper to quotation CREATE
+2. Add transaction wrapper to order CREATE
+3. Fix order authentication (require session, no '8080' default)
+4. Fix order workspace source (use session, not request body)
+5. Add input validation to both endpoints
+
+HIGH PRIORITY:
+6. Standardize field types (TinyInt vs Int vs VarChar)
+7. Fix order log INSERT to include 最終로그1
+8. Migrate quotation to use apiCall() helper
+9. Document why quotation stores per-line suppliers
+10. Document why orders don't store tax information
+
+MEDIUM PRIORITY:
+11. Add comprehensive input validation (dates, numbers, ranges)
+12. Consistent error handling with proper rollback
+13. Remove hardcoded URLs
+14. Align quotation/order data models
+
+EVIDENCE LOCATIONS
+==================
+
+Quotation Creation:
+- Frontend: js/quotation.js line 2154 (submitQuotation function)
+- Backend: server.js line 1503 (POST /api/quotations_add)
+
+Order Creation:
+- Frontend: js/order.js line 2942 (submitNewOrder function)
+- Backend: server.js line 2224 (POST /api/orders)
+
+Order Update (with transaction):
+- Backend: server.js line 2375 (PUT /api/orders/:date/:no)
+
+API Helper:
+- index.html line 3366 (apiCall function)
+
+CONCLUSION
+==========
+
+The quotation and order creation flows have SIGNIFICANT LOGIC DIFFERENCES despite
+serving similar purposes. These differences indicate either:
+
+1. Evolved development - order.js built after quotation.js with improvements
+2. Different business requirements - but not documented anywhere
+3. Incomplete refactoring - copy-paste resulted in divergent code
+
+Most critical issues:
+- Neither uses transactions in CREATE (data integrity risk)
+- Order allows unauthenticated access and workspace spoofing
+- Different field types and data models unexplained
+- Inconsistent API calling patterns
+
+The codebase would benefit from alignment and comprehensive refactoring.

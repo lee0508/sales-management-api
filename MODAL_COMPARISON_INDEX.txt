@@ -1,0 +1,98 @@
+MODAL COMPARISON ANALYSIS - COMPLETE DOCUMENTATION
+==================================================
+
+This directory contains comprehensive analysis of the Quotation and Order modal
+UI structures in index.html. These documents help understand the similarities
+and differences between the two modals.
+
+FILES IN THIS ANALYSIS
+======================
+
+1. MODAL_QUICK_REFERENCE.txt (5.7 KB)
+   - Quick lookup table for all field differences
+   - Field comparison table with IDs
+   - Critical differences highlighted
+   
+2. MODAL_FIELD_COMPARISON.txt (8.9 KB)
+   - Detailed breakdown of every field and its properties
+   - Complete ID reference table
+   
+3. MODAL_VISUAL_LAYOUT.txt (12 KB)
+   - ASCII diagrams showing visual layout and appearance
+   - Grid column structure and spacing information
+
+
+KEY FINDINGS - IDENTICAL ELEMENTS
+==================================
+- Overall HTML structure and layout
+- Grid system (2 columns, 16px gap)
+- Styling and CSS (padding, borders, colors, typography)
+- Table structure (9 columns, identical headers/footers)
+- Responsive behavior
+- Modal container properties (1200px width, 90vh height)
+- Button styling and positioning
+
+
+FIELD DIFFERENCES
+=================
+Quotation IDs:          Order IDs:
+- quotationDate         - orderDate
+- deliveryDate          - orderDeliveryDate
+- selectedCustomerCode  - selectedSupplierCode
+- selectedCustomerName  - selectedSupplierName
+- quotationTitle        - orderTitle
+- quotationRemark       - orderRemarks
+- quotationDetailTable  - orderDetailTable
+- totalSupplyPrice      - orderTotalSupplyPrice
+- totalVat              - orderTotalVat
+- grandTotal            - orderGrandTotal
+
+ORDER ONLY (Quotation does NOT have):
+- orderPaymentMethod dropdown
+- orderStatus dropdown
+
+
+CRITICAL DIFFERENCES
+====================
+1. Extra Fields in Order Modal
+   - Payment Method dropdown (between supplier selection and title)
+   - Status dropdown (same row as payment method)
+
+2. ID Naming Inconsistency
+   - Order table body: "newOrderDetailTableBody" (inconsistent "new" prefix)
+
+3. Submit Button Text
+   - Quotation: "견적서 등록"
+   - Order: "저장"
+
+4. Search Function Names
+   - openMaterialSearchModal() vs openOrderMaterialSearchModal()
+
+
+MODAL LOCATIONS IN index.html
+=============================
+
+Quotation Modal: Line 5246 - 5465
+  - ID: quotationModal
+  - Form: quotationForm
+  - Submit Handler: submitQuotation(event)
+
+Order Modal: Line 6368 - 6616
+  - ID: orderModal
+  - Form: orderForm
+  - Submit Handler: submitNewOrder(event)
+
+
+JAVASCRIPT FILES
+================
+- js/quotation.js - Quotation modal handlers
+- js/order.js - Order modal handlers
+
+
+START HERE
+==========
+1. Read MODAL_QUICK_REFERENCE.txt for quick answers
+2. Read MODAL_FIELD_COMPARISON.txt for detailed structure
+3. Read MODAL_VISUAL_LAYOUT.txt for appearance and layout
+
+All files created: 2025-11-01

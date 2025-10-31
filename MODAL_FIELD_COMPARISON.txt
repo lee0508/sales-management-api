@@ -1,0 +1,241 @@
+QUOTATION vs ORDER MODAL - COMPLETE FIELD COMPARISON
+=====================================================
+
+FORM CONTAINERS
+===============
+Quotation: <form id="quotationForm" onsubmit="submitQuotation(event)">
+Order:     <form id="orderForm" onsubmit="submitNewOrder(event)">
+
+
+BASIC INFORMATION SECTION (기본 정보)
+=====================================
+Container: Grid with 2 columns, gap: 16px, background: #f8f9fa
+
+FIELD 1 - Date (Column 1)
+─────────────────────────
+Quotation: Label="견적일자 *", ID="quotationDate", Type="date", required
+Order:     Label="발주일자 *", ID="orderDate", Type="date", required
+
+FIELD 2 - Delivery Date (Column 2)
+───────────────────────────────────
+Quotation: Label="출고희망일자", ID="deliveryDate", Type="date"
+Order:     Label="입고희망일자", ID="orderDeliveryDate", Type="date"
+
+FIELD 3 - Customer/Supplier (Full Width, columns 1/-1)
+──────────────────────────────────────────────────────
+Quotation: Label="매출처 *"
+  Hidden:  <input type="hidden" id="selectedCustomerCode">
+  Display: <input type="text" id="selectedCustomerName" required 
+                   placeholder="매출처 코드 또는 이름 입력 후 엔터">
+  Button:  <button onclick="openCustomerSearchModal()">검색</button>
+  Info:    <div id="selectedCustomerInfo">
+             <span id="selectedCustomerDisplay"></span>
+
+Order: Label="매입처 *"
+  Hidden:  <input type="hidden" id="selectedSupplierCode">
+  Display: <input type="text" id="selectedSupplierName" required 
+                   placeholder="매입처 코드 또는 이름 입력 후 엔터">
+  Button:  <button onclick="openSupplierSearchModal()">검색</button>
+  Info:    <div id="selectedSupplierInfo">
+             <span id="selectedSupplierDisplay"></span>
+
+★★★ CRITICAL DIFFERENCE - ORDER MODAL ONLY ★★★
+
+FIELD 3.5a - Payment Method (Column 1) - ORDER ONLY
+───────────────────────────────────────────────────
+Order: Label="결제방법"
+       <select id="orderPaymentMethod">
+         <option value="">선택</option>
+         <option value="현금">현금</option>
+         <option value="계좌이체">계좌이체</option>
+         <option value="어음">어음</option>
+         <option value="카드">카드</option>
+       </select>
+
+QUOTATION DOES NOT HAVE THIS FIELD!
+
+FIELD 3.5b - Status (Column 2) - ORDER ONLY
+─────────────────────────────────────────────
+Order: Label="상태"
+       <select id="orderStatus">
+         <option value="0">작성중</option>
+         <option value="1">발주완료</option>
+         <option value="2">입고완료</option>
+       </select>
+
+QUOTATION DOES NOT HAVE THIS FIELD!
+
+★★★ END OF ORDER-ONLY FIELDS ★★★
+
+FIELD 4 - Title (Full Width, columns 1/-1)
+───────────────────────────────────────────
+Quotation: Label="제목", ID="quotationTitle", Type="text",
+           Placeholder="견적서 제목을 입력하세요"
+Order:     Label="제목", ID="orderTitle", Type="text",
+           Placeholder="발주서 제목을 입력하세요"
+
+FIELD 5 - Remarks (Full Width, columns 1/-1)
+──────────────────────────────────────────────
+Quotation: Label="적요", Textarea ID="quotationRemark",
+           Placeholder="비고사항을 입력하세요", Min-height=80px
+Order:     Label="적요", Textarea ID="orderRemarks",
+           Placeholder="비고사항을 입력하세요", Min-height=80px
+
+
+DETAIL ITEMS SECTION
+====================
+Section Header:
+Quotation: "견적 상세내역"
+Order:     "발주 상세내역"
+
+Add Button:
+Quotation: <button onclick="openMaterialSearchModal()">+ 자재 추가</button>
+Order:     <button onclick="openOrderMaterialSearchModal()">+ 자재 추가</button>
+
+TABLE STRUCTURE
+───────────────
+Container: <div style="overflow-x: auto; border: 1px solid var(--border); border-radius: 8px;">
+
+Table Element:
+Quotation: <table id="quotationDetailTable" style="width: 100%; border-collapse: collapse;">
+Order:     <table id="orderDetailTable" style="width: 100%; border-collapse: collapse;">
+
+Table Headers (IDENTICAL):
+  <thead style="background: #f8f9fa;">
+    <tr>
+      <th width="40px">순번</th>
+      <th>자재코드</th>
+      <th>자재명</th>
+      <th>규격</th>
+      <th width="100px" text-align="right">수량</th>
+      <th width="120px" text-align="right">단가</th>
+      <th width="120px" text-align="right">공급가</th>
+      <th width="100px" text-align="right">부가세</th>
+      <th width="60px" text-align="center">삭제</th>
+    </tr>
+  </thead>
+
+Table Body ID:
+Quotation: <tbody id="quotationDetailTableBody">
+Order:     <tbody id="newOrderDetailTableBody">  ← NOTE: Different naming pattern
+
+Empty State Message:
+Quotation: "자재 추가 버튼을 클릭하여 견적 상세내역을 입력하세요"
+Order:     "자재 추가 버튼을 클릭하여 발주 상세내역을 입력하세요"
+
+Table Footer (IDENTICAL structure):
+  <tfoot style="background: #f8f9fa; font-weight: 600;">
+    <!-- Row 1: Totals -->
+    <tr>
+      <td colspan="6" text-align="right">합계</td>
+      <td id="[supplyPriceTotalId]" text-align="right">0</td>
+      <td id="[vatTotalId]" text-align="right">0</td>
+      <td></td>
+    </tr>
+    <!-- Row 2: Grand Total -->
+    <tr>
+      <td colspan="6" text-align="right">총액</td>
+      <td colspan="2" id="[grandTotalId]" text-align="right" color="#007bff" font-size="16px">0</td>
+      <td></td>
+    </tr>
+  </tfoot>
+
+Footer IDs:
+Quotation: totalSupplyPrice, totalVat, grandTotal
+Order:     orderTotalSupplyPrice, orderTotalVat, orderGrandTotal
+
+
+BUTTON AREA
+===========
+Container: <div style="display: flex; gap: 12px; justify-content: flex-end;">
+
+Cancel Button (IDENTICAL):
+  Text: "취소"
+  Quotation onclick: closeQuotationModal()
+  Order onclick: closeOrderModal()
+  Styling: background var(--bg-light), border: 1px solid var(--border)
+
+Submit Button (DIFFERENT TEXT):
+  Quotation: type="submit", text="견적서 등록"
+  Order: type="submit", text="저장"
+  Styling: background var(--primary), color white
+
+
+SEARCH DIALOGS
+==============
+Quotation Search Modals:
+  1. customerSearchModal - for selecting customer
+  2. materialSearchModal - for adding materials
+
+Order Search Modals:
+  1. supplierSearchModal - for selecting supplier
+  2. newOrderMaterialModal - for adding materials
+
+
+KEY STRUCTURAL DIFFERENCES
+==========================
+
+1. ORDER HAS 2 EXTRA FIELDS
+   - orderPaymentMethod (dropdown: 현금, 계좌이체, 어음, 카드)
+   - orderStatus (dropdown: 작성중, 발주완료, 입고완료)
+   These fields appear between supplier selection and title field.
+   Quotation does NOT have these fields.
+
+2. FIELD ID NAMING
+   Quotation uses: quotationDate, quotationTitle, quotationRemark
+   Order uses: orderDate, orderTitle, orderRemarks (more consistent prefixing)
+
+3. TABLE BODY ID
+   Quotation: quotationDetailTableBody
+   Order: newOrderDetailTableBody (includes "new" prefix)
+
+4. TOTAL IDS
+   Quotation: totalSupplyPrice, totalVat, grandTotal
+   Order: orderTotalSupplyPrice, orderTotalVat, orderGrandTotal
+
+5. SUBMIT BUTTON TEXT
+   Quotation: "견적서 등록"
+   Order: "저장"
+
+6. SEARCH MODAL FUNCTIONS
+   Quotation: openMaterialSearchModal()
+   Order: openOrderMaterialSearchModal()
+
+
+VISUAL/STYLING COMPARISON
+=========================
+Both modals use IDENTICAL styling for:
+- Container width: 1200px, height: 90vh
+- Grid layout: 2 columns with 16px gap
+- All input/select/textarea: same padding (12px 16px), border (2px), radius (8px)
+- Section background: #f8f9fa
+- Table styling and spacing
+- Button styling and sizing
+- Colors and typography
+
+Only difference is the ORDER modal has 2 additional dropdown fields.
+
+
+SUMMARY FOR DEVELOPERS
+======================
+
+If you want to make the modals completely identical in appearance:
+
+1. ADD to Quotation modal:
+   - Payment Method dropdown (결제방법)
+   - Status dropdown (상태)
+   Insert these after supplier/customer selection, before title field
+
+2. OR REMOVE from Order modal:
+   - Payment Method dropdown
+   - Status dropdown
+   (But this might break order-specific functionality)
+
+3. STANDARDIZE ID NAMING:
+   - Consider renaming "newOrderDetailTableBody" to "orderDetailTableBody"
+   - Consider using consistent ID prefix pattern
+
+4. ALIGN BUTTON TEXT:
+   - Decide on "등록" vs "저장" and use consistently
+
+The HTML structure, grid layout, styling, and component organization are already identical.

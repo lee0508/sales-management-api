@@ -41,7 +41,9 @@ async function loadTransactions() {
     if (endDate) query.append('endDate', endDate);
     if (status) query.append('status', status);
 
-    const res = await fetch(`http://localhost:3000/api/transactions?${query.toString()}`);
+    const res = await fetch(`http://localhost:3000/api/transactions?${query.toString()}`, {
+      credentials: 'include' // 세션 쿠키 포함
+    });
     const data = await res.json();
 
     if (!data.success) throw new Error('데이터를 불러오지 못했습니다.');
@@ -238,7 +240,7 @@ async function openTransactionDetailModal(transactionNo) {
     // 명세서번호 형식: "YYYYMMDD-번호" 를 분리
     const [date, no] = transactionNo.split('-');
 
-    const res = await fetch(`http://localhost:3000/api/transactions/${date}/${no}`);
+    const res = await fetch(`http://localhost:3000/api/transactions/${date}/${no}`, { credentials: 'include' });
     const result = await res.json();
 
     if (!result.success) throw new Error(result.message || '상세 정보를 불러올 수 없습니다.');
@@ -338,7 +340,7 @@ async function openTransactionDetailModal(transactionNo) {
 let newTransactionDetails = [];
 
 // ✅ 거래명세서 작성 모달 열기
-function openTransactionModal() {
+function openNewTransactionModal() {
   // 폼 초기화
   document.getElementById('transactionCreateForm').reset();
 
@@ -692,6 +694,7 @@ async function submitTransactionCreate(event) {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // 세션 쿠키 포함
       body: JSON.stringify(transactionData),
     });
 
@@ -797,8 +800,8 @@ async function editTransaction(transactionDate, transactionNo) {
     );
     document.getElementById('editTransactionCustomer').textContent = firstDetail.매출처명 || '-';
 
-    // 입출고구분 설정 (기본값 1)
-    document.getElementById('editTransactionStatus').value = firstDetail.입출고구분 || 1;
+    // 입출고구분 설정 (거래명세서는 항상 2=출고)
+    document.getElementById('editTransactionStatus').value = 2;
 
     // 전역 변수에 현재 편집 중인 거래명세서 정보 저장
     window.currentEditingTransaction = {
@@ -958,6 +961,7 @@ async function submitTransactionEdit() {
     const response = await fetch(`http://localhost:3000/api/transactions/${거래일자}/${거래번호}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // 세션 쿠키 포함
       body: JSON.stringify({
         입출고구분: parseInt(입출고구분),
         details: details,

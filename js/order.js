@@ -59,12 +59,13 @@ $(document).ready(function () {
         },
       },
       {
-        // 순번 (자동 생성)
+        // 순번 (역순: 가장 오래된 발주 = 1, 최신 발주 = 마지막 번호)
         data: null,
         orderable: false,
         className: 'text-center',
         render: function (data, type, row, meta) {
-          return meta.row + 1;
+          const info = table.page.info();
+          return info.recordsDisplay - meta.row;
         },
       },
       {
@@ -194,6 +195,14 @@ $(document).ready(function () {
     table.on('draw', function () {
       const info = table.page.info();
       $('#orderCount').text(info.recordsDisplay);
+      console.log('✅ 발주 건수 업데이트:', info.recordsDisplay);
+    });
+
+    // DataTable 초기화 완료 후 건수 업데이트
+    table.on('init', function() {
+      const info = table.page.info();
+      $('#orderCount').text(info.recordsDisplay);
+      console.log('✅ 발주 DataTable 초기화 완료, 건수:', info.recordsDisplay);
     });
   }
 
@@ -2030,7 +2039,7 @@ let newOrderDetails = [];
 /**
  * 발주서 작성 모달 열기 (새 패턴)
  */
-function openOrderModal() {
+function openNewOrderModal() {
   // 모달 제목 설정
   document.getElementById('orderModalTitle').textContent = '발주서 작성';
 
@@ -2048,9 +2057,6 @@ function openOrderModal() {
   // 발주일자를 오늘 날짜로 설정
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('orderDate').value = today;
-
-  // 사업장 목록 로드
-  loadWorkplacesForNewOrder();
 
   // 상세내역 초기화
   newOrderDetails = [];
@@ -2109,11 +2115,11 @@ function openSupplierSearchModal() {
   document.getElementById('supplierSearchModal').style.display = 'block';
 
   // 검색 입력란에 사용자가 입력한 값 설정
-  document.getElementById('supplierSearchInput').value = supplierNameInput;
+  document.getElementById('orderSupplierSearchInput').value = supplierNameInput;
 
   // 입력값이 있으면 자동으로 검색 실행
   if (supplierNameInput) {
-    searchSuppliers();
+    searchOrderSuppliers();
   }
 
   console.log('✅ 매입처 검색 모달 열기:', supplierNameInput);
@@ -2124,10 +2130,10 @@ function closeSupplierSearchModal() {
   document.getElementById('supplierSearchModal').style.display = 'none';
 }
 
-// ✅ 매입처 검색
-async function searchSuppliers() {
+// ✅ 발주서용 매입처 검색
+async function searchOrderSuppliers() {
   try {
-    const searchText = document.getElementById('supplierSearchInput').value.trim();
+    const searchText = document.getElementById('orderSupplierSearchInput').value.trim();
 
     const response = await fetch(
       `http://localhost:3000/api/suppliers?search=${encodeURIComponent(searchText)}`,
@@ -2158,6 +2164,14 @@ async function searchSuppliers() {
       tr.style.cursor = 'pointer';
       tr.onmouseover = () => (tr.style.background = '#f8f9fa');
       tr.onmouseout = () => (tr.style.background = 'white');
+
+      // 행 클릭 시 매입처 선택
+      tr.onclick = (e) => {
+        // 선택 버튼 클릭은 버튼의 onclick 이벤트가 처리하므로 제외
+        if (e.target.tagName !== 'BUTTON') {
+          selectSupplier(supplier);
+        }
+      };
 
       tr.innerHTML = `
         <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${supplier.매입처코드}</td>
@@ -2192,9 +2206,9 @@ async function searchSuppliers() {
 
 // ✅ 매입처 선택
 function selectSupplier(supplier) {
-  // 매입처 코드와 이름 설정
+  // 매입처 코드와 이름 설정 (견적서 스타일과 동일)
   document.getElementById('selectedSupplierCode').value = supplier.매입처코드;
-  document.getElementById('selectedSupplierName').value = `[${supplier.매입처코드}] ${supplier.매입처명}`;
+  document.getElementById('selectedSupplierName').value = supplier.매입처명;
 
   // 선택된 매입처 정보 표시
   const infoDiv = document.getElementById('selectedSupplierInfo');
@@ -2853,39 +2867,49 @@ function renderNewOrderDetailTable() {
   if (newOrderDetails.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="padding: 40px; text-align: center; color: #999; border: 1px solid #e5e7eb;">
-          자재를 추가해주세요
+        <td colspan="9" style="padding: 40px; text-align: center; color: #999;">
+          자재 추가 버튼을 클릭하여 발주 상세내역을 입력하세요
         </td>
       </tr>
     `;
+    // 합계 초기화
+    document.getElementById('orderTotalSupplyPrice').textContent = '0';
+    document.getElementById('orderTotalVat').textContent = '0';
+    document.getElementById('orderGrandTotal').textContent = '0';
     return;
   }
 
   tbody.innerHTML = '';
 
+  let 총공급가 = 0;
+  let 총부가세 = 0;
+
   newOrderDetails.forEach((detail, index) => {
-    const 발주량 = parseFloat(detail.발주량) || 0;
-    const 입고단가 = parseFloat(detail.입고단가) || 0;
-    const 출고단가 = parseFloat(detail.출고단가) || 0;
-    const 금액 = 발주량 * 입고단가;
+    const 수량 = parseFloat(detail.발주량) || 0;
+    const 단가 = parseFloat(detail.입고단가) || 0;
+    const 공급가 = 수량 * 단가;
+    const 부가세 = Math.round(공급가 * 0.1);
+
+    총공급가 += 공급가;
+    총부가세 += 부가세;
+
+    // 자재코드 표시 (세부코드만)
+    const 자재코드표시 = detail.자재코드 ? detail.자재코드.substring(4) : '-';
 
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td style="padding: 12px; text-align: center; border: 1px solid #e5e7eb;">${index + 1}</td>
-      <td style="padding: 12px; border: 1px solid #e5e7eb;">${detail.자재명 || '-'}</td>
-      <td style="padding: 12px; text-align: center; border: 1px solid #e5e7eb;">${
-        detail.규격 || '-'
-      }</td>
-      <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb;">${발주량.toLocaleString()}</td>
-      <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb;">${입고단가.toLocaleString()}원</td>
-      <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb;">${출고단가.toLocaleString()}원</td>
-      <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; font-weight: 600; color: #2563eb;">
-        ${금액.toLocaleString()}원
-      </td>
-      <td style="padding: 12px; text-align: center; border: 1px solid #e5e7eb;">
+      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${index + 1}</td>
+      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${자재코드표시}</td>
+      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${detail.자재명 || '-'}</td>
+      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${detail.규격 || '-'}</td>
+      <td style="padding: 12px; text-align: right; border-bottom: 1px solid var(--border);">${수량.toLocaleString()}</td>
+      <td style="padding: 12px; text-align: right; border-bottom: 1px solid var(--border);">${단가.toLocaleString()}</td>
+      <td style="padding: 12px; text-align: right; border-bottom: 1px solid var(--border);">${공급가.toLocaleString()}</td>
+      <td style="padding: 12px; text-align: right; border-bottom: 1px solid var(--border);">${부가세.toLocaleString()}</td>
+      <td style="padding: 12px; text-align: center; border-bottom: 1px solid var(--border);">
         <button type="button" onclick="removeNewOrderDetail(${index})" style="
-          padding: 6px 12px;
-          background: #ef4444;
+          padding: 4px 8px;
+          background: #dc3545;
           color: white;
           border: none;
           border-radius: 4px;
@@ -2896,6 +2920,12 @@ function renderNewOrderDetailTable() {
     `;
     tbody.appendChild(row);
   });
+
+  // 합계 업데이트
+  const 총액 = 총공급가 + 총부가세;
+  document.getElementById('orderTotalSupplyPrice').textContent = 총공급가.toLocaleString();
+  document.getElementById('orderTotalVat').textContent = 총부가세.toLocaleString();
+  document.getElementById('orderGrandTotal').textContent = 총액.toLocaleString();
 }
 
 /**
@@ -2914,7 +2944,7 @@ async function submitNewOrder(event) {
 
   try {
     // 입력값 수집
-    const 사업장코드 = document.getElementById('orderWorkplace').value;
+    const 사업장코드 = currentUser?.사업장코드 || '01'; // 로그인한 사용자의 사업장 코드 사용
     const 매입처코드 = document.getElementById('selectedSupplierCode').value;
     const 발주일자 = document.getElementById('orderDate').value.replace(/-/g, '');
     const 입고희망일자 = document.getElementById('orderDeliveryDate').value.replace(/-/g, '');
@@ -2924,11 +2954,6 @@ async function submitNewOrder(event) {
     const 적요 = document.getElementById('orderRemarks').value;
 
     // 유효성 검사
-    if (!사업장코드) {
-      alert('사업장을 선택해주세요.');
-      return;
-    }
-
     if (!매입처코드) {
       alert('매입처를 선택해주세요.');
       return;

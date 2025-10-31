@@ -17,14 +17,15 @@
   <script src="js/dataTableInit.js" defer></script>
 
   <script src="js/customer.js" defer></script>
-  <script src="js/supplier.js" defer></script>
-  <script src="js/quotation.js" defer></script>
-  <script src="js/order.js" defer></script>
-  <script src="js/postoffice.js" defer></script>
-  <script src="js/transaction.js" defer></script>
-  <script src="js/purchase.js" defer></script>
+  <script src="js/supplier.js?v=1031M" defer></script>
+  <script src="js/quotation.js?v=1031M" defer></script>
+  <script src="js/order.js?v=1031M" defer></script>
+  <script src="js/postoffice.js?v=1031M" defer></script>
+  <script src="js/transaction.js?v=1031M" defer></script>
+  <script src="js/purchase.js?v=1031M" defer></script>
 
   <link rel="stylesheet" href="css/onstyles.css?v=5" />
+  <!-- <link rel="stylesheet" href="css/shadcn-ui.css" /> -->
   <!-- <link rel="stylesheet" href="css/default.css" /> -->
 </head>
 
@@ -333,7 +334,7 @@
             <div style="display: flex; gap: 8px; align-items: center;">
               <input
                 type="text"
-                id="customerSearchInput"
+                id="customerListSearchInput"
                 placeholder="매출처코드 또는 매출처명 검색..."
                 style="
                   padding: 10px 16px;
@@ -443,7 +444,7 @@
               <button class="btn btn-secondary" onclick="filterQuotations()">조회</button>
             </div>
             <div class="toolbar-right">
-              <button class="btn btn-success" onclick="openQuotationModal()" style="
+              <button class="btn btn-success" onclick="openNewQuotationModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -1375,7 +1376,7 @@
             </div>
 
             <div class="toolbar-right">
-              <button class="btn btn-success" onclick="openTransactionModal()" style="
+              <button class="btn btn-success" onclick="openNewTransactionModal()" style="
                   padding: 10px 20px;
                   background: #28a745;
                   color: white;
@@ -1545,19 +1546,8 @@
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280;">매출처명</span>
                   <span id="editTransactionCustomer" style="color: #1f2937;">-</span>
                 </div>
-                <div style="display: flex; align-items: center;">
-                  <span style="min-width: 100px; font-weight: 500; color: #6b7280;">입출고구분</span>
-                  <select id="editTransactionStatus" style="
-                    padding: 8px 12px;
-                    border: 2px solid #e5e7eb;
-                    border-radius: 6px;
-                    font-size: 14px;
-                  ">
-                    <option value="1">작성중</option>
-                    <option value="2">확정</option>
-                    <option value="3">발행완료</option>
-                  </select>
-                </div>
+                <!-- 입출고구분 (거래명세서는 항상 2=출고, hidden) -->
+                <input type="hidden" id="editTransactionStatus" value="2">
               </div>
             </div>
 
@@ -2033,21 +2023,8 @@
                     " />
                   </div>
 
-                  <!-- 입출고구분 -->
-                  <div>
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">입출고구분 *</label>
-                    <select id="transactionCreateType" required style="
-                      width: 100%;
-                      padding: 12px 16px;
-                      border: 2px solid #e5e7eb;
-                      border-radius: 8px;
-                      font-size: 14px;
-                    ">
-                      <option value="1">작성중</option>
-                      <option value="2">확정</option>
-                      <option value="3">발행완료</option>
-                    </select>
-                  </div>
+                  <!-- 입출고구분 (거래명세서는 항상 2=출고) -->
+                  <input type="hidden" id="transactionCreateType" value="2">
 
                   <!-- 매출처 선택 -->
                   <div style="grid-column: 1 / -1;">
@@ -2627,7 +2604,7 @@
               <button class="btn btn-secondary" onclick="filterOrders()">조회</button>
             </div>
             <div class="toolbar-right">
-              <button class="btn btn-success" onclick="openOrderModal()" style="
+              <button class="btn btn-success" onclick="openNewOrderModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -2700,7 +2677,7 @@
             </div>
 
             <div class="toolbar-right">
-              <button class="btn btn-success" onclick="openPurchaseStatementModal()" style="
+              <button class="btn btn-success" onclick="openNewPurchaseStatementModal()" style="
                   padding: 10px 20px;
                   background: #28a745;
                   color: white;
@@ -2827,7 +2804,556 @@
               </table>
             </div>
           </div>
-        </div>      
+        </div>
+
+        <!-- ✅ 매입전표 작성 모달 -->
+        <div id="purchaseStatementCreateModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 1200px; max-height: 90vh; overflow-y: auto;">
+            <!-- 헤더 -->
+            <div style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 24px;
+              padding-bottom: 16px;
+              border-bottom: 2px solid #e5e7eb;
+            ">
+              <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937;">매입전표 작성</h2>
+              <button onclick="closePurchaseStatementCreateModal()" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                 onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <form id="purchaseStatementCreateForm" onsubmit="submitPurchaseStatementCreate(event)">
+              <!-- 기본 정보 섹션 -->
+              <div style="background: #f9fafb; padding: 20px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #e5e7eb;">
+                <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151;">기본 정보</h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                  <!-- 거래일자 -->
+                  <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">거래일자 *</label>
+                    <input type="date" id="purchaseStatementCreateDate" required style="
+                      width: 100%;
+                      padding: 12px 16px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                    " />
+                  </div>
+
+                  <!-- 입출고구분 (매입전표는 항상 1=입고) -->
+                  <input type="hidden" id="purchaseStatementCreateType" value="1">
+
+                  <!-- 매입처 선택 -->
+                  <div style="grid-column: 1 / -1;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">매입처 *</label>
+                    <div style="display: flex; gap: 8px;">
+                      <input type="text" id="purchaseStatementCreateSupplierCode" readonly style="
+                        width: 120px;
+                        padding: 12px 16px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        background: #f5f5f5;
+                      " placeholder="코드" />
+                      <input type="text" id="purchaseStatementCreateSupplierName" readonly required style="
+                        flex: 1;
+                        padding: 12px 16px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        background: #f5f5f5;
+                      " placeholder="매입처를 선택하세요" />
+                      <button type="button" onclick="openPurchaseStatementSupplierSearchModal()" style="
+                        padding: 10px 20px;
+                        background: #2563eb;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        white-space: nowrap;
+                      " onmouseover="this.style.background='#1d4ed8';"
+                         onmouseout="this.style.background='#2563eb';">
+                        매입처 검색
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 적요 -->
+                  <div style="grid-column: 1 / -1;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">적요</label>
+                    <textarea id="purchaseStatementCreateRemark" style="
+                      width: 100%;
+                      padding: 12px 16px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      resize: vertical;
+                      min-height: 80px;
+                    " placeholder="비고사항을 입력하세요"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 상세내역 섹션 -->
+              <div style="margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                  <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #374151;">매입 품목 내역</h3>
+                  <button type="button" onclick="openNewPurchaseStatementDetailAddModal()" style="
+                    padding: 8px 16px;
+                    background: #10b981;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  " onmouseover="this.style.background='#059669';"
+                     onmouseout="this.style.background='#10b981';">
+                    + 자재 추가
+                  </button>
+                </div>
+
+                <!-- 상세내역 테이블 -->
+                <div style="overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #f9fafb;">
+                      <tr>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb; width: 40px;">순번</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">자재코드</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">자재명</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">규격</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb; width: 100px;">수량</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb; width: 120px;">단가</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb; width: 120px;">공급가액</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb; width: 100px;">부가세</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e5e7eb; width: 60px;">수정</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e5e7eb; width: 60px;">삭제</th>
+                      </tr>
+                    </thead>
+                    <tbody id="purchaseStatementCreateDetailTableBody">
+                      <tr>
+                        <td colspan="10" style="padding: 40px; text-align: center; color: #6b7280;">
+                          자재 추가 버튼을 클릭하여 매입 상세내역을 입력하세요
+                        </td>
+                      </tr>
+                    </tbody>
+                    <tfoot style="background: #f9fafb; font-weight: 600;">
+                      <tr>
+                        <td colspan="6" style="padding: 12px; text-align: right; border-top: 2px solid #e5e7eb; color: #1f2937;">합계</td>
+                        <td id="purchaseStatementCreateTotalSupply" style="padding: 12px; text-align: right; border-top: 2px solid #e5e7eb; color: #1f2937;">0</td>
+                        <td id="purchaseStatementCreateTotalVat" style="padding: 12px; text-align: right; border-top: 2px solid #e5e7eb; color: #1f2937;">0</td>
+                        <td colspan="2" style="padding: 12px; border-top: 2px solid #e5e7eb;"></td>
+                      </tr>
+                      <tr>
+                        <td colspan="6" style="padding: 12px; text-align: right; color: #1f2937;">총액</td>
+                        <td colspan="2" id="purchaseStatementCreateGrandTotal" style="padding: 12px; text-align: right; color: #2563eb; font-size: 16px;">0</td>
+                        <td colspan="2"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 버튼 영역 -->
+              <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 24px; border-top: 2px solid #e5e7eb;">
+                <button type="button" onclick="closePurchaseStatementCreateModal()" style="
+                  padding: 12px 24px;
+                  background: #f3f4f6;
+                  border: none;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  cursor: pointer;
+                  color: #374151;
+                  transition: all 0.2s;
+                " onmouseover="this.style.background='#e5e7eb';"
+                   onmouseout="this.style.background='#f3f4f6';">
+                  취소
+                </button>
+                <button type="submit" style="
+                  padding: 12px 24px;
+                  background: #2563eb;
+                  border: none;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  cursor: pointer;
+                  color: white;
+                  transition: all 0.2s;
+                " onmouseover="this.style.background='#1d4ed8';"
+                   onmouseout="this.style.background='#2563eb';">
+                  매입전표 등록
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- ✅ 매입전표 매입처 검색 모달 -->
+        <div id="purchaseStatementSupplierSearchModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 800px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #1f2937;">매입처 검색</h3>
+              <button onclick="closePurchaseStatementSupplierSearchModal()" style="
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                font-size: 20px;
+                color: #6b7280;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">×</button>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+              <input type="text" id="purchaseStatementSupplierSearchInput" placeholder="매입처명 또는 코드 검색"
+                onkeypress="if(event.key === 'Enter') searchPurchaseStatementSuppliers()" style="
+                flex: 1;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 6px;
+                font-size: 14px;
+              " />
+              <button onclick="searchPurchaseStatementSuppliers()" style="
+                padding: 10px 20px;
+                background: #2563eb;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 500;
+              " onmouseover="this.style.background='#1d4ed8';"
+                 onmouseout="this.style.background='#2563eb';">검색</button>
+            </div>
+
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: #f9fafb; position: sticky; top: 0;">
+                  <tr>
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">코드</th>
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">매입처명</th>
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">전화번호</th>
+                    <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e5e7eb;">선택</th>
+                  </tr>
+                </thead>
+                <tbody id="purchaseStatementSupplierSearchTableBody">
+                  <tr>
+                    <td colspan="4" style="padding: 40px; text-align: center; color: #6b7280;">
+                      검색 버튼을 클릭하여 매입처를 검색하세요
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 매입전표 작성 - 자재 추가 모달 -->
+        <div id="newPurchaseStatementDetailAddModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 600px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">품목 추가</h2>
+              <button onclick="closeNewPurchaseStatementDetailAddModal()" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                 onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- ✅ 자재 검색 영역 -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">자재 검색</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="newPurchaseStatementMaterialSearchInput" style="
+                    flex: 1;
+                    padding: 10px 12px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " placeholder="자재명 또는 품목코드로 검색"
+                  onkeypress="if(event.key === 'Enter') searchNewPurchaseStatementMaterials()" />
+                  <button onclick="searchNewPurchaseStatementMaterials()" style="
+                    padding: 10px 20px;
+                    background: #3b82f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                    white-space: nowrap;
+                  " onmouseover="this.style.background='#2563eb';"
+                     onmouseout="this.style.background='#3b82f6';">
+                    검색
+                  </button>
+                </div>
+              </div>
+
+              <!-- ✅ 검색 결과 테이블 (3컬럼, 클릭 가능) -->
+              <div id="newPurchaseStatementMaterialSearchResults" style="display: none;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">검색 결과</label>
+                <div style="max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+                  <table id="newPurchaseStatementMaterialSearchTable" style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #f9fafb; position: sticky; top: 0;">
+                      <tr>
+                        <th style="padding: 10px 12px; text-align: left; border-bottom: 2px solid #e5e7eb; font-weight: 600; font-size: 13px; color: #374151;">품목코드</th>
+                        <th style="padding: 10px 12px; text-align: left; border-bottom: 2px solid #e5e7eb; font-weight: 600; font-size: 13px; color: #374151;">품명</th>
+                        <th style="padding: 10px 12px; text-align: left; border-bottom: 2px solid #e5e7eb; font-weight: 600; font-size: 13px; color: #374151;">규격</th>
+                      </tr>
+                    </thead>
+                    <tbody id="newPurchaseStatementMaterialSearchTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- ✅ 선택된 자재 표시 (파란색 카드) -->
+              <div id="newPurchaseStatementSelectedMaterialInfo" style="display: none; background: #f0f9ff; padding: 12px; border-radius: 8px; border: 2px solid #bfdbfe;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
+                  <div>
+                    <div style="font-weight: 600; color: #1e40af; font-size: 15px;" id="newPurchaseStatementSelectedMaterialName">-</div>
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 2px;" id="newPurchaseStatementSelectedMaterialCode">-</div>
+                  </div>
+                  <button onclick="clearNewSelectedPurchaseStatementMaterial()" style="
+                    padding: 4px 12px;
+                    background: white;
+                    border: 1px solid #bfdbfe;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    color: #2563eb;
+                    font-weight: 500;
+                  " onmouseover="this.style.background='#eff6ff';"
+                     onmouseout="this.style.background='white';">
+                    취소
+                  </button>
+                </div>
+              </div>
+
+              <!-- ✅ 수량 입력 -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">수량 *</label>
+                <input type="number" id="newPurchaseStatementAddDetailQuantity" value="1" min="0" step="0.01"
+                  oninput="calculateNewPurchaseStatementDetailAmount()"
+                  style="
+                    width: 100%;
+                    padding: 10px 12px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " />
+              </div>
+
+              <!-- ✅ 단가 입력 -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">단가 (원) *</label>
+                <input type="number" id="newPurchaseStatementAddDetailPrice" value="0" min="0" step="1"
+                  oninput="calculateNewPurchaseStatementDetailAmount()"
+                  style="
+                    width: 100%;
+                    padding: 10px 12px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " />
+              </div>
+
+              <!-- ✅ 공급가액 표시 (읽기 전용) -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">공급가액 (원)</label>
+                <input type="text" id="newPurchaseStatementAddDetailAmount" readonly value="0" style="
+                  width: 100%;
+                  padding: 10px 12px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  background: #f9fafb;
+                  color: #1f2937;
+                  font-weight: 600;
+                " />
+              </div>
+            </div>
+
+            <!-- ✅ 버튼 영역 -->
+            <div style="display: flex; gap: 10px; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+              <button type="button" onclick="closeNewPurchaseStatementDetailAddModal()" style="
+                flex: 1;
+                padding: 12px 20px;
+                background: #f3f4f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: #374151;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button type="button" onclick="confirmNewPurchaseStatementDetailAdd()" style="
+                flex: 1;
+                padding: 12px 20px;
+                background: #2563eb;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#1d4ed8';"
+                 onmouseout="this.style.background='#2563eb';">
+                추가하기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 매입전표 작성 - 품목 수정 모달 -->
+        <div id="newPurchaseStatementDetailEditModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">품목 수정</h2>
+              <button onclick="closeNewPurchaseStatementDetailEditModal()" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                 onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- ✅ 자재 정보 표시 (읽기 전용, 파란색 카드) -->
+              <div style="background: #f0f9ff; padding: 12px; border-radius: 8px; border: 2px solid #bfdbfe;">
+                <div style="font-size: 12px; color: #3b82f6; font-weight: 600; margin-bottom: 4px;">선택된 자재</div>
+                <div style="font-weight: 600; color: #1e40af; font-size: 15px;" id="newPurchaseStatementEditMaterialName">-</div>
+                <div style="font-size: 12px; color: #6b7280; margin-top: 2px;" id="newPurchaseStatementEditMaterialCode">-</div>
+              </div>
+
+              <!-- ✅ 수량 수정 -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">수량 *</label>
+                <input type="number" id="newPurchaseStatementEditDetailQuantity" value="1" min="0" step="0.01"
+                  oninput="calculateNewPurchaseStatementEditDetailAmount()"
+                  style="
+                    width: 100%;
+                    padding: 10px 12px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " />
+              </div>
+
+              <!-- ✅ 단가 수정 -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">단가 (원) *</label>
+                <input type="number" id="newPurchaseStatementEditDetailPrice" value="0" min="0" step="1"
+                  oninput="calculateNewPurchaseStatementEditDetailAmount()"
+                  style="
+                    width: 100%;
+                    padding: 10px 12px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " />
+              </div>
+
+              <!-- ✅ 공급가액 표시 (읽기 전용) -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">공급가액 (원)</label>
+                <input type="text" id="newPurchaseStatementEditDetailAmount" readonly value="0" style="
+                  width: 100%;
+                  padding: 10px 12px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  background: #f9fafb;
+                  color: #1f2937;
+                  font-weight: 600;
+                " />
+              </div>
+            </div>
+
+            <!-- ✅ 버튼 영역 -->
+            <div style="display: flex; gap: 10px; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+              <button type="button" onclick="closeNewPurchaseStatementDetailEditModal()" style="
+                flex: 1;
+                padding: 12px 20px;
+                background: #f3f4f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: #374151;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button type="button" onclick="confirmNewPurchaseStatementDetailEdit()" style="
+                flex: 1;
+                padding: 12px 20px;
+                background: #2563eb;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#1d4ed8';"
+                 onmouseout="this.style.background='#2563eb';">
+                수정 완료
+              </button>
+            </div>
+          </div>
+        </div>
 
         <!-- 매입처관리 페이지 -->
         <div id="supplierPage" class="page-content hidden">
@@ -2837,7 +3363,7 @@
             <div style="display: flex; gap: 8px; align-items: center;">
               <input
                 type="text"
-                id="supplierSearchInput"
+                id="supplierListSearchInput"
                 placeholder="매입처코드 또는 매입처명 검색..."
                 style="
                   padding: 10px 16px;
@@ -2964,10 +3490,10 @@
 
     // API 기본 URL
     // 포트 3000에서 접속한 경우: 같은 origin 사용
-    // 다른 포트(8000 등)에서 접속한 경우: 127.0.0.1:3000 사용 (localhost 대신)
+    // 다른 포트(8000 등)에서 접속한 경우: localhost:3000 사용
     const API_BASE_URL = window.location.port === '3000'
       ? `${window.location.origin}/api`
-      : 'http://127.0.0.1:3000/api';
+      : 'http://localhost:3000/api';
 
     // 현재 로그인 사용자 정보
     let currentUser = null;
@@ -5014,22 +5540,18 @@
             <div style="grid-column: 1 / -1;">
               <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px;">매출처 *</label>
               <div style="display: flex; gap: 8px;">
-                <input type="text" id="selectedCustomerCode" readonly style="
-                      width: 120px;
-                      padding: 12px 16px;
-                      border: 2px solid var(--border);
-                      border-radius: 8px;
-                      font-size: 14px;
-                      background: #f5f5f5;
-                    " placeholder="코드" />
-                <input type="text" id="selectedCustomerName" readonly required style="
+                <!-- 숨겨진 매출처 코드 필드 (실제 값 저장용) -->
+                <input type="hidden" id="selectedCustomerCode" />
+
+                <!-- 통합 검색 입력란 -->
+                <input type="text" id="selectedCustomerName" required style="
                       flex: 1;
                       padding: 12px 16px;
                       border: 2px solid var(--border);
                       border-radius: 8px;
                       font-size: 14px;
-                      background: #f5f5f5;
-                    " placeholder="매출처를 선택하세요" />
+                    " placeholder="매출처 코드 또는 이름 입력 후 엔터"
+                    onkeypress="if(event.key === 'Enter') { event.preventDefault(); openCustomerSearchModal(); }" />
                 <button type="button" onclick="openCustomerSearchModal()" style="
                       padding: 10px 20px;
                       background: var(--primary);
@@ -5041,8 +5563,13 @@
                       cursor: pointer;
                       white-space: nowrap;
                     ">
-                  매출처 검색
+                  검색
                 </button>
+              </div>
+              <!-- 선택된 매출처 정보 표시 -->
+              <div id="selectedCustomerInfo" style="display: none; margin-top: 8px; padding: 8px 12px; background: #f0f9ff; border-radius: 6px; border: 1px solid #bfdbfe;">
+                <span style="font-size: 12px; color: #3b82f6; font-weight: 600;">선택된 매출처:</span>
+                <span id="selectedCustomerDisplay" style="margin-left: 8px; font-weight: 600; color: #1e40af;"></span>
               </div>
             </div>
 
@@ -5181,14 +5708,14 @@
       </div>
 
       <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-        <input type="text" id="customerSearchInput" placeholder="매출처명 또는 코드 검색"
-          onkeypress="if(event.key === 'Enter') searchCustomers()" style="
+        <input type="text" id="quotationCustomerSearchInput" placeholder="매출처명 또는 코드 검색"
+          onkeypress="if(event.key === 'Enter') searchQuotationCustomers()" style="
           flex: 1;
           padding: 10px 12px;
           border: 2px solid #e5e7eb;
           border-radius: 6px;
         " />
-        <button onclick="searchCustomers()" style="
+        <button onclick="searchQuotationCustomers()" style="
           padding: 10px 20px;
           background: #007bff;
           color: white;
@@ -6102,16 +6629,30 @@
       <form id="orderForm" onsubmit="submitNewOrder(event)">
         <!-- ✅ 발주 마스터 정보 (카드 스타일) -->
         <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
-          <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151;">발주 기본 정보</h3>
+          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">기본 정보</h3>
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
-            <!-- 사업장코드 -->
+            <!-- 발주일자 -->
             <div>
-              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
-                사업장 <span style="color: #ef4444;">*</span>
-              </label>
-              <select id="orderWorkplace" class="form-control" required style="width: 100%;">
-                <option value="">사업장 선택</option>
-              </select>
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px;">발주일자 *</label>
+              <input type="date" id="orderDate" required style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid var(--border);
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " />
+            </div>
+
+            <!-- 입고희망일자 -->
+            <div>
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px;">입고희망일자</label>
+              <input type="date" id="orderDeliveryDate" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid var(--border);
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " />
             </div>
 
             <!-- 매입처 선택 -->
@@ -6128,7 +6669,8 @@
                       border: 2px solid var(--border);
                       border-radius: 8px;
                       font-size: 14px;
-                    " placeholder="매입처 코드 또는 이름 입력 후 엔터" onkeypress="if(event.key === 'Enter') { event.preventDefault(); openSupplierSearchModal(); }" />
+                    " placeholder="매입처 코드 또는 이름 입력 후 엔터"
+                    onkeypress="if(event.key === 'Enter') { event.preventDefault(); openSupplierSearchModal(); }" />
                 <button type="button" onclick="openSupplierSearchModal()" style="
                       padding: 10px 20px;
                       background: var(--primary);
@@ -6150,62 +6692,64 @@
               </div>
             </div>
 
-            <!-- 발주일자 -->
-            <div>
-              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
-                발주일자 <span style="color: #ef4444;">*</span>
-              </label>
-              <input type="date" id="orderDate" class="form-control" required style="width: 100%;" />
-            </div>
-
-            <!-- 입고희망일자 -->
-            <div>
-              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
-                입고희망일자
-              </label>
-              <input type="date" id="orderDeliveryDate" class="form-control" style="width: 100%;" />
-            </div>
-
             <!-- 결제방법 -->
             <div>
-              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
-                결제방법
-              </label>
-              <select id="orderPaymentMethod" class="form-control" style="width: 100%;">
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px;">결제방법</label>
+              <select id="orderPaymentMethod" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid var(--border);
+                    border-radius: 8px;
+                    font-size: 14px;
+                  ">
                 <option value="">선택</option>
                 <option value="현금">현금</option>
-                <option value="카드">카드</option>
                 <option value="계좌이체">계좌이체</option>
                 <option value="어음">어음</option>
+                <option value="카드">카드</option>
               </select>
             </div>
 
             <!-- 상태 -->
             <div>
-              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
-                상태
-              </label>
-              <select id="orderStatus" class="form-control" style="width: 100%;">
-                <option value="0">발주대기</option>
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px;">상태</label>
+              <select id="orderStatus" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid var(--border);
+                    border-radius: 8px;
+                    font-size: 14px;
+                  ">
+                <option value="0">작성중</option>
                 <option value="1">발주완료</option>
                 <option value="2">입고완료</option>
               </select>
             </div>
 
-            <!-- 제목 (전체 너비) -->
+            <!-- 제목 -->
             <div style="grid-column: 1 / -1;">
-              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
-                제목 <span style="color: #ef4444;">*</span>
-              </label>
-              <input type="text" id="orderTitle" class="form-control" required placeholder="발주 제목을 입력하세요" style="width: 100%;" />
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px;">제목</label>
+              <input type="text" id="orderTitle" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid var(--border);
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " placeholder="발주서 제목을 입력하세요" />
             </div>
 
-            <!-- 적요 (전체 너비) -->
+            <!-- 적요 -->
             <div style="grid-column: 1 / -1;">
-              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
-                적요
-              </label>
-              <textarea id="orderRemarks" class="form-control" rows="3" placeholder="발주 내용을 입력하세요" style="width: 100%; resize: vertical;"></textarea>
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px;">적요</label>
+              <textarea id="orderRemarks" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid var(--border);
+                    border-radius: 8px;
+                    font-size: 14px;
+                    resize: vertical;
+                    min-height: 80px;
+                  " placeholder="비고사항을 입력하세요"></textarea>
             </div>
           </div>
         </div>
@@ -6228,60 +6772,69 @@
             </button>
           </div>
 
-          <div id="newOrderDetailTableContainer" style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e7eb;">
-              <thead style="background: #f3f4f6;">
+          <div id="newOrderDetailTableContainer" style="overflow-x: auto; border: 1px solid var(--border); border-radius: 8px;">
+            <table id="orderDetailTable" style="width: 100%; border-collapse: collapse;">
+              <thead style="background: #f8f9fa;">
                 <tr>
-                  <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: center; width: 50px;">No</th>
-                  <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left;">자재명</th>
-                  <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: center; width: 120px;">규격</th>
-                  <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: right; width: 100px;">발주량</th>
-                  <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: right; width: 120px;">입고단가</th>
-                  <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: right; width: 120px;">출고단가</th>
-                  <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: right; width: 130px;">공급가액</th>
-                  <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: center; width: 80px;">삭제</th>
+                  <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border); width: 40px;">순번</th>
+                  <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">자재코드</th>
+                  <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">자재명</th>
+                  <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">규격</th>
+                  <th style="padding: 12px; text-align: right; border-bottom: 2px solid var(--border); width: 100px;">수량</th>
+                  <th style="padding: 12px; text-align: right; border-bottom: 2px solid var(--border); width: 120px;">단가</th>
+                  <th style="padding: 12px; text-align: right; border-bottom: 2px solid var(--border); width: 120px;">공급가</th>
+                  <th style="padding: 12px; text-align: right; border-bottom: 2px solid var(--border); width: 100px;">부가세</th>
+                  <th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border); width: 60px;">삭제</th>
                 </tr>
               </thead>
               <tbody id="newOrderDetailTableBody">
                 <tr>
-                  <td colspan="8" style="padding: 40px; text-align: center; color: #999; border: 1px solid #e5e7eb;">
-                    자재를 추가해주세요
+                  <td colspan="9" style="padding: 40px; text-align: center; color: #999;">
+                    자재 추가 버튼을 클릭하여 발주 상세내역을 입력하세요
                   </td>
                 </tr>
               </tbody>
+              <tfoot style="background: #f8f9fa; font-weight: 600;">
+                <tr>
+                  <td colspan="6" style="padding: 12px; text-align: right; border-top: 2px solid var(--border);">합계</td>
+                  <td id="orderTotalSupplyPrice" style="padding: 12px; text-align: right; border-top: 2px solid var(--border);">0</td>
+                  <td id="orderTotalVat" style="padding: 12px; text-align: right; border-top: 2px solid var(--border);">0</td>
+                  <td style="padding: 12px; border-top: 2px solid var(--border);"></td>
+                </tr>
+                <tr>
+                  <td colspan="6" style="padding: 12px; text-align: right;">총액</td>
+                  <td colspan="2" id="orderGrandTotal" style="padding: 12px; text-align: right; color: #007bff; font-size: 16px;">0</td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
 
-        <!-- ✅ 저장 버튼 -->
-        <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 2px solid #e5e7eb;">
+        <!-- 버튼 영역 -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
           <button type="button" onclick="closeOrderModal()" style="
-            padding: 12px 24px;
-            background: #f3f4f6;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            color: #374151;
-            transition: all 0.2s;
-          " onmouseover="this.style.background='#e5e7eb';"
-             onmouseout="this.style.background='#f3f4f6';">
+                padding: 10px 24px;
+                background: var(--bg-light);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+              ">
             취소
           </button>
           <button type="submit" style="
-            padding: 12px 24px;
-            background: #3b82f6;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            color: white;
-            transition: all 0.2s;
-          " onmouseover="this.style.background='#2563eb';"
-             onmouseout="this.style.background='#3b82f6';">
-            저장하기
+                padding: 10px 24px;
+                background: var(--primary);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+              ">
+            발주서 저장
           </button>
         </div>
       </form>
@@ -6305,14 +6858,14 @@
       </div>
 
       <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-        <input type="text" id="supplierSearchInput" placeholder="매입처명 또는 코드 검색"
-          onkeypress="if(event.key === 'Enter') searchSuppliers()" style="
+        <input type="text" id="orderSupplierSearchInput" placeholder="매입처명 또는 코드 검색"
+          onkeypress="if(event.key === 'Enter') searchOrderSuppliers()" style="
           flex: 1;
           padding: 10px 12px;
           border: 2px solid #e5e7eb;
           border-radius: 6px;
         " />
-        <button onclick="searchSuppliers()" style="
+        <button onclick="searchOrderSuppliers()" style="
           padding: 10px 20px;
           background: #007bff;
           color: white;

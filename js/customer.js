@@ -131,7 +131,7 @@ $(document).ready(function () {
   });
 
   // Enter 키 이벤트 처리
-  $('#customerSearchInput').on('keypress', function (e) {
+  $('#customerListSearchInput').on('keypress', function (e) {
     if (e.which === 13) { // Enter key
       e.preventDefault();
       searchCustomers();
@@ -140,7 +140,7 @@ $(document).ready(function () {
 
   // 검색 함수를 전역으로 노출
   window.searchCustomers = function () {
-    const keyword = $('#customerSearchInput').val().trim();
+    const keyword = $('#customerListSearchInput').val().trim();
     console.log('🔍 매출처 검색:', keyword);
     currentSearchKeyword = keyword;
     loadCustomers(keyword);
@@ -149,7 +149,7 @@ $(document).ready(function () {
   // 검색 초기화 함수를 전역으로 노출
   window.resetCustomerSearch = function () {
     console.log('🔄 매출처 검색 초기화');
-    $('#customerSearchInput').val('');
+    $('#customerListSearchInput').val('');
     currentSearchKeyword = '';
     loadCustomers('');
   };

@@ -1,0 +1,192 @@
+QUOTATION vs ORDER MODAL - VISUAL LAYOUT DIAGRAM
+================================================
+
+QUOTATION MODAL LAYOUT (Line 5246)
+==================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 견적서 작성                                                   × │  ← Header
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 기본 정보                                                        │
+├───────────────────────┬───────────────────────────────────────┤
+│ 견적일자 *            │ 출고희망일자                          │  Row 1
+│ [Date Input]          │ [Date Input]                         │
+├─────────────────────────────────────────────────────────────────┤
+│ 매출처 *                                                        │  Row 2
+│ [Customer Search Input ▼]  [검색 Button]                      │
+│ 선택된 매출처: [Display]                                        │
+├─────────────────────────────────────────────────────────────────┤
+│ 제목                                                            │  Row 3
+│ [Title Input - Full Width]                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ 적요                                                            │  Row 4
+│ [Remarks Textarea - Full Width]                              │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 견적 상세내역                          + 자재 추가 Button       │
+├─────────────────────────────────────────────────────────────────┤
+│ 순번│자재코드│자재명│규격│수량│단가│공급가│부가세│삭제         │
+├─────────────────────────────────────────────────────────────────┤
+│ [Table Body - empty state]                                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                        합계    공급가  부가세  │
+│                                        총액    총액            │
+└─────────────────────────────────────────────────────────────────┘
+
+[취소 Button]  [견적서 등록 Button]
+
+
+ORDER MODAL LAYOUT (Line 6368)
+==============================
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 발주서 작성                                                   × │  ← Header
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 기본 정보                                                        │
+├───────────────────────┬───────────────────────────────────────┤
+│ 발주일자 *            │ 입고희망일자                          │  Row 1
+│ [Date Input]          │ [Date Input]                         │
+├─────────────────────────────────────────────────────────────────┤
+│ 매입처 *                                                        │  Row 2
+│ [Supplier Search Input ▼]  [검색 Button]                      │
+│ 선택된 매입처: [Display]                                        │
+├───────────────────────┬───────────────────────────────────────┤
+│ 결제방법              │ 상태                                  │  Row 3 ★
+│ [Dropdown]            │ [Dropdown]                          │  ★ ORDER ONLY
+├─────────────────────────────────────────────────────────────────┤
+│ 제목                                                            │  Row 4
+│ [Title Input - Full Width]                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ 적요                                                            │  Row 5
+│ [Remarks Textarea - Full Width]                              │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 발주 상세내역                          + 자재 추가 Button       │
+├─────────────────────────────────────────────────────────────────┤
+│ 순번│자재코드│자재명│규격│수량│단가│공급가│부가세│삭제         │
+├─────────────────────────────────────────────────────────────────┤
+│ [Table Body - empty state]                                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                        합계    공급가  부가세  │
+│                                        총액    총액            │
+└─────────────────────────────────────────────────────────────────┘
+
+[취소 Button]  [저장 Button]
+
+
+VISUAL DIFFERENCES
+==================
+
+Only 3 visual differences:
+
+1. HEADER TITLE
+   Quotation: "견적서 작성"
+   Order:     "발주서 작성"
+
+2. CUSTOMER/SUPPLIER SECTION
+   Quotation: "매출처 *" + label "선택된 매출처:" 
+   Order:     "매입처 *" + label "선택된 매입처:"
+
+3. EXTRA ROW IN ORDER MODAL (★ marked above)
+   Quotation: Does NOT have this row
+   Order:     Has "결제방법" (Payment Method) and "상태" (Status) dropdowns
+   
+4. SECTION HEADERS
+   Quotation: "견적 상세내역"
+   Order:     "발주 상세내역"
+
+5. SUBMIT BUTTON TEXT
+   Quotation: "견적서 등록"
+   Order:     "저장"
+
+Everything else is IDENTICAL.
+
+
+GRID COLUMN STRUCTURE
+=====================
+
+Quotation (5 rows):
+  Row 1: [Date] [DeliveryDate]
+  Row 2: [Customer Search] (full width)
+  Row 3: [Title] (full width)
+  Row 4: [Remarks] (full width)
+
+Order (5 rows):
+  Row 1: [Date] [DeliveryDate]
+  Row 2: [Supplier Search] (full width)
+  Row 3: [PaymentMethod] [Status]           ← EXTRA ROW IN ORDER
+  Row 4: [Title] (full width)
+  Row 5: [Remarks] (full width)
+
+
+SPACING & SIZING
+================
+
+Basic Information Section:
+- Background: #f8f9fa
+- Padding: 20px
+- Border radius: 8px
+- Grid gap: 16px
+- All inputs: width 100%, padding 12px 16px, border 2px
+
+Detail Items Table:
+- Container: overflow-x auto, border 1px, border-radius 8px
+- Thead: background #f8f9fa
+- Tbody: standard rows with padding 12px
+- Tfoot: background #f8f9fa, font-weight 600
+
+Buttons:
+- Container: flex, gap 12px, justify-content flex-end
+- Each button: padding 10px 24px, border-radius 8px
+- Cancel: bg var(--bg-light), border 1px
+- Submit: bg var(--primary), color white
+
+
+TABLE COLUMNS (Identical in both)
+==================================================
+
+Column 1: 순번          width: 40px,   text-align: left
+Column 2: 자재코드                     text-align: left
+Column 3: 자재명                       text-align: left
+Column 4: 규격                         text-align: left
+Column 5: 수량          width: 100px,  text-align: right
+Column 6: 단가          width: 120px,  text-align: right
+Column 7: 공급가        width: 120px,  text-align: right
+Column 8: 부가세        width: 100px,  text-align: right
+Column 9: 삭제          width: 60px,   text-align: center
+
+
+RESPONSIVE BEHAVIOR
+===================
+
+Max width: 1200px (both modals)
+Height: 90vh (both modals)
+
+When content overflows:
+- Detail table: horizontal scroll (overflow-x: auto)
+- Form area: vertical scroll (on parent div)
+- Header: sticky (position: sticky, top: -32px, z-index: 10)
+
+
+MODAL OVERLAY
+=============
+
+Both modals use:
+- class="modal" with style="display: none;"
+- Covers entire viewport (fixed positioning)
+- Shows centered modal-content with backdrop
+
+Modal trigger functions:
+- Quotation: openQuotationModal()
+- Order: openOrderModal()
+
+Modal close functions:
+- Quotation: closeQuotationModal()
+- Order: closeOrderModal()
+

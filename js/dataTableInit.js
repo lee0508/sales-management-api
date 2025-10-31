@@ -20,6 +20,7 @@ function initDataTable(tableId, url, columns) {
       info: '_START_ - _END_ / 총 _TOTAL_건',
       paginate: { previous: '이전', next: '다음' },
     },
+    order: [], // 백엔드에서 제공하는 순서 유지
     responsive: true,
     autoWidth: false,
     pageLength: 10,

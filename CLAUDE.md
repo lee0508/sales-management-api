@@ -562,13 +562,108 @@ GET `/api/customers` supports pagination:
 - Uses ROW_NUMBER() for SQL Server pagination (see server.js lines 207-253)
 - Returns: `currentPage`, `totalPages`, `total` in response
 
-### Authentication
-Session-based authentication with bcrypt password hashing:
-- POST `/api/auth/login` - Verifies password with bcrypt, sets `시작일시`, `로그인여부='Y'`
-- POST `/api/auth/logout` - Sets `종료일시`, `로그인여부='N'`
-- Middleware available: `requireAuth()`, `requireRole(roleCode)` (defined but not widely used)
-- Supports both bcrypt hashed and legacy plaintext passwords during migration
-- Session cookie expires after 24 hours
+### Authentication & Authorization
+
+**IMPORTANT**: Session management and user tracking are critical for:
+1. **Audit Trail**: Recording "who" performed each operation (사용자코드, 사용자명)
+2. **Access Control**: Restricting API access based on user roles (사용자권한)
+3. **Future Permission System**: Menu-based role permissions (메뉴별 권한 관리)
+
+#### Current Implementation (✅ Completed)
+
+**Session Configuration**: [server.js:46-63](server.js#L46-L63)
+- Session store: Memory-based (use Redis for production)
+- Cookie lifetime: 24 hours
+- Session data structure:
+  ```javascript
+  req.session.user = {
+    사용자코드: '0687',
+    사용자명: '장준호',
+    사용자권한: '99',  // Role code
+    사업장코드: '01',
+    사업장명: '제이씨엠전기'
+  }
+  ```
+
+**Login API**: [server.js:151-239](server.js#L151-L239)
+- POST `/api/auth/login` - Verifies bcrypt password, creates session
+- Updates 사용자 table: `시작일시`, `로그인여부='Y'`
+- Returns user info (excluding password)
+
+**Logout API**: [server.js:242-276](server.js#L242-L276)
+- POST `/api/auth/logout` - Destroys session
+- Updates 사용자 table: `종료일시`, `로그인여부='N'`
+
+**Authentication Middleware**: [server.js:111-119](server.js#L111-L119)
+```javascript
+function requireAuth(req, res, next)
+```
+- Ensures user is logged in before API access
+- **Currently NOT applied to most endpoints** (security risk)
+
+**Authorization Middleware**: [server.js:125-146](server.js#L125-L146)
+```javascript
+function requireRole(allowedRoles)
+```
+- Checks `사용자권한` field for role-based access
+- Example: `requireRole(['99', '50'])` allows only 관리자 and 영업관리자
+
+#### User Tracking in Creation APIs (✅ Completed - 2025-10-31)
+
+All creation APIs now return user information in response:
+
+**Quotation Creation**: [server.js:1625-1650](server.js#L1625-L1650)
+```javascript
+// Response includes:
+{ 견적일자, 견적번호, 사용자코드, 사용자명, 매출처코드, 매출처명 }
+```
+
+**Order Creation**: [server.js:2328-2353](server.js#L2328-L2353)
+```javascript
+// Response includes:
+{ 발주일자, 발주번호, 사용자코드, 사용자명, 매입처코드, 매입처명 }
+```
+
+**Transaction Creation**: [server.js:3318-3344](server.js#L3318-L3344)
+```javascript
+// Response includes:
+{ 거래일자, 거래번호, 사용자코드, 사용자명, 매출처코드, 매출처명 }
+```
+
+**Purchase Statement Creation**: [server.js:3691-3718](server.js#L3691-L3718)
+```javascript
+// Response includes:
+{ 거래일자, 거래번호, 사용자코드, 사용자명, 매입처코드, 매입처명, 미지급금지급금액 }
+```
+
+#### Known Security Issues (⚠️ To Be Fixed)
+
+1. **Missing Authentication**: Most endpoints lack `requireAuth` middleware
+   - Anyone can access APIs without login
+   - User code defaults to '8080' when session is missing
+
+2. **No Authorization**: No role-based access control implemented
+   - All logged-in users can perform any operation
+   - No distinction between 관리자, 영업담당, 구매담당
+
+3. **SQL Injection**: Some endpoints use string interpolation instead of parameterized queries
+
+#### Future Development: Menu-Based Permissions
+
+See [SESSION_AND_PERMISSION_GUIDE.md](SESSION_AND_PERMISSION_GUIDE.md) for detailed implementation plan.
+
+**Planned Role Hierarchy**:
+- `99` = 시스템 관리자 (full access)
+- `50` = 영업 관리자 (sales management)
+- `40` = 구매 관리자 (purchase management)
+- `30` = 영업 담당 (sales operations)
+- `20` = 구매 담당 (purchase operations)
+- `10` = 일반 사용자 (read-only)
+
+**Implementation Priority**:
+1. **Phase 1** (Immediate): Apply `requireAuth` to all write operations
+2. **Phase 2** (Next): Apply `requireRole` to sensitive operations
+3. **Phase 3** (Future): Row-level security, audit logs, permission UI
 
 ### Main Endpoint Groups
 
