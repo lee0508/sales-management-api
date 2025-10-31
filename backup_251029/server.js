@@ -37,7 +37,6 @@ app.use(
       secure: process.env.NODE_ENV === 'production', // HTTPS에서만 true
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24시간
-      sameSite: 'lax', // 크로스 오리진 요청 허용 (개발 환경)
     },
   }),
 );
@@ -91,9 +90,8 @@ async function connectDB() {
 
 connectDB()
   .then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Server running at http://0.0.0.0:${PORT}`);
-      console.log(`✅ Network access available at http://<SERVER_IP>:${PORT}`);
+    app.listen(PORT, () => {
+      console.log(`✅ Server running at http://127.0.0.1:${PORT}`);
       console.log('✅ Static files served from project root (index.html 포함)');
     });
   })
@@ -218,9 +216,6 @@ app.post('/api/auth/login', async (req, res) => {
       사업장명: user.사업장명,
     };
 
-    console.log('✅ 로그인 성공 - 세션 ID:', req.sessionID);
-    console.log('✅ 로그인 성공 - 세션에 사용자 정보 저장:', req.session.user);
-
     res.json({
       success: true,
       message: '로그인 성공',
@@ -337,14 +332,11 @@ app.get('/api/customer_new', async (req, res) => {
   try {
     console.log('===== 신규 매출처코드 생성 요청 =====');
 
-    // 1. 현재 가장 큰 매출처코드 조회 (영문 접두사별로, 숫자 부분 기준 정렬)
+    // 1. 현재 가장 큰 매출처코드 조회
     const query = `
       SELECT TOP 1 매출처코드
       FROM 매출처
-      WHERE LEN(매출처코드) = 8
-      ORDER BY
-        SUBSTRING(매출처코드, 1, 1) DESC,
-        CAST(SUBSTRING(매출처코드, 2, 7) AS INT) DESC
+      ORDER BY 매출처코드 DESC
     `;
 
     const result = await pool.request().query(query);
@@ -368,9 +360,8 @@ app.get('/api/customer_new', async (req, res) => {
       console.log(`  - 접두사: ${prefix}`);
       console.log(`  - 숫자 부분: ${numPart} -> ${nextNum}`);
     } else {
-      // 매출처가 하나도 없으면 Y0000001부터 시작 (영문 1자리 + 숫자 7자리)
-      newCode = 'Y0000001';
-      console.log('  - 첫 매출처 생성');
+      // 매출처가 하나도 없으면 A0000001부터 시작 (영문 1자리 + 숫자 7자리)
+      newCode = 'A0000001';
     }
 
     console.log('✅ 생성된 매출처코드:', newCode, `(총 ${newCode.length}자리)`);
@@ -489,76 +480,12 @@ app.post('/api/customers', async (req, res) => {
     console.log('매출처코드:', 매출처코드);
     console.log('매출처명:', 매출처명);
 
-    // 세션에서 사용자코드 가져오기
-    console.log('세션 ID:', req.sessionID);
-    console.log('세션 정보:', req.session);
-    console.log('세션 사용자:', req.session?.user);
-    const 사용자코드 = req.session?.user?.사용자코드;
-    console.log('사용자코드:', 사용자코드);
-
-    if (!사용자코드) {
-      console.log('❌ 세션에 사용자코드 없음 - 401 반환');
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
-    console.log('✅ 세션 인증 성공 - 사용자코드:', 사용자코드);
-
-    // 세션에서 사업장코드 가져오기
-    const 사업장코드 = req.session?.user?.사업장코드;
-    console.log('사업장코드:', 사업장코드);
-
-    // 중복 체크 및 자동 증가 로직
-    let 최종매출처코드 = 매출처코드;
-
-    // 1. 중복 확인
-    const checkQuery = `
-      SELECT COUNT(*) as cnt
-      FROM 매출처
-      WHERE 사업장코드 = @사업장코드 AND 매출처코드 = @매출처코드
-    `;
-
-    const checkResult = await pool
-      .request()
-      .input('사업장코드', sql.VarChar(2), 사업장코드)
-      .input('매출처코드', sql.VarChar(8), 매출처코드)
-      .query(checkQuery);
-
-    // 2. 중복이면 다음 코드 자동 생성
-    if (checkResult.recordset[0].cnt > 0) {
-      console.log('⚠️ 매출처코드 중복 감지 - 자동 증가 처리');
-
-      const maxQuery = `
-        SELECT TOP 1 매출처코드
-        FROM 매출처
-        WHERE LEN(매출처코드) = 8
-        ORDER BY
-          SUBSTRING(매출처코드, 1, 1) DESC,
-          CAST(SUBSTRING(매출처코드, 2, 7) AS INT) DESC
-      `;
-
-      const maxResult = await pool.request().query(maxQuery);
-
-      if (maxResult.recordset.length > 0) {
-        const lastCode = maxResult.recordset[0].매출처코드;
-        const prefix = lastCode.charAt(0);
-        const numPart = lastCode.substring(1);
-        const nextNum = parseInt(numPart) + 1;
-        최종매출처코드 = prefix + String(nextNum).padStart(7, '0');
-
-        console.log(`  기존 코드: ${매출처코드} → 새 코드: ${최종매출처코드}`);
-      }
-    }
-
     // 수정일자 (YYYYMMDD 형식)
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     await pool
       .request()
-      .input('매출처코드', sql.VarChar(8), 최종매출처코드)
-      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('매출처코드', sql.VarChar(8), 매출처코드)
       .input('매출처명', sql.VarChar(30), 매출처명)
       .input('사업자번호', sql.VarChar(14), 사업자번호 || '')
       .input('법인번호', sql.VarChar(14), 법인번호 || '')
@@ -577,29 +504,23 @@ app.post('/api/customers', async (req, res) => {
       .input('담당자명', sql.VarChar(30), 담당자명 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
       .input('비고란', sql.VarChar(100), 비고란 || '').query(`
         INSERT INTO 매출처 (
-          매출처코드, 사업장코드, 매출처명, 사업자번호, 법인번호, 대표자명, 대표자주민번호,
+          매출처코드, 매출처명, 사업자번호, 법인번호, 대표자명, 대표자주민번호,
           개업일자, 우편번호, 주소, 번지, 업태, 업종, 전화번호, 팩스번호,
-          은행코드, 계좌번호, 담당자명, 사용구분, 수정일자, 사용자코드, 비고란
+          은행코드, 계좌번호, 담당자명, 사용구분, 수정일자, 비고란
         ) VALUES (
-          @매출처코드, @사업장코드, @매출처명, @사업자번호, @법인번호, @대표자명, @대표자주민번호,
+          @매출처코드, @매출처명, @사업자번호, @법인번호, @대표자명, @대표자주민번호,
           @개업일자, @우편번호, @주소, @번지, @업태, @업종, @전화번호, @팩스번호,
-          @은행코드, @계좌번호, @담당자명, @사용구분, @수정일자, @사용자코드, @비고란
+          @은행코드, @계좌번호, @담당자명, @사용구분, @수정일자, @비고란
         )
       `);
 
-    console.log('✅ 매출처 등록 완료 - 매출처코드:', 최종매출처코드);
+    console.log('✅ 매출처 등록 완료');
 
     res.json({
       success: true,
-      message: 최종매출처코드 !== 매출처코드
-        ? `매출처가 등록되었습니다. (코드: ${최종매출처코드})`
-        : '매출처가 등록되었습니다.',
-      data: {
-        매출처코드: 최종매출처코드,
-      },
+      message: '매출처가 등록되었습니다.',
     });
   } catch (err) {
     console.error('❌ 매출처 등록 에러:', err);
@@ -632,15 +553,6 @@ app.put('/api/customers/:code', async (req, res) => {
       비고란,
     } = req.body;
 
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     await pool
@@ -664,7 +576,6 @@ app.put('/api/customers/:code', async (req, res) => {
       .input('담당자명', sql.VarChar(30), 담당자명 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
       .input('비고란', sql.VarChar(100), 비고란 || '').query(`
         UPDATE 매출처 SET
           매출처명 = @매출처명,
@@ -685,7 +596,6 @@ app.put('/api/customers/:code', async (req, res) => {
           담당자명 = @담당자명,
           사용구분 = @사용구분,
           수정일자 = @수정일자,
-          사용자코드 = @사용자코드,
           비고란 = @비고란
         WHERE 매출처코드 = @매출처코드
       `);
@@ -700,34 +610,15 @@ app.put('/api/customers/:code', async (req, res) => {
   }
 });
 
-// 매출처 삭제 (Soft Delete)
+// 매출처 삭제
 app.delete('/api/customers/:code', async (req, res) => {
   try {
     const { code } = req.params;
 
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
-    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-
     await pool
       .request()
       .input('매출처코드', sql.VarChar(8), code)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .input('수정일자', sql.VarChar(8), 수정일자)
-      .query(`
-        UPDATE 매출처 SET
-          사용구분 = 1,
-          사용자코드 = @사용자코드,
-          수정일자 = @수정일자
-        WHERE 매출처코드 = @매출처코드
-      `);
+      .query('DELETE FROM 매출처 WHERE 매출처코드 = @매출처코드');
 
     res.json({
       success: true,
@@ -927,74 +818,12 @@ app.post('/api/suppliers', async (req, res) => {
       단가구분,
     } = req.body;
 
-    console.log('===== 매입처 신규 등록 요청 =====');
-    console.log('매입처코드:', 매입처코드);
-    console.log('매입처명:', 매입처명);
-
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
-    console.log('✅ 세션 인증 성공 - 사용자코드:', 사용자코드);
-
-    // 세션에서 사업장코드 가져오기
-    const session사업장코드 = req.session?.user?.사업장코드;
-    const 최종사업장코드 = 사업장코드 || session사업장코드;
-    console.log('사업장코드:', 최종사업장코드);
-
-    // 중복 체크 및 자동 증가 로직
-    let 최종매입처코드 = 매입처코드;
-
-    // 1. 중복 확인
-    const checkQuery = `
-      SELECT COUNT(*) as cnt
-      FROM 매입처
-      WHERE 사업장코드 = @사업장코드 AND 매입처코드 = @매입처코드
-    `;
-
-    const checkResult = await pool
-      .request()
-      .input('사업장코드', sql.VarChar(2), 최종사업장코드)
-      .input('매입처코드', sql.VarChar(8), 매입처코드)
-      .query(checkQuery);
-
-    // 2. 중복이면 다음 코드 자동 생성
-    if (checkResult.recordset[0].cnt > 0) {
-      console.log('⚠️ 매입처코드 중복 감지 - 자동 증가 처리');
-
-      const maxQuery = `
-        SELECT TOP 1 매입처코드
-        FROM 매입처
-        WHERE LEN(매입처코드) = 8
-        ORDER BY
-          SUBSTRING(매입처코드, 1, 1) DESC,
-          CAST(SUBSTRING(매입처코드, 2, 7) AS INT) DESC
-      `;
-
-      const maxResult = await pool.request().query(maxQuery);
-
-      if (maxResult.recordset.length > 0) {
-        const lastCode = maxResult.recordset[0].매입처코드;
-        const prefix = lastCode.charAt(0);
-        const numPart = lastCode.substring(1);
-        const nextNum = parseInt(numPart) + 1;
-        최종매입처코드 = prefix + String(nextNum).padStart(7, '0');
-
-        console.log(`  기존 코드: ${매입처코드} → 새 코드: ${최종매입처코드}`);
-      }
-    }
-
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     await pool
       .request()
-      .input('사업장코드', sql.VarChar(2), 최종사업장코드)
-      .input('매입처코드', sql.VarChar(8), 최종매입처코드)
+      .input('사업장코드', sql.VarChar(2), 사업장코드 || '')
+      .input('매입처코드', sql.VarChar(8), 매입처코드)
       .input('매입처명', sql.VarChar(30), 매입처명)
       .input('사업자번호', sql.VarChar(14), 사업자번호 || '')
       .input('법인번호', sql.VarChar(14), 법인번호 || '')
@@ -1015,7 +844,7 @@ app.post('/api/suppliers', async (req, res) => {
       .input('담당자명', sql.VarChar(30), 담당자명 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .input('사용자코드', sql.VarChar(4), '')
       .input('비고란', sql.VarChar(100), 비고란 || '')
       .input('단가구분', sql.TinyInt, 단가구분 || 1).query(`
                 INSERT INTO 매입처 (
@@ -1033,20 +862,13 @@ app.post('/api/suppliers', async (req, res) => {
                 )
             `);
 
-    console.log('✅ 매입처 등록 완료 - 매입처코드:', 최종매입처코드);
-
     res.json({
       success: true,
-      message: 최종매입처코드 !== 매입처코드
-        ? `매입처가 등록되었습니다. (코드: ${최종매입처코드})`
-        : '매입처가 등록되었습니다.',
-      data: {
-        매입처코드: 최종매입처코드,
-      },
+      message: '매입처가 등록되었습니다.',
     });
   } catch (err) {
     console.error('매입처 등록 에러:', err);
-    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+    res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
 
@@ -1079,15 +901,6 @@ app.post('/api/suppliers_new', async (req, res) => {
       단가구분,
     } = req.body;
 
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     await pool
@@ -1114,7 +927,7 @@ app.post('/api/suppliers_new', async (req, res) => {
       .input('담당자명', sql.VarChar(30), 담당자명 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .input('사용자코드', sql.VarChar(4), '')
       .input('비고란', sql.VarChar(100), 비고란 || '')
       .input('단가구분', sql.TinyInt, 단가구분 || 1).query(`
                 INSERT INTO 매입처 (
@@ -1170,15 +983,6 @@ app.put('/api/suppliers_edit/:code', async (req, res) => {
       단가구분,
     } = req.body;
 
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     await pool
@@ -1204,7 +1008,6 @@ app.put('/api/suppliers_edit/:code', async (req, res) => {
       .input('담당자명', sql.VarChar(30), 담당자명 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
       .input('비고란', sql.VarChar(100), 비고란 || '')
       .input('단가구분', sql.TinyInt, 단가구분 || 1).query(`
                 UPDATE 매입처 SET
@@ -1228,7 +1031,6 @@ app.put('/api/suppliers_edit/:code', async (req, res) => {
                     담당자명 = @담당자명,
                     사용구분 = @사용구분,
                     수정일자 = @수정일자,
-                    사용자코드 = @사용자코드,
                     비고란 = @비고란,
                     단가구분 = @단가구분
                 WHERE 매입처코드 = @매입처코드
@@ -1272,15 +1074,6 @@ app.put('/api/suppliers/:code', async (req, res) => {
       단가구분,
     } = req.body;
 
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     await pool
@@ -1306,7 +1099,6 @@ app.put('/api/suppliers/:code', async (req, res) => {
       .input('담당자명', sql.VarChar(30), 담당자명 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
       .input('비고란', sql.VarChar(100), 비고란 || '')
       .input('단가구분', sql.TinyInt, 단가구분 || 1).query(`
                 UPDATE 매입처 SET
@@ -1330,7 +1122,6 @@ app.put('/api/suppliers/:code', async (req, res) => {
                     담당자명 = @담당자명,
                     사용구분 = @사용구분,
                     수정일자 = @수정일자,
-                    사용자코드 = @사용자코드,
                     비고란 = @비고란,
                     단가구분 = @단가구분
                 WHERE 매입처코드 = @매입처코드
@@ -1505,21 +1296,12 @@ app.post('/api/quotations_add', async (req, res) => {
   try {
     const { master, details } = req.body;
 
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
     // 견적번호 생성 (로그 테이블 사용)
     const logResult = await pool
       .request()
       .input('테이블명', sql.VarChar(50), '견적')
       .input('베이스코드', sql.VarChar(50), master.견적일자).query(`
-                SELECT 최종로그 FROM 로그
+                SELECT 최종로그 FROM 로그 
                 WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
             `);
 
@@ -1545,7 +1327,7 @@ app.post('/api/quotations_add', async (req, res) => {
       .input('적요', sql.VarChar(50), master.적요 || '')
       .input('상태코드', sql.TinyInt, master.상태코드 || 1)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+      .input('사용자코드', sql.VarChar(4), master.사용자코드 || '').query(`
                 INSERT INTO 견적 (
                     사업장코드, 견적일자, 견적번호, 매출처코드, 출고희망일자,
                     결제방법, 결제예정일자, 유효일수, 제목, 적요, 상태코드,
@@ -1582,7 +1364,7 @@ app.post('/api/quotations_add', async (req, res) => {
         .input('출고부가', sql.Money, detail.출고부가 || 0)
         .input('적요', sql.VarChar(50), detail.적요 || '')
         .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+        .input('사용자코드', sql.VarChar(4), master.사용자코드 || '').query(`
                     INSERT INTO 견적내역 (
                         사업장코드, 견적일자, 견적번호, 견적시간, 자재코드,
                         매입처코드, 수량, 매출처코드, 계산서발행여부, 입고단가,
@@ -1604,9 +1386,8 @@ app.post('/api/quotations_add', async (req, res) => {
         .input('테이블명', sql.VarChar(50), '견적')
         .input('베이스코드', sql.VarChar(50), master.견적일자)
         .input('최종로그', sql.Money, 견적번호)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
         .input('수정일자', sql.VarChar(8), 수정일자).query(`
-                    UPDATE 로그 SET 최종로그 = @최종로그, 사용자코드 = @사용자코드, 수정일자 = @수정일자
+                    UPDATE 로그 SET 최종로그 = @최종로그, 수정일자 = @수정일자
                     WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
                 `);
     } else {
@@ -1615,10 +1396,9 @@ app.post('/api/quotations_add', async (req, res) => {
         .input('테이블명', sql.VarChar(50), '견적')
         .input('베이스코드', sql.VarChar(50), master.견적일자)
         .input('최종로그', sql.Money, 견적번호)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
         .input('수정일자', sql.VarChar(8), 수정일자).query(`
-                    INSERT INTO 로그 (테이블명, 베이스코드, 최종로그, 최종로그1, 사용자코드, 수정일자)
-                    VALUES (@테이블명, @베이스코드, @최종로그, 0, @사용자코드, @수정일자)
+                    INSERT INTO 로그 (테이블명, 베이스코드, 최종로그, 최종로그1, 수정일자, 사용자코드)
+                    VALUES (@테이블명, @베이스코드, @최종로그, 0, @수정일자, '')
                 `);
     }
 
@@ -1672,16 +1452,6 @@ app.get('/api/quotations/:date/:no/details', async (req, res) => {
 app.delete('/api/quotations/:date/:no', async (req, res) => {
   try {
     const { date, no } = req.params;
-
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     // 마스터 삭제 (사용구분 = 1)
@@ -1689,10 +1459,9 @@ app.delete('/api/quotations/:date/:no', async (req, res) => {
       .request()
       .input('견적일자', sql.VarChar(8), date)
       .input('견적번호', sql.Real, parseFloat(no))
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
       .input('수정일자', sql.VarChar(8), 수정일자).query(`
         UPDATE 견적
-        SET 사용구분 = 1, 사용자코드 = @사용자코드, 수정일자 = @수정일자
+        SET 사용구분 = 1, 수정일자 = @수정일자
         WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호
       `);
 
@@ -1701,10 +1470,9 @@ app.delete('/api/quotations/:date/:no', async (req, res) => {
       .request()
       .input('견적일자', sql.VarChar(8), date)
       .input('견적번호', sql.Real, parseFloat(no))
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
       .input('수정일자', sql.VarChar(8), 수정일자).query(`
         UPDATE 견적내역
-        SET 사용구분 = 1, 사용자코드 = @사용자코드, 수정일자 = @수정일자
+        SET 사용구분 = 1, 수정일자 = @수정일자
         WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호
       `);
 
@@ -1753,16 +1521,6 @@ app.put('/api/quotations/:date/:no', async (req, res) => {
   try {
     const { date, no } = req.params;
     const { 매출처코드, 출고희망일자, 결제방법, 결제예정일자, 유효일수, 제목, 적요 } = req.body;
-
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     await pool
@@ -1776,7 +1534,6 @@ app.put('/api/quotations/:date/:no', async (req, res) => {
       .input('유효일수', sql.Int, 유효일수 || 0)
       .input('제목', sql.VarChar(30), 제목 || '')
       .input('적요', sql.VarChar(50), 적요 || '')
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
       .input('수정일자', sql.VarChar(8), 수정일자).query(`
         UPDATE 견적
         SET
@@ -1787,7 +1544,6 @@ app.put('/api/quotations/:date/:no', async (req, res) => {
           유효일수 = @유효일수,
           제목 = @제목,
           적요 = @적요,
-          사용자코드 = @사용자코드,
           수정일자 = @수정일자
         WHERE 견적일자 = @견적일자 AND 견적번호 = @견적번호
       `);
@@ -2244,7 +2000,7 @@ app.post('/api/orders', async (req, res) => {
 
     // 3. 발주 마스터 삽입
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080'; // 세션에서 가져오기, 없으면 기본값
+    const 사용자코드 = '0001'; // TODO: 세션에서 가져오기
 
     await transaction
       .request()
@@ -2356,7 +2112,7 @@ app.put('/api/orders/:date/:no', async (req, res) => {
 
     const 사업장코드 = masterInfo.recordset[0]?.사업장코드 || '01';
     const 매입처코드 = masterInfo.recordset[0]?.매입처코드 || '';
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080'; // 세션에서 가져오기, 없으면 기본값
+    const 사용자코드 = '0001'; // TODO: 세션에서 가져오기
 
     // 1. 마스터 정보 수정
     await transaction
@@ -2368,7 +2124,6 @@ app.put('/api/orders/:date/:no', async (req, res) => {
       .input('제목', sql.VarChar(30), 제목)
       .input('적요', sql.VarChar(50), 적요)
       .input('상태코드', sql.Int, 상태코드)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
       .input('수정일자', sql.VarChar(8), 수정일자).query(`
         UPDATE 발주
         SET 입고희망일자 = @입고희망일자,
@@ -2376,7 +2131,6 @@ app.put('/api/orders/:date/:no', async (req, res) => {
             제목 = @제목,
             적요 = @적요,
             상태코드 = @상태코드,
-            사용자코드 = @사용자코드,
             수정일자 = @수정일자
         WHERE 발주일자 = @발주일자 AND 발주번호 = @발주번호
       `);
@@ -2468,47 +2222,30 @@ app.put('/api/orders/:date/:no', async (req, res) => {
   }
 });
 
-// 발주 삭제 (Soft Delete - 사용구분 변경)
+// 발주 삭제 (마스터 + 디테일)
 app.delete('/api/orders/:date/:no', async (req, res) => {
   const transaction = pool.transaction();
 
   try {
     const { date, no } = req.params;
 
-    // 세션에서 사용자코드 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드;
-    if (!사용자코드) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
-    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-
     await transaction.begin();
 
-    // 1. 발주 마스터 Soft Delete
+    // 1. 발주 디테일 삭제
     await transaction
       .request()
       .input('발주일자', sql.VarChar(8), date)
-      .input('발주번호', sql.Real, parseFloat(no))
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .input('수정일자', sql.VarChar(8), 수정일자).query(`
-        UPDATE 발주
-        SET 사용구분 = 1, 사용자코드 = @사용자코드, 수정일자 = @수정일자
+      .input('발주번호', sql.Real, parseFloat(no)).query(`
+        DELETE FROM 발주내역
         WHERE 발주일자 = @발주일자 AND 발주번호 = @발주번호
       `);
 
-    // 2. 발주 디테일 Soft Delete
+    // 2. 발주 마스터 삭제
     await transaction
       .request()
       .input('발주일자', sql.VarChar(8), date)
-      .input('발주번호', sql.Real, parseFloat(no))
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .input('수정일자', sql.VarChar(8), 수정일자).query(`
-        UPDATE 발주내역
-        SET 사용구분 = 1, 사용자코드 = @사용자코드, 수정일자 = @수정일자
+      .input('발주번호', sql.Real, parseFloat(no)).query(`
+        DELETE FROM 발주
         WHERE 발주일자 = @발주일자 AND 발주번호 = @발주번호
       `);
 
@@ -2836,8 +2573,6 @@ app.get('/api/transactions', async (req, res) => {
       SELECT
         t.사업장코드,
         t.거래일자,
-        t.거래번호,
-        t.입출고구분,
         t.매출처코드,
         c.매출처명,
         SUM(ISNULL(t.입고수량,0) * ISNULL(t.입고단가,0)) AS 입고금액,
@@ -2850,7 +2585,6 @@ app.get('/api/transactions', async (req, res) => {
       FROM 자재입출내역 t
       LEFT JOIN 매출처 c ON t.매출처코드 = c.매출처코드
       WHERE t.사용구분 = 0
-        AND t.입출고구분 = 2
     `;
 
     // ✅ 날짜 조건
@@ -2879,7 +2613,7 @@ app.get('/api/transactions', async (req, res) => {
     }
 
     query += `
-      GROUP BY t.사업장코드, t.거래일자, t.거래번호, t.입출고구분, t.매출처코드, c.매출처명
+      GROUP BY t.사업장코드, t.거래일자, t.매출처코드, c.매출처명, t.거래번호
       ORDER BY t.거래일자 DESC, t.거래번호 ASC
     `;
 
@@ -2961,14 +2695,13 @@ app.get('/api/transactions/:id', async (req, res) => {
 app.get('/api/transactions/:date/:no', async (req, res) => {
   try {
     const { date, no } = req.params;
-    console.log('거래명세서 상세 조회 요청:', { date, no, noType: typeof no });
 
     const result = await pool
       .request()
-      .input('거래일자', sql.VarChar(8), date)
-      .input('거래번호', sql.Real, parseFloat(no)).query(`
-        SELECT
-          i.분류코드, i.세부코드,
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고번호', sql.Real, parseFloat(no)).query(`
+        SELECT 
+          i.분류코드, i.세부코드, 
           (i.분류코드 + i.세부코드) AS 자재코드,
           m.자재명, m.규격, m.단위,
           ISNULL(i.출고수량,0) AS 수량,
@@ -2976,24 +2709,17 @@ app.get('/api/transactions/:date/:no', async (req, res) => {
           ISNULL(i.출고수량,0) * ISNULL(i.출고단가,0) AS 공급가액,
           ISNULL(i.출고부가,0) AS 부가세,
           (ISNULL(i.출고수량,0) * ISNULL(i.출고단가,0)) + ISNULL(i.출고부가,0) AS 합계금액,
-          i.적요, i.입출고구분, i.매출처코드,
-          c.매출처명, u.사용자명
+          i.적요
         FROM 자재입출내역 i
         LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
-        LEFT JOIN 매출처 c ON i.매출처코드 = c.매출처코드
-        LEFT JOIN 사용자 u ON i.사용자코드 = u.사용자코드
-        WHERE i.거래일자 = @거래일자
-          AND i.거래번호 = @거래번호
-          AND i.입출고구분 = 2
+        WHERE i.입출고일자 = @입출고일자 AND i.입출고번호 = @입출고번호
         ORDER BY m.자재명
       `);
 
-    console.log('거래명세서 상세 조회 결과:', result.recordset.length, '건');
     res.json({ success: true, data: result.recordset });
   } catch (err) {
     console.error('거래명세서 상세 조회 에러:', err);
-    console.error('에러 상세:', err.message, err.stack);
-    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+    res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
 
@@ -3058,14 +2784,14 @@ app.post('/api/taxinvoice/create', async (req, res) => {
 
     const tx = await pool
       .request()
-      .input('거래일자', sql.VarChar(8), date)
-      .input('거래번호', sql.Real, parseFloat(no)).query(`
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고번호', sql.Real, parseFloat(no)).query(`
         SELECT TOP 1 i.매출처코드, c.매출처명,
           SUM(i.출고수량 * i.출고단가) AS 공급가액,
           SUM(i.출고부가) AS 세액
         FROM 자재입출내역 i
         LEFT JOIN 매출처 c ON i.매출처코드 = c.매출처코드
-        WHERE i.거래일자 = @거래일자 AND i.거래번호 = @거래번호
+        WHERE i.입출고일자 = @입출고일자 AND i.입출고번호 = @입출고번호
         GROUP BY i.매출처코드, c.매출처명
       `);
 
@@ -3099,918 +2825,28 @@ app.post('/api/taxinvoice/create', async (req, res) => {
   }
 });
 
-// ✅ 거래명세서 수정 (자재입출내역 UPDATE)
-app.put('/api/transactions/:date/:no', async (req, res) => {
-  try {
-    const { date: 거래일자, no: 거래번호 } = req.params;
-    const { 입출고구분, details } = req.body;
-    const 사업장코드 = '01';
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080'; // 세션에서 가져오기, 없으면 기본값
-
-    console.log(`✅ 거래명세서 수정 요청: ${거래일자}-${거래번호}`);
-
-    // 유효성 검사
-    if (!details || details.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: '최소 1개 이상의 품목이 필요합니다.',
-      });
-    }
-
-    // 1. 기존 거래명세서 삭제 (거래일자 + 거래번호)
-    await pool.request()
-      .input('거래일자', sql.VarChar(8), 거래일자)
-      .input('거래번호', sql.Real, parseFloat(거래번호))
-      .query(`
-        DELETE FROM 자재입출내역
-        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
-      `);
-
-    console.log(`✅ 기존 거래명세서 삭제 완료: ${거래일자}-${거래번호}`);
-
-    // 2. 현재 시간 (HHMMSS + 밀리초 3자리 = 9자)
-    const now = new Date();
-    const 입출고시간 =
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0') +
-      now.getMilliseconds().toString().padStart(3, '0');
-
-    const 수정일자 = 거래일자;
-
-    // 3. 새로운 상세내역 INSERT
-    for (const detail of details) {
-      const { 자재코드, 수량, 단가, 매출처코드 } = detail;
-
-      // 자재코드 분리
-      const 분류코드 = 자재코드.substring(0, 2);
-      const 세부코드 = 자재코드.substring(2);
-
-      const 출고수량 = 수량;
-      const 출고단가 = 단가;
-      const 출고부가 = Math.round(출고수량 * 출고단가 * 0.1);
-
-      await pool.request()
-        .input('사업장코드', sql.VarChar(2), 사업장코드)
-        .input('분류코드', sql.VarChar(2), 분류코드)
-        .input('세부코드', sql.VarChar(16), 세부코드)
-        .input('입출고구분', sql.TinyInt, 입출고구분 || 2)
-        .input('입출고일자', sql.VarChar(8), 거래일자)
-        .input('입출고시간', sql.VarChar(9), 입출고시간)
-        .input('출고수량', sql.Money, 출고수량)
-        .input('출고단가', sql.Money, 출고단가)
-        .input('출고부가', sql.Money, 출고부가)
-        .input('매출처코드', sql.VarChar(8), 매출처코드 || '')
-        .input('거래일자', sql.VarChar(8), 거래일자)
-        .input('거래번호', sql.Real, parseFloat(거래번호))
-        .input('적요', sql.VarChar(50), detail.적요 || '')
-        .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
-        .query(`
-          INSERT INTO 자재입출내역 (
-            사업장코드, 분류코드, 세부코드, 입출고구분, 입출고일자, 입출고시간,
-            입고수량, 입고단가, 입고부가,
-            출고수량, 출고단가, 출고부가,
-            매출처코드, 매입처코드,
-            거래일자, 거래번호,
-            적요, 수정일자, 사용자코드, 사용구분
-          ) VALUES (
-            @사업장코드, @분류코드, @세부코드, @입출고구분, @입출고일자, @입출고시간,
-            0, 0, 0,
-            @출고수량, @출고단가, @출고부가,
-            @매출처코드, '',
-            @거래일자, @거래번호,
-            @적요, @수정일자, @사용자코드, 0
-          )
-        `);
-    }
-
-    console.log(`✅ 거래명세서 수정 완료: ${거래일자}-${거래번호} (${details.length}건)`);
-
-    res.json({
-      success: true,
-      message: '거래명세서가 수정되었습니다.',
-      data: {
-        거래일자,
-        거래번호,
-      },
-    });
-  } catch (err) {
-    console.error('❌ 거래명세서 수정 에러:', err);
-    res.status(500).json({
-      success: false,
-      message: '서버 오류: ' + err.message,
-    });
-  }
-});
-
-// ✅ 거래명세서 작성 (자재입출내역에 INSERT)
-app.post('/api/transactions', async (req, res) => {
-  try {
-    const { 거래일자, 입출고구분, 매출처코드, 적요, details } = req.body;
-    const 사업장코드 = '01'; // 기본 사업장
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080'; // 세션에서 가져오기, 없으면 기본값
-
-    // 유효성 검사
-    if (!거래일자 || !매출처코드 || !details || details.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: '필수 정보가 누락되었습니다.',
-      });
-    }
-
-    // 거래번호 생성 (로그 테이블 사용)
-    const 베이스코드 = 거래일자; // YYYYMMDD
-    const 테이블명 = '자재입출내역';
-
-    // 로그 테이블에서 다음 번호 조회 및 업데이트
-    const logResult = await pool.request()
-      .input('테이블명', sql.VarChar(20), 테이블명)
-      .input('베이스코드', sql.VarChar(20), 베이스코드)
-      .query(`
-        SELECT 최종로그 FROM 로그
-        WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
-      `);
-
-    let 거래번호;
-    if (logResult.recordset.length > 0) {
-      거래번호 = logResult.recordset[0].최종로그 + 1;
-      await pool.request()
-        .input('최종로그', sql.Real, 거래번호)
-        .input('테이블명', sql.VarChar(20), 테이블명)
-        .input('베이스코드', sql.VarChar(20), 베이스코드)
-        .query(`
-          UPDATE 로그 SET 최종로그 = @최종로그
-          WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
-        `);
-    } else {
-      거래번호 = 1;
-      await pool.request()
-        .input('테이블명', sql.VarChar(20), 테이블명)
-        .input('베이스코드', sql.VarChar(20), 베이스코드)
-        .input('최종로그', sql.Real, 거래번호)
-        .query(`
-          INSERT INTO 로그 (테이블명, 베이스코드, 최종로그)
-          VALUES (@테이블명, @베이스코드, @최종로그)
-        `);
-    }
-
-    // 현재 시간 (HHMMSS + 밀리초 3자리 = 9자)
-    const now = new Date();
-    const 거래시간 =
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0') +
-      now.getMilliseconds().toString().padStart(3, '0');
-
-    const 수정일자 = 거래일자;
-
-    // 각 상세내역을 자재입출내역에 INSERT
-    for (const detail of details) {
-      const { 자재코드, 수량, 단가 } = detail;
-
-      // 자재코드 분리 (분류코드 2자리 + 세부코드 16자리)
-      const 분류코드 = 자재코드.substring(0, 2);
-      const 세부코드 = 자재코드.substring(2);
-
-      const 출고수량 = 수량;
-      const 출고단가 = 단가;
-      const 출고부가 = Math.round(출고수량 * 출고단가 * 0.1); // 부가세 10%
-
-      await pool.request()
-        .input('사업장코드', sql.VarChar(2), 사업장코드)
-        .input('분류코드', sql.VarChar(2), 분류코드)
-        .input('세부코드', sql.VarChar(16), 세부코드)
-        .input('입출고구분', sql.TinyInt, 입출고구분 || 2) // 기본: 출고
-        .input('입출고일자', sql.VarChar(8), 거래일자)
-        .input('입출고시간', sql.VarChar(9), 거래시간)
-        .input('출고수량', sql.Money, 출고수량)
-        .input('출고단가', sql.Money, 출고단가)
-        .input('출고부가', sql.Money, 출고부가)
-        .input('매출처코드', sql.VarChar(8), 매출처코드)
-        .input('거래일자', sql.VarChar(8), 거래일자)
-        .input('거래번호', sql.Real, 거래번호)
-        .input('적요', sql.VarChar(50), 적요 || '')
-        .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
-        .query(`
-          INSERT INTO 자재입출내역 (
-            사업장코드, 분류코드, 세부코드, 입출고구분, 입출고일자, 입출고시간,
-            입고수량, 입고단가, 입고부가,
-            출고수량, 출고단가, 출고부가,
-            매출처코드, 매입처코드,
-            거래일자, 거래번호,
-            적요, 수정일자, 사용자코드, 사용구분
-          ) VALUES (
-            @사업장코드, @분류코드, @세부코드, @입출고구분, @입출고일자, @입출고시간,
-            0, 0, 0,
-            @출고수량, @출고단가, @출고부가,
-            @매출처코드, '',
-            @거래일자, @거래번호,
-            @적요, @수정일자, @사용자코드, 0
-          )
-        `);
-    }
-
-    console.log(`✅ 거래명세서 작성 완료: ${거래일자}-${거래번호} (${details.length}건)`);
-
-    res.json({
-      success: true,
-      message: '거래명세서가 작성되었습니다.',
-      data: {
-        거래일자,
-        거래번호,
-        명세서번호: `${거래일자}-${거래번호}`,
-      },
-    });
-  } catch (err) {
-    console.error('❌ 거래명세서 작성 에러:', err);
-    res.status(500).json({
-      success: false,
-      message: '서버 오류: ' + err.message,
-    });
-  }
-});
-
-// ✅ 거래명세서 삭제
-app.delete('/api/transactions/:date/:no', async (req, res) => {
-  try {
-    const { date: 거래일자, no: 거래번호 } = req.params;
-
-    console.log(`✅ 거래명세서 삭제 요청: ${거래일자}-${거래번호}`);
-
-    // 거래명세서 삭제 (자재입출내역에서 해당 거래일자 + 거래번호 삭제)
-    const result = await pool.request()
-      .input('거래일자', sql.VarChar(8), 거래일자)
-      .input('거래번호', sql.Real, parseFloat(거래번호))
-      .query(`
-        DELETE FROM 자재입출내역
-        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
-      `);
-
-    if (result.rowsAffected[0] === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '거래명세서를 찾을 수 없습니다.',
-      });
-    }
-
-    console.log(`✅ 거래명세서 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`);
-
-    res.json({
-      success: true,
-      message: '거래명세서가 삭제되었습니다.',
-    });
-  } catch (err) {
-    console.error('❌ 거래명세서 삭제 에러:', err);
-    res.status(500).json({
-      success: false,
-      message: '서버 오류: ' + err.message,
-    });
-  }
-});
-
-// ================================
-// 매입전표관리 API (Purchase Statements)
-// ================================
-
-// ✅ 매입전표 목록 조회 (입고 구분)
-app.get('/api/purchase-statements', async (req, res) => {
-  try {
-    const { startDate, endDate, supplierCode, statementNo, status } = req.query;
-
-    let query = `
-      SELECT
-        t.사업장코드,
-        t.거래일자,
-        t.거래번호,
-        t.입출고구분,
-        t.매입처코드,
-        s.매입처명,
-        SUM(ISNULL(t.입고수량,0) * ISNULL(t.입고단가,0)) AS 입고금액,
-        SUM(ISNULL(t.입고부가,0)) AS 입고부가세,
-        (ISNULL(t.거래일자,'') + '-' + CAST(t.거래번호 AS VARCHAR(10))) AS 전표번호,
-        MAX(t.적요) AS 적요,
-        MAX(t.사용자코드) AS 작성자
-      FROM 자재입출내역 t
-      LEFT JOIN 매입처 s ON t.매입처코드 = s.매입처코드
-      WHERE t.사용구분 = 0
-        AND t.입출고구분 = 1
-    `;
-
-    // ✅ 날짜 조건
-    if (startDate && endDate) {
-      query += ` AND t.거래일자 BETWEEN '${startDate.replace(/-/g, '')}' AND '${endDate.replace(
-        /-/g,
-        '',
-      )}'`;
-    } else {
-      query += ` AND t.거래일자 >= CONVERT(VARCHAR(8), DATEADD(MONTH, -1, GETDATE()), 112)`;
-    }
-
-    // ✅ 매입처 코드 필터
-    if (supplierCode) {
-      query += ` AND t.매입처코드 = '${supplierCode}'`;
-    }
-
-    // ✅ 전표번호(거래번호) 필터
-    if (statementNo) {
-      query += ` AND CAST(t.거래번호 AS VARCHAR(10)) = '${statementNo}'`;
-    }
-
-    // ✅ 상태 필터 (예: 입출고구분)
-    if (status) {
-      query += ` AND CAST(t.입출고구분 AS VARCHAR(10)) = '${status}'`;
-    }
-
-    query += `
-      GROUP BY t.사업장코드, t.거래일자, t.거래번호, t.입출고구분, t.매입처코드, s.매입처명
-      ORDER BY t.거래일자 DESC, t.거래번호 ASC
-    `;
-
-    const result = await pool.request().query(query);
-    res.json({ success: true, data: result.recordset });
-  } catch (err) {
-    console.error('매입전표 조회 오류:', err);
-    res.status(500).json({ success: false, message: 'DB 조회 실패' });
-  }
-});
-
-// ✅ 매입전표 상세 조회 (날짜 + 번호)
-app.get('/api/purchase-statements/:date/:no', async (req, res) => {
-  try {
-    const { date, no } = req.params;
-    console.log('매입전표 상세 조회 요청:', { date, no, noType: typeof no });
-
-    const result = await pool
-      .request()
-      .input('거래일자', sql.VarChar(8), date)
-      .input('거래번호', sql.Real, parseFloat(no)).query(`
-        SELECT
-          i.분류코드, i.세부코드,
-          (i.분류코드 + i.세부코드) AS 자재코드,
-          m.자재명, m.규격, m.단위,
-          ISNULL(i.입고수량,0) AS 수량,
-          ISNULL(i.입고단가,0) AS 단가,
-          ISNULL(i.입고수량,0) * ISNULL(i.입고단가,0) AS 공급가액,
-          ISNULL(i.입고부가,0) AS 부가세,
-          (ISNULL(i.입고수량,0) * ISNULL(i.입고단가,0)) + ISNULL(i.입고부가,0) AS 합계금액,
-          i.적요, i.입출고구분, i.매입처코드,
-          s.매입처명, u.사용자명
-        FROM 자재입출내역 i
-        LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
-        LEFT JOIN 매입처 s ON i.매입처코드 = s.매입처코드
-        LEFT JOIN 사용자 u ON i.사용자코드 = u.사용자코드
-        WHERE i.거래일자 = @거래일자
-          AND i.거래번호 = @거래번호
-          AND i.입출고구분 = 1
-        ORDER BY m.자재명
-      `);
-
-    console.log('매입전표 상세 조회 결과:', result.recordset.length, '건');
-    res.json({ success: true, data: result.recordset });
-  } catch (err) {
-    console.error('매입전표 상세 조회 에러:', err);
-    console.error('에러 상세:', err.message, err.stack);
-    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
-  }
-});
-
-// ✅ 매입 단가 이력 조회 (최근 1년) — 특정 매입처 + 자재코드 기준
-app.get('/api/purchase-statements/price-history', async (req, res) => {
-  try {
-    const { supplierCode, materialCode } = req.query;
-    if (!supplierCode || !materialCode) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'supplierCode와 materialCode가 필요합니다.' });
-    }
-
-    // 오늘 및 1년 전 날짜 계산
-    const today = new Date();
-    const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
-    const lastYear = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
-    const startDate = lastYear.toISOString().slice(0, 10).replace(/-/g, '');
-
-    const 분류코드 = materialCode.substring(0, 2);
-    const 세부코드 = materialCode.substring(2);
-
-    const result = await pool
-      .request()
-      .input('startDate', sql.VarChar(8), startDate)
-      .input('endDate', sql.VarChar(8), endDate)
-      .input('supplierCode', sql.VarChar(8), supplierCode)
-      .input('분류코드', sql.VarChar(2), 분류코드)
-      .input('세부코드', sql.VarChar(16), 세부코드).query(`
-        SELECT
-          i.입출고일자, s.매입처명, (i.분류코드 + i.세부코드) AS 자재코드,
-          m.자재명, ISNULL(i.입고수량,0) AS 수량, ISNULL(i.입고단가,0) AS 단가
-        FROM 자재입출내역 i
-        LEFT JOIN 매입처 s ON i.매입처코드 = s.매입처코드
-        LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
-        WHERE i.입출고구분 = 1
-          AND i.입출고일자 BETWEEN @startDate AND @endDate
-          AND i.매입처코드 = @supplierCode
-          AND i.분류코드 = @분류코드 AND i.세부코드 = @세부코드
-        ORDER BY i.입출고일자 DESC
-      `);
-
-    res.json({ success: true, data: result.recordset });
-  } catch (err) {
-    console.error('매입 단가 이력 조회 에러:', err);
-    res.status(500).json({ success: false, message: '서버 오류' });
-  }
-});
-
-// ✅ 매입전표 작성 (자재입출내역에 INSERT)
-app.post('/api/purchase-statements', async (req, res) => {
-  try {
-    const { 거래일자, 입출고구분, 매입처코드, 적요, details } = req.body;
-    const 사업장코드 = '01';
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
-
-    // 유효성 검사
-    if (!거래일자 || !매입처코드 || !details || details.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: '필수 정보가 누락되었습니다.',
-      });
-    }
-
-    // 거래번호 생성 (로그 테이블 사용)
-    const 베이스코드 = 거래일자;
-    const 테이블명 = '자재입출내역';
-
-    const logResult = await pool.request()
-      .input('테이블명', sql.VarChar(20), 테이블명)
-      .input('베이스코드', sql.VarChar(20), 베이스코드)
-      .query(`
-        SELECT 최종로그 FROM 로그
-        WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
-      `);
-
-    let 거래번호;
-    if (logResult.recordset.length > 0) {
-      거래번호 = logResult.recordset[0].최종로그 + 1;
-      await pool.request()
-        .input('최종로그', sql.Real, 거래번호)
-        .input('테이블명', sql.VarChar(20), 테이블명)
-        .input('베이스코드', sql.VarChar(20), 베이스코드)
-        .query(`
-          UPDATE 로그 SET 최종로그 = @최종로그
-          WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
-        `);
-    } else {
-      거래번호 = 1;
-      await pool.request()
-        .input('테이블명', sql.VarChar(20), 테이블명)
-        .input('베이스코드', sql.VarChar(20), 베이스코드)
-        .input('최종로그', sql.Real, 거래번호)
-        .query(`
-          INSERT INTO 로그 (테이블명, 베이스코드, 최종로그)
-          VALUES (@테이블명, @베이스코드, @최종로그)
-        `);
-    }
-
-    // 현재 시간
-    const now = new Date();
-    const 거래시간 =
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0') +
-      now.getMilliseconds().toString().padStart(3, '0');
-
-    const 수정일자 = 거래일자;
-
-    // 💰 합계금액 계산 (미지급금 발생 금액)
-    let 총공급가액 = 0;
-    let 총부가세 = 0;
-
-    // 1️⃣ 각 상세내역을 자재입출내역에 INSERT
-    for (const detail of details) {
-      const { 자재코드, 수량, 단가 } = detail;
-
-      const 분류코드 = 자재코드.substring(0, 2);
-      const 세부코드 = 자재코드.substring(2);
-
-      const 입고수량 = 수량;
-      const 입고단가 = 단가;
-      const 입고부가 = Math.round(입고수량 * 입고단가 * 0.1);
-
-      // 합계 누적
-      총공급가액 += 입고수량 * 입고단가;
-      총부가세 += 입고부가;
-
-      await pool.request()
-        .input('사업장코드', sql.VarChar(2), 사업장코드)
-        .input('분류코드', sql.VarChar(2), 분류코드)
-        .input('세부코드', sql.VarChar(16), 세부코드)
-        .input('입출고구분', sql.TinyInt, 입출고구분 || 1) // 기본: 입고
-        .input('입출고일자', sql.VarChar(8), 거래일자)
-        .input('입출고시간', sql.VarChar(9), 거래시간)
-        .input('입고수량', sql.Money, 입고수량)
-        .input('입고단가', sql.Money, 입고단가)
-        .input('입고부가', sql.Money, 입고부가)
-        .input('매입처코드', sql.VarChar(8), 매입처코드)
-        .input('거래일자', sql.VarChar(8), 거래일자)
-        .input('거래번호', sql.Real, 거래번호)
-        .input('적요', sql.VarChar(50), 적요 || '')
-        .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
-        .query(`
-          INSERT INTO 자재입출내역 (
-            사업장코드, 분류코드, 세부코드, 입출고구분, 입출고일자, 입출고시간,
-            입고수량, 입고단가, 입고부가,
-            출고수량, 출고단가, 출고부가,
-            매출처코드, 매입처코드,
-            거래일자, 거래번호,
-            적요, 수정일자, 사용자코드, 사용구분
-          ) VALUES (
-            @사업장코드, @분류코드, @세부코드, @입출고구분, @입출고일자, @입출고시간,
-            @입고수량, @입고단가, @입고부가,
-            0, 0, 0,
-            '', @매입처코드,
-            @거래일자, @거래번호,
-            @적요, @수정일자, @사용자코드, 0
-          )
-        `);
-    }
-
-    console.log(`✅ 자재입출내역 작성 완료: ${거래일자}-${거래번호} (${details.length}건)`);
-
-    // 2️⃣ 미지급금내역 자동 생성 (거래일자 기준)
-    const 미지급금지급금액 = 총공급가액 + 총부가세;
-
-    await pool.request()
-      .input('사업장코드', sql.VarChar(2), 사업장코드)
-      .input('매입처코드', sql.VarChar(8), 매입처코드)
-      .input('미지급금지급일자', sql.VarChar(8), 거래일자)
-      .input('미지급금지급시간', sql.VarChar(9), 거래시간)
-      .input('미지급금지급금액', sql.Money, 미지급금지급금액)
-      .input('결제방법', sql.VarChar(10), '') // 추후 결제 시 업데이트
-      .input('만기일자', sql.VarChar(8), '')
-      .input('어음번호', sql.VarChar(20), '')
-      .input('적요', sql.VarChar(50), `매입전표 ${거래일자}-${거래번호}`)
-      .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
-        INSERT INTO 미지급금내역 (
-          사업장코드, 매입처코드, 미지급금지급일자, 미지급금지급시간,
-          미지급금지급금액, 결제방법, 만기일자, 어음번호, 적요,
-          수정일자, 사용자코드
-        ) VALUES (
-          @사업장코드, @매입처코드, @미지급금지급일자, @미지급금지급시간,
-          @미지급금지급금액, @결제방법, @만기일자, @어음번호, @적요,
-          @수정일자, @사용자코드
-        )
-      `);
-
-    console.log(`✅ 미지급금내역 자동 생성: ${매입처코드} - ${미지급금지급금액.toLocaleString()}원`);
-    console.log(`✅ 매입전표 작성 완료: ${거래일자}-${거래번호}`);
-
-    res.json({
-      success: true,
-      message: '매입전표 및 미지급금이 생성되었습니다.',
-      data: {
-        거래일자,
-        거래번호,
-        전표번호: `${거래일자}-${거래번호}`,
-        미지급금지급금액,
-      },
-    });
-  } catch (err) {
-    console.error('❌ 매입전표 작성 에러:', err);
-    res.status(500).json({
-      success: false,
-      message: '서버 오류: ' + err.message,
-    });
-  }
-});
-
-// ✅ 매입전표 수정
-app.put('/api/purchase-statements/:date/:no', async (req, res) => {
-  try {
-    const { date: 거래일자, no: 거래번호 } = req.params;
-    const { 입출고구분, details } = req.body;
-    const 사업장코드 = '01';
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
-
-    console.log(`✅ 매입전표 수정 요청: ${거래일자}-${거래번호}`);
-
-    // 유효성 검사
-    if (!details || details.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: '최소 1개 이상의 품목이 필요합니다.',
-      });
-    }
-
-    // 1. 기존 매입전표 삭제
-    await pool.request()
-      .input('거래일자', sql.VarChar(8), 거래일자)
-      .input('거래번호', sql.Real, parseFloat(거래번호))
-      .query(`
-        DELETE FROM 자재입출내역
-        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
-      `);
-
-    console.log(`✅ 기존 매입전표 삭제 완료: ${거래일자}-${거래번호}`);
-
-    // 2. 현재 시간
-    const now = new Date();
-    const 입출고시간 =
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0') +
-      now.getMilliseconds().toString().padStart(3, '0');
-
-    const 수정일자 = 거래일자;
-
-    // 3. 새로운 상세내역 INSERT
-    for (const detail of details) {
-      const { 자재코드, 수량, 단가, 매입처코드 } = detail;
-
-      const 분류코드 = 자재코드.substring(0, 2);
-      const 세부코드 = 자재코드.substring(2);
-
-      const 입고수량 = 수량;
-      const 입고단가 = 단가;
-      const 입고부가 = Math.round(입고수량 * 입고단가 * 0.1);
-
-      await pool.request()
-        .input('사업장코드', sql.VarChar(2), 사업장코드)
-        .input('분류코드', sql.VarChar(2), 분류코드)
-        .input('세부코드', sql.VarChar(16), 세부코드)
-        .input('입출고구분', sql.TinyInt, 입출고구분 || 1)
-        .input('입출고일자', sql.VarChar(8), 거래일자)
-        .input('입출고시간', sql.VarChar(9), 입출고시간)
-        .input('입고수량', sql.Money, 입고수량)
-        .input('입고단가', sql.Money, 입고단가)
-        .input('입고부가', sql.Money, 입고부가)
-        .input('매입처코드', sql.VarChar(8), 매입처코드 || '')
-        .input('거래일자', sql.VarChar(8), 거래일자)
-        .input('거래번호', sql.Real, parseFloat(거래번호))
-        .input('적요', sql.VarChar(50), detail.적요 || '')
-        .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
-        .query(`
-          INSERT INTO 자재입출내역 (
-            사업장코드, 분류코드, 세부코드, 입출고구분, 입출고일자, 입출고시간,
-            입고수량, 입고단가, 입고부가,
-            출고수량, 출고단가, 출고부가,
-            매출처코드, 매입처코드,
-            거래일자, 거래번호,
-            적요, 수정일자, 사용자코드, 사용구분
-          ) VALUES (
-            @사업장코드, @분류코드, @세부코드, @입출고구분, @입출고일자, @입출고시간,
-            @입고수량, @입고단가, @입고부가,
-            0, 0, 0,
-            '', @매입처코드,
-            @거래일자, @거래번호,
-            @적요, @수정일자, @사용자코드, 0
-          )
-        `);
-    }
-
-    console.log(`✅ 매입전표 수정 완료: ${거래일자}-${거래번호} (${details.length}건)`);
-
-    res.json({
-      success: true,
-      message: '매입전표가 수정되었습니다.',
-      data: {
-        거래일자,
-        거래번호,
-      },
-    });
-  } catch (err) {
-    console.error('❌ 매입전표 수정 에러:', err);
-    res.status(500).json({
-      success: false,
-      message: '서버 오류: ' + err.message,
-    });
-  }
-});
-
-// ✅ 매입전표 삭제
-app.delete('/api/purchase-statements/:date/:no', async (req, res) => {
-  try {
-    const { date: 거래일자, no: 거래번호 } = req.params;
-
-    console.log(`✅ 매입전표 삭제 요청: ${거래일자}-${거래번호}`);
-
-    const result = await pool.request()
-      .input('거래일자', sql.VarChar(8), 거래일자)
-      .input('거래번호', sql.Real, parseFloat(거래번호))
-      .query(`
-        DELETE FROM 자재입출내역
-        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
-      `);
-
-    if (result.rowsAffected[0] === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '매입전표를 찾을 수 없습니다.',
-      });
-    }
-
-    console.log(`✅ 매입전표 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`);
-
-    res.json({
-      success: true,
-      message: '매입전표가 삭제되었습니다.',
-    });
-  } catch (err) {
-    console.error('❌ 매입전표 삭제 에러:', err);
-    res.status(500).json({
-      success: false,
-      message: '서버 오류: ' + err.message,
-    });
-  }
-});
-
-// ================================
-// 미지급금 관리 API (Accounts Payable)
-// ================================
-
-// ✅ 미지급금 내역 조회 (특정 매입처 + 일자)
-app.get('/api/accounts-payable', async (req, res) => {
-  try {
-    const { supplierCode, startDate, endDate } = req.query;
-
-    let query = `
-      SELECT
-        미지급금지급일자,
-        미지급금지급시간,
-        매입처코드,
-        미지급금지급금액,
-        결제방법,
-        만기일자,
-        어음번호,
-        적요,
-        사용자코드
-      FROM 미지급금내역
-      WHERE 사업장코드 = '01'
-    `;
-
-    if (supplierCode) {
-      query += ` AND 매입처코드 = '${supplierCode}'`;
-    }
-
-    if (startDate && endDate) {
-      query += ` AND 미지급금지급일자 BETWEEN '${startDate.replace(/-/g, '')}' AND '${endDate.replace(/-/g, '')}'`;
-    }
-
-    query += ` ORDER BY 미지급금지급일자 DESC, 미지급금지급시간 DESC`;
-
-    const result = await pool.request().query(query);
-    res.json({ success: true, data: result.recordset });
-  } catch (err) {
-    console.error('미지급금 조회 오류:', err);
-    res.status(500).json({ success: false, message: 'DB 조회 실패' });
-  }
-});
-
-// ✅ 미지급금 등록
-app.post('/api/accounts-payable', async (req, res) => {
-  try {
-    const { 매입처코드, 미지급금지급일자, 미지급금지급금액, 결제방법, 만기일자, 어음번호, 적요 } = req.body;
-    const 사업장코드 = '01';
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
-
-    // 유효성 검사
-    if (!매입처코드 || !미지급금지급일자 || !미지급금지급금액) {
-      return res.status(400).json({
-        success: false,
-        message: '필수 정보가 누락되었습니다.',
-      });
-    }
-
-    // 현재 시간
-    const now = new Date();
-    const 미지급금지급시간 =
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0') +
-      now.getMilliseconds().toString().padStart(3, '0');
-
-    const 수정일자 = 미지급금지급일자;
-
-    await pool.request()
-      .input('사업장코드', sql.VarChar(2), 사업장코드)
-      .input('매입처코드', sql.VarChar(8), 매입처코드)
-      .input('미지급금지급일자', sql.VarChar(8), 미지급금지급일자)
-      .input('미지급금지급시간', sql.VarChar(9), 미지급금지급시간)
-      .input('미지급금지급금액', sql.Money, 미지급금지급금액)
-      .input('결제방법', sql.VarChar(10), 결제방법 || '')
-      .input('만기일자', sql.VarChar(8), 만기일자 || '')
-      .input('어음번호', sql.VarChar(20), 어음번호 || '')
-      .input('적요', sql.VarChar(50), 적요 || '')
-      .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
-        INSERT INTO 미지급금내역 (
-          사업장코드, 매입처코드, 미지급금지급일자, 미지급금지급시간,
-          미지급금지급금액, 결제방법, 만기일자, 어음번호, 적요,
-          수정일자, 사용자코드
-        ) VALUES (
-          @사업장코드, @매입처코드, @미지급금지급일자, @미지급금지급시간,
-          @미지급금지급금액, @결제방법, @만기일자, @어음번호, @적요,
-          @수정일자, @사용자코드
-        )
-      `);
-
-    console.log(`✅ 미지급금 등록 완료: ${매입처코드} - ${미지급금지급금액}원`);
-
-    res.json({
-      success: true,
-      message: '미지급금이 등록되었습니다.',
-      data: {
-        매입처코드,
-        미지급금지급일자,
-        미지급금지급금액,
-      },
-    });
-  } catch (err) {
-    console.error('❌ 미지급금 등록 에러:', err);
-    res.status(500).json({
-      success: false,
-      message: '서버 오류: ' + err.message,
-    });
-  }
-});
-
-// ✅ 매입처별 미지급 잔액 조회
-app.get('/api/accounts-payable/balance/:supplierCode', async (req, res) => {
-  try {
-    const { supplierCode } = req.params;
-
-    // 1. 총 매입액 계산 (자재입출내역에서 입고 금액)
-    const purchaseResult = await pool.request()
-      .input('매입처코드', sql.VarChar(8), supplierCode)
-      .query(`
-        SELECT
-          ISNULL(SUM(입고수량 * 입고단가 * 1.1), 0) AS 총매입액
-        FROM 자재입출내역
-        WHERE 매입처코드 = @매입처코드
-          AND 입출고구분 = 1
-          AND 사용구분 = 0
-      `);
-
-    // 2. 총 지급액 계산 (미지급금내역에서 지급 금액)
-    const paymentResult = await pool.request()
-      .input('매입처코드', sql.VarChar(8), supplierCode)
-      .query(`
-        SELECT
-          ISNULL(SUM(미지급금지급금액), 0) AS 총지급액
-        FROM 미지급금내역
-        WHERE 매입처코드 = @매입처코드
-      `);
-
-    const 총매입액 = purchaseResult.recordset[0].총매입액;
-    const 총지급액 = paymentResult.recordset[0].총지급액;
-    const 미지급잔액 = 총매입액 - 총지급액;
-
-    res.json({
-      success: true,
-      data: {
-        매입처코드: supplierCode,
-        총매입액,
-        총지급액,
-        미지급잔액,
-      },
-    });
-  } catch (err) {
-    console.error('미지급 잔액 조회 오류:', err);
-    res.status(500).json({ success: false, message: '서버 오류' });
-  }
-});
-
-// ================================
-// 거래명세서 인쇄 및 기타 API
-// ================================
-
 // 거래명세서 인쇄용 데이터 조회
 app.get('/api/transactions/:date/:no/print', async (req, res) => {
   try {
     const { date, no } = req.params;
     const resultHeader = await pool
       .request()
-      .input('거래일자', sql.VarChar(8), date)
-      .input('거래번호', sql.Real, parseFloat(no)).query(`
-        SELECT TOP 1 i.거래일자, i.거래번호, i.매출처코드, c.매출처명,
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고번호', sql.Real, parseFloat(no)).query(`
+        SELECT TOP 1 i.입출고일자, i.입출고번호, i.매출처코드, c.매출처명,
           SUM(i.출고수량 * i.출고단가) AS 공급가액,
           SUM(i.출고부가) AS 부가세,
           SUM((i.출고수량 * i.출고단가) + i.출고부가) AS 총합계
         FROM 자재입출내역 i
         LEFT JOIN 매출처 c ON i.매출처코드 = c.매출처코드
-        WHERE i.거래일자 = @거래일자 AND i.거래번호 = @거래번호
-        GROUP BY i.거래일자, i.거래번호, i.매출처코드, c.매출처명
+        WHERE i.입출고일자 = @입출고일자 AND i.입출고번호 = @입출고번호
+        GROUP BY i.입출고일자, i.입출고번호, i.매출처코드, c.매출처명
       `);
 
     const resultDetail = await pool
       .request()
-      .input('거래일자', sql.VarChar(8), date)
-      .input('거래번호', sql.Real, parseFloat(no)).query(`
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고번호', sql.Real, parseFloat(no)).query(`
         SELECT (i.분류코드 + i.세부코드) AS 자재코드, m.자재명, m.규격, m.단위,
           i.출고수량 AS 수량, i.출고단가 AS 단가,
           (i.출고수량 * i.출고단가) AS 공급가액,
@@ -4018,7 +2854,7 @@ app.get('/api/transactions/:date/:no/print', async (req, res) => {
           (i.출고수량 * i.출고단가 + i.출고부가) AS 합계금액
         FROM 자재입출내역 i
         LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
-        WHERE i.거래일자 = @거래일자 AND i.거래번호 = @거래번호
+        WHERE i.입출고일자 = @입출고일자 AND i.입출고번호 = @입출고번호
       `);
 
     res.json({

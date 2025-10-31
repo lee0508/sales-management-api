@@ -106,7 +106,7 @@ async function loadTransactions() {
           data: null,
           render: (data, type, row) => {
             return `
-              <div id="actions-${row.거래일자}_${row.거래번호}" style="display: flex; gap: 4px; justify-content: center;">
+              <div id="transaction-actions-${row.거래일자}_${row.거래번호}" style="display: flex; gap: 4px; justify-content: center;">
                 <button class="btn-icon btn-view" onclick="openTransactionDetailModal('${row.명세서번호}')" title="보기">보기</button>
                 <button class="btn-icon btn-edit" style="display: none;" onclick="editTransaction('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon btn-delete" style="display: none;" onclick="deleteTransaction('${row.거래일자}', ${row.거래번호})" title="삭제">삭제</button>
@@ -134,27 +134,59 @@ async function loadTransactions() {
       pageLength: 10,
       responsive: true,
       autoWidth: false,
+      drawCallback: function(settings) {
+        // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
+        $('.transactionCheckbox').each(function() {
+          const $checkbox = $(this);
+          const transactionDate = String($checkbox.data('date'));
+          const transactionNo = String($checkbox.data('no'));
+          const isChecked = $checkbox.prop('checked');
+          const actionDiv = $('#transaction-actions-' + transactionDate + '_' + transactionNo);
+
+          if (isChecked) {
+            actionDiv.find('.btn-view').hide();
+            actionDiv.find('.btn-edit').show();
+            actionDiv.find('.btn-delete').show();
+          } else {
+            actionDiv.find('.btn-view').show();
+            actionDiv.find('.btn-edit').hide();
+            actionDiv.find('.btn-delete').hide();
+          }
+        });
+      }
     });
 
     // ✅ 개별 체크박스 이벤트 (DataTable 초기화 후 등록)
     $(document)
       .off('change', '.transactionCheckbox')
       .on('change', '.transactionCheckbox', function () {
-        const transactionDate = $(this).data('date');
-        const transactionNo = $(this).data('no');
+        const transactionDate = String($(this).data('date'));
+        const transactionNo = String($(this).data('no'));
         const isChecked = $(this).prop('checked');
-        const actionDiv = $(`#actions-${transactionDate}_${transactionNo}`);
+        const actionDiv = $('#transaction-actions-' + transactionDate + '_' + transactionNo);
 
-        console.log('✅ 체크박스 변경:', { transactionDate, transactionNo, isChecked });
+        console.log('✅ 체크박스 변경:', {
+          transactionDate,
+          transactionNo,
+          isChecked,
+          actionDiv: actionDiv.length,
+          btnView: actionDiv.find('.btn-view').length,
+          btnEdit: actionDiv.find('.btn-edit').length,
+          btnDelete: actionDiv.find('.btn-delete').length
+        });
 
         if (isChecked) {
+          // 체크됨: 보기 버튼 숨기고 수정/삭제 버튼 표시
           actionDiv.find('.btn-view').hide();
           actionDiv.find('.btn-edit').show();
           actionDiv.find('.btn-delete').show();
+          console.log('✅ 버튼 표시 완료 - 수정/삭제 버튼 visible');
         } else {
+          // 체크 해제: 수정/삭제 버튼 숨기고 보기 버튼 표시
           actionDiv.find('.btn-view').show();
           actionDiv.find('.btn-edit').hide();
           actionDiv.find('.btn-delete').hide();
+          console.log('✅ 버튼 표시 완료 - 보기 버튼 visible');
         }
       });
 
@@ -275,7 +307,7 @@ async function openTransactionDetailModal(transactionNo) {
           className: 'dt-right',
         },
       ],
-      order: [[0, 'asc']],
+      order: [],  // 정렬 비활성화 - 입력 순서대로 표시
       pageLength: 10,
       language: {
         lengthMenu: '페이지당 _MENU_ 개씩 보기',

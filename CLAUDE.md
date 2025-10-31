@@ -68,8 +68,37 @@ All database tables and columns use Korean names:
 - 매입처 (Suppliers/Purchase Vendors)
 - 견적 (Quotations) + 견적내역 (Quotation Details)
 - 발주 (Purchase Orders) + 발주내역 (Order Details)
-- 자재 (Materials) + 자재분류 (Material Categories) + 자재원장 (Material Ledger) + 자재입출내역 (Inventory Transactions)
+- 자재 (Materials) + 자재분류 (Material Categories) + 자재원장 (Material Ledger) + **자재입출내역 (Inventory Transactions - 핵심!)**
+- 세금계산서 (Tax Invoices)
+- 미수금내역 (Accounts Receivable)
+- 미지급금내역 (Accounts Payable)
 - 로그 (Log table for auto-incrementing IDs)
+
+### 자재입출내역 Table - 입출고 구분 (CRITICAL!)
+
+**IMPORTANT**: The `자재입출내역` table serves BOTH sales (출고) and purchase (입고) transactions. The `입출고구분` field determines the type:
+
+```sql
+-- 자재입출내역 구분
+입출고구분 = 1  →  매입전표 (입고/Purchase)
+입출고구분 = 2  →  거래명세서 (출고/Sales)
+```
+
+| 입출고구분 | 업무 | 거래처 필드 | 수량/단가/부가 | 비고 |
+|---------|------|-----------|--------------|------|
+| **1** | 매입 (입고) | 매입처코드 | 입고수량, 입고단가, 입고부가 | 공급업체로부터 자재 구매 |
+| **2** | 매출 (출고) | 매출처코드 | 출고수량, 출고단가, 출고부가 | 고객에게 자재 판매 |
+
+**Query Examples**:
+```sql
+-- 매입전표 조회
+SELECT * FROM 자재입출내역
+WHERE 입출고구분 = 1 AND 거래일자 = '20251001' AND 사용구분 = 0
+
+-- 거래명세서 조회
+SELECT * FROM 자재입출내역
+WHERE 입출고구분 = 2 AND 거래일자 = '20251001' AND 사용구분 = 0
+```
 
 ### Master-Detail Pattern
 Quotations (견적) and Purchase Orders (발주) follow master-detail architecture:
@@ -224,6 +253,295 @@ Always use `substring(4)` to display only the pure detail code:
 // For full material code: "0101MOFS105"
 const displayCode = materialCode.substring(4); // "MOFS105"
 ```
+
+## Business Process Workflows
+
+### 매출관리 프로세스 (Sales Management Process)
+
+**거래명세서 작성 시 영향받는 테이블:**
+
+```
+거래명세서 작성 (POST /api/transactions)
+         ↓
+┌────────────────────────────────────────────────┐
+│ 1️⃣ 자재입출내역 테이블 (✅ 현재 구현됨)         │
+│    INSERT with:                                │
+│    - 입출고구분 = 2 (출고)                      │
+│    - 매출처코드                                 │
+│    - 출고수량, 출고단가, 출고부가                │
+│    - 거래일자, 거래번호                         │
+│                                                │
+│    공급가액 = 출고수량 × 출고단가               │
+│    부가세 = 출고부가 (10%)                      │
+│    합계 = 공급가액 + 부가세                     │
+└────────────────────────────────────────────────┘
+         ↓
+┌────────────────────────────────────────────────┐
+│ 2️⃣ 세금계산서 테이블 (❌ TODO - 추후 구현)     │
+│    INSERT when status = "확정" or "발행완료":   │
+│    - 작성일자 = 거래일자                        │
+│    - 매출처코드                                 │
+│    - 공급가액 = SUM(출고수량 × 출고단가)        │
+│    - 세액 = SUM(출고부가)                      │
+│    - 합계금액 = 공급가액 + 세액                 │
+│                                                │
+│    전자세금계산서 발행 준비                     │
+└────────────────────────────────────────────────┘
+         ↓
+┌────────────────────────────────────────────────┐
+│ 3️⃣ 미수금내역 테이블 (❌ TODO - 추후 구현)     │
+│    INSERT when status = "확정":                │
+│    - 매출처코드                                 │
+│    - 미수금발생일자 = 거래일자                  │
+│    - 미수금발생금액 = 합계금액                  │
+│                                                │
+│    이후 입금 처리로 미수금 차감                 │
+└────────────────────────────────────────────────┘
+```
+
+**Implementation Status:**
+- ✅ **Step 1**: 자재입출내역 INSERT implemented (server.js lines 3208-3333)
+- ❌ **Step 2**: 세금계산서 generation (장부 테이블 - to be implemented later)
+- ❌ **Step 3**: 미수금내역 tracking (to be implemented later)
+
+### 매입관리 프로세스 (Purchase Management Process)
+
+**매입전표 작성 시 영향받는 테이블:**
+
+```
+매입전표 작성 (POST /api/purchase-statements)
+         ↓
+┌────────────────────────────────────────────────┐
+│ ✅ AUTOMATIC PROCESS (단일 트랜잭션)            │
+│                                                │
+│ 1️⃣ 자재입출내역 테이블                         │
+│    INSERT with:                                │
+│    - 입출고구분 = 1 (입고)                      │
+│    - 매입처코드                                 │
+│    - 입고수량, 입고단가, 입고부가                │
+│    - 거래일자, 거래번호                         │
+│                                                │
+│    공급가액 = 입고수량 × 입고단가               │
+│    부가세 = 입고부가 (10%)                      │
+│    합계 = 공급가액 + 부가세                     │
+│         ↓                                      │
+│         ↓ (자동 계산 후 즉시 실행)              │
+│         ↓                                      │
+│ 2️⃣ 미지급금내역 테이블                         │
+│    AUTO INSERT immediately after:              │
+│    - 매입처코드                                 │
+│    - 미지급금지급일자 = 거래일자                │
+│    - 미지급금지급금액 = SUM(합계금액)           │
+│    - 적요 = "매입전표 거래일자-거래번호"        │
+│                                                │
+│    ⚡ 매입전표 작성 시 자동 생성됨!              │
+└────────────────────────────────────────────────┘
+```
+
+**Implementation Status:**
+- ✅ **Steps 1 & 2**: 자재입출내역 + 미지급금내역 AUTOMATIC insertion (server.js lines 3585-3680)
+  - Single API call creates both records
+  - 거래일자 기준으로 자동 생성
+  - Total amount calculated during inventory insertion
+  - Accounts payable generated immediately in same transaction
+- ✅ **Additional APIs**: 미지급금내역 management (server.js lines 3787-3941)
+  - GET /api/accounts-payable/balance/:supplierCode - 잔액 조회
+  - Manual POST /api/accounts-payable also available if needed
+
+**Key Formula:**
+```javascript
+// 매입전표
+총매입액 = SUM(입고수량 × 입고단가 × 1.1) FROM 자재입출내역 WHERE 입출고구분 = 1
+총지급액 = SUM(미지급금지급금액) FROM 미지급금내역
+미지급잔액 = 총매입액 - 총지급액
+
+// 거래명세서
+총매출액 = SUM(출고수량 × 출고단가 × 1.1) FROM 자재입출내역 WHERE 입출고구분 = 2
+총입금액 = SUM(미수금입금금액) FROM 미수금내역 (TODO)
+미수금잔액 = 총매출액 - 총입금액
+```
+
+---
+
+## 장부관리 (Ledger Management) - 향후 개발 예정
+
+### 매입처장부관리 (Supplier Ledger Management)
+
+**목적**: 매입처별 미지급금 현황 및 거래내역 조회
+
+**데이터 구조**:
+```
+매입처장부관리 화면
+         ↓
+┌────────────────────────────────────────────────┐
+│ 📊 기준 테이블: 미지급금내역                    │
+│                                                │
+│ SELECT * FROM 미지급금내역                     │
+│ WHERE 매입처코드 = @매입처코드                  │
+│ ORDER BY 미지급금지급일자 DESC                  │
+│                                                │
+│ 표시 항목:                                      │
+│ - 미지급금지급일자 (거래일자)                   │
+│ - 미지급금지급금액 (발생금액)                   │
+│ - 결제방법, 만기일자, 어음번호                  │
+│ - 적요 (참조: 매입전표 번호)                    │
+│ - 누적잔액 계산                                 │
+└────────────────────────────────────────────────┘
+         ↓ (세부내역 조회 시)
+┌────────────────────────────────────────────────┐
+│ 📝 세부내역: 자재입출내역 테이블                │
+│                                                │
+│ SELECT * FROM 자재입출내역                     │
+│ WHERE 거래일자 = @거래일자                      │
+│   AND 거래번호 = @거래번호                      │
+│   AND 입출고구분 = 1                            │
+│   AND 매입처코드 = @매입처코드                  │
+│                                                │
+│ 표시 항목:                                      │
+│ - 자재코드, 자재명, 규격, 단위                  │
+│ - 입고수량, 입고단가, 입고부가                  │
+│ - 공급가액 = 입고수량 × 입고단가                │
+│ - 부가세 = 입고부가                             │
+└────────────────────────────────────────────────┘
+```
+
+**구현 가이드**:
+```javascript
+// 매입처 장부 조회 API (예정)
+GET /api/supplier-ledger/:supplierCode
+
+// Response 구조:
+{
+  success: true,
+  data: {
+    매입처코드: "00000001",
+    매입처명: "공급업체명",
+    총미지급액: 5000000,      // 누적 미지급금
+    총지급액: 3000000,        // 누적 지급액
+    미지급잔액: 2000000,      // 잔액
+    거래내역: [
+      {
+        미지급금지급일자: "20251029",
+        미지급금지급금액: 1000000,
+        결제방법: "현금",
+        적요: "매입전표 20251029-1",
+        // 세부내역 링크
+        거래일자: "20251029",
+        거래번호: 1
+      }
+    ]
+  }
+}
+
+// 세부내역 조회 (기존 API 활용)
+GET /api/purchase-statements/:date/:no
+```
+
+---
+
+### 매출처장부관리 (Customer Ledger Management)
+
+**목적**: 매출처별 미수금 현황 및 거래내역 조회
+
+**데이터 구조**:
+```
+매출처장부관리 화면
+         ↓
+┌────────────────────────────────────────────────┐
+│ 📊 기준 테이블: 미수금내역 (TODO - 미구현)      │
+│                                                │
+│ SELECT * FROM 미수금내역                       │
+│ WHERE 매출처코드 = @매출처코드                  │
+│ ORDER BY 미수금발생일자 DESC                    │
+│                                                │
+│ 표시 항목:                                      │
+│ - 미수금발생일자 (거래일자)                     │
+│ - 미수금발생금액 (발생금액)                     │
+│ - 미수금입금일자, 미수금입금금액 (입금처리)     │
+│ - 결제방법, 만기일자, 어음번호                  │
+│ - 적요 (참조: 거래명세서 번호)                  │
+│ - 누적잔액 계산                                 │
+└────────────────────────────────────────────────┘
+         ↓ (세부내역 조회 시)
+┌────────────────────────────────────────────────┐
+│ 📝 세부내역: 자재입출내역 테이블                │
+│                                                │
+│ SELECT * FROM 자재입출내역                     │
+│ WHERE 거래일자 = @거래일자                      │
+│   AND 거래번호 = @거래번호                      │
+│   AND 입출고구분 = 2                            │
+│   AND 매출처코드 = @매출처코드                  │
+│                                                │
+│ 표시 항목:                                      │
+│ - 자재코드, 자재명, 규격, 단위                  │
+│ - 출고수량, 출고단가, 출고부가                  │
+│ - 공급가액 = 출고수량 × 출고단가                │
+│ - 부가세 = 출고부가                             │
+└────────────────────────────────────────────────┘
+```
+
+**구현 가이드**:
+```javascript
+// 매출처 장부 조회 API (예정)
+GET /api/customer-ledger/:customerCode
+
+// Response 구조:
+{
+  success: true,
+  data: {
+    매출처코드: "00000001",
+    매출처명: "고객사명",
+    총매출액: 8000000,        // 누적 매출액
+    총입금액: 5000000,        // 누적 입금액
+    미수금잔액: 3000000,      // 잔액
+    거래내역: [
+      {
+        미수금발생일자: "20251029",
+        미수금발생금액: 1500000,
+        미수금입금일자: "20251105",  // NULL if unpaid
+        미수금입금금액: 1500000,
+        결제방법: "계좌이체",
+        적요: "거래명세서 20251029-1",
+        // 세부내역 링크
+        거래일자: "20251029",
+        거래번호: 1
+      }
+    ]
+  }
+}
+
+// 세부내역 조회 (기존 API 활용)
+GET /api/transactions/:date/:no
+```
+
+---
+
+### 장부관리 구현 시 핵심 원칙
+
+1. **기준 테이블 (Master Table)**:
+   - 매입처장부: `미지급금내역` 테이블 기준
+   - 매출처장부: `미수금내역` 테이블 기준
+
+2. **세부내역 참조 (Detail Reference)**:
+   - 양쪽 모두 `자재입출내역` 테이블에서 세부 품목 정보 조회
+   - `입출고구분` 필드로 구분:
+     - 매입: `입출고구분 = 1` (입고)
+     - 매출: `입출고구분 = 2` (출고)
+
+3. **금액 계산 (Amount Calculation)**:
+   - 장부 화면에서는 **미지급금/미수금 테이블의 금액**을 표시
+   - 세부내역 조회 시 **자재입출내역의 품목별 금액**을 표시
+   - 합계 검증: 미지급금/미수금 금액 = SUM(자재입출내역 품목별 금액)
+
+4. **데이터 무결성 (Data Integrity)**:
+   - 매입전표 작성 시 → 미지급금내역 자동 생성 (✅ 구현됨)
+   - 거래명세서 작성 시 → 미수금내역 자동 생성 (❌ TODO)
+   - 삭제 시 연관 데이터 처리 고려 필요
+
+**Implementation Status:**
+- ❌ 매입처장부관리 API 및 화면 (TODO)
+- ❌ 매출처장부관리 API 및 화면 (TODO)
+- ❌ 미수금내역 자동 생성 로직 (TODO)
 
 ## API Architecture
 
@@ -427,6 +745,142 @@ Functions for viewing record details (read-only):
   - `openTransactionDetailModal(transactionNo)` - View transaction details
 
 **Why This Matters**: Clear naming prevents confusion between creating new records vs editing existing ones, especially important in Korean UI where buttons may say "작성" (create) vs "수정" (edit).
+
+## Critical Frontend Development Rules
+
+### 1. Unique IDs and Classes for Each Page/Module
+
+**CRITICAL**: When working in a Single Page Application (SPA) where multiple pages coexist in the same HTML document, **always use unique IDs and class names** with page-specific prefixes to prevent conflicts.
+
+#### ID Naming Convention
+```javascript
+// ❌ BAD - Generic IDs that conflict across pages
+<div id="actions-20251030_1">         // Used in multiple pages!
+<div id="editModal">                   // Conflicts everywhere!
+<button id="saveBtn">                  // Which page's save button?
+
+// ✅ GOOD - Page-specific prefixed IDs
+<div id="quotation-actions-20251030_1">      // Quotation page
+<div id="transaction-actions-20251030_1">    // Transaction page
+<div id="order-actions-20251030_1">          // Order page
+
+<div id="quotationEditModal">                // Quotation edit modal
+<div id="transactionEditModal">              // Transaction edit modal
+
+<button id="quotationSaveBtn">               // Quotation save
+<button id="transactionSaveBtn">             // Transaction save
+```
+
+#### Class Naming Convention
+Use BEM (Block Element Modifier) pattern with page prefix:
+```javascript
+// ✅ GOOD - Scoped class names
+.quotation-checkbox       // Quotation page checkboxes
+.transaction-checkbox     // Transaction page checkboxes
+.order-checkbox          // Order page checkboxes
+
+.quotation-detail-row    // Quotation detail rows
+.transaction-detail-row  // Transaction detail rows
+```
+
+#### Modal ID Convention
+All modals must have unique, page-specific IDs:
+```javascript
+// ✅ Modal IDs
+#quotationEditModal
+#quotationDeleteModal
+#quotationDetailModal
+#transactionEditModal
+#transactionDeleteModal
+#transactionDetailModal
+#orderEditModal
+#orderDeleteModal
+```
+
+#### Real-World Example from This Project
+**Problem**: Quotation management and Transaction management both used `id="actions-20251030_1"`, causing jQuery to always target the first match (quotation's buttons) even when clicking transaction checkboxes.
+
+**Solution**: Changed transaction IDs to `id="transaction-actions-20251030_1"`.
+
+**Lesson**: In SPA environments, generic IDs like `actions-*`, `editModal`, `deleteBtn` will cause conflicts. Always prefix with page/module name.
+
+### 2. DataTable Display Order for Material/Item Lists
+
+**CRITICAL**: When displaying material/item lists in DataTables, especially in create/edit modals for documents (quotations, orders, transactions), **always preserve input order**.
+
+#### Where This Applies
+- **Sales Management (매출관리)**:
+  - Quotation creation/edit (`견적서작성`, `견적 수정`)
+  - Transaction statement creation/edit (`거래명세서 신규등록`, `거래명세서 수정`)
+
+- **Purchase Management (매입관리)**:
+  - Purchase order creation/edit (`발주서작성`, `발주 수정`)
+  - Purchase statement creation/edit (`매입전표 신규등록`, `매입전표 수정`)
+
+#### Implementation Rule
+```javascript
+// ✅ CORRECT - Preserve input order (no initial sorting)
+$('#materialTable').DataTable({
+  data: materials,
+  order: [],  // Empty array = no initial sort, preserve input order
+  columns: [...]
+});
+
+// ❌ WRONG - Sorting by row number changes input order
+$('#materialTable').DataTable({
+  data: materials,
+  order: [[0, 'asc']],  // Sorts by first column (row number)
+  columns: [...]
+});
+
+// ❌ WRONG - Sorting by any column changes input order
+$('#materialTable').DataTable({
+  data: materials,
+  order: [[2, 'asc']],  // Sorts by material code
+  columns: [...]
+});
+```
+
+#### Why Input Order Matters
+1. **User Intent**: Users add materials in a specific sequence that has business meaning (e.g., grouping related items, order of importance)
+2. **Document Consistency**: When viewing/printing documents, items should appear in the order they were entered
+3. **Data Integrity**: Input order often reflects logical flow or priority that shouldn't be arbitrarily changed by UI sorting
+
+#### Where Sorting IS Allowed
+Sorting is appropriate for:
+- Master lists (customer list, supplier list, material catalog)
+- Search results
+- Report views
+- But NOT for:
+  - Document line items during creation/editing
+  - Detail views showing "what was entered"
+
+#### Example Locations in This Project
+```javascript
+// transaction.js - Transaction detail modal (line ~310)
+window.transactionDetailTableInstance = $('#transactionDetailTable').DataTable({
+  data: details,
+  order: [],  // ✅ Preserve input order
+  ...
+});
+
+// quotation.js - Quotation detail edit table
+$('#quotationEditDetailTable').DataTable({
+  data: quotationDetails,
+  order: [],  // ✅ Preserve input order
+  ...
+});
+
+// order.js - Order detail table
+$('#orderDetailTable').DataTable({
+  data: orderDetails,
+  order: [],  // ✅ Preserve input order
+  ...
+});
+```
+
+#### Summary
+**Rule**: For any DataTable displaying materials/items in document creation or editing contexts (quotations, orders, transactions), always use `order: []` to preserve input order.
 
 ## Code Organization Notes
 
