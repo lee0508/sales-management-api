@@ -41,7 +41,7 @@ $(document).ready(function () {
     const status = document.getElementById('orderStatusFilter').value;
 
     // API URL 구성
-    let apiUrl = 'http://localhost:3000/api/orders?';
+    let apiUrl = '/api/orders?';
     if (status) {
       apiUrl += `상태코드=${status}&`;
     }
@@ -1345,7 +1345,7 @@ function filterOrders() {
 
   // DataTable URL 파라미터 업데이트
   const table = $('#orderTable').DataTable();
-  let url = 'http://localhost:3000/api/orders?';
+  let url = '/api/orders?';
 
   if (status) {
     url += `상태코드=${status}&`;

@@ -36,7 +36,7 @@ Connection pool settings:
 # Copy environment template
 cp .env.template .env
 
-# Edit .env with your database credentials
+# Edit .env with your database credentials and base path
 # Then install dependencies
 npm install
 
@@ -47,7 +47,31 @@ node scripts/test-db.js
 npm start                    # Starts server on port 3000
 ```
 
-Server runs on `http://localhost:3000`
+### Server Configuration
+
+**Environment Variables** (`.env` file):
+- `PORT`: Server port (default: 3000)
+- `BASE_PATH`: Application base path for deployment (default: `/sales-management-api`)
+  - Allows flexible deployment with custom folder names
+  - Example values: `/sales-management-api`, `/erp`, `/company-system`
+
+**Access URLs**:
+- Web Application: `http://localhost:3000{BASE_PATH}/index.html`
+  - Default: `http://localhost:3000/sales-management-api/index.html`
+  - Custom: `http://localhost:3000/erp/index.html` (if BASE_PATH=/erp)
+- API Endpoints: `http://localhost:3000/api/*` (BASE_PATH does not affect API routes)
+
+**Deployment Example**:
+```bash
+# Company A deployment
+BASE_PATH=/erp-system
+
+# Company B deployment
+BASE_PATH=/sales-app
+
+# Development
+BASE_PATH=/sales-management-api
+```
 
 ### Utility Scripts
 Located in `/scripts` directory:

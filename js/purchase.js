@@ -346,7 +346,7 @@ async function searchPurchaseStatementMaterials() {
     const searchText = document.getElementById('purchaseStatementMaterialSearchInput').value.trim();
 
     const response = await fetch(
-      `http://localhost:3000/api/materials?search=${encodeURIComponent(searchText)}`,
+      `/api/materials?search=${encodeURIComponent(searchText)}`,
     );
     const result = await response.json();
 
@@ -463,7 +463,7 @@ async function searchPurchaseStatementSuppliers() {
     const searchText = document.getElementById('purchaseStatementSupplierSearchInput').value.trim();
 
     const response = await fetch(
-      `http://localhost:3000/api/suppliers?search=${encodeURIComponent(searchText)}`,
+      `/api/suppliers?search=${encodeURIComponent(searchText)}`,
     );
     const result = await response.json();
 

@@ -17,7 +17,7 @@ $(document).ready(function () {
   // DataTable 초기화
   const quotationTable = $('#quotationTable').DataTable({
     ajax: {
-      url: 'http://localhost:3000/api/quotations',
+      url: '/api/quotations',
       data: function (d) {
         // 필터링 파라미터 추가
         const 사업장코드 = currentUser?.사업장코드 || '01';
@@ -284,7 +284,7 @@ $(document).ready(function () {
     const status = document.getElementById('quotationStatusFilter').value;
 
     // API URL 구성
-    let apiUrl = 'http://localhost:3000/api/quotations?';
+    let apiUrl = '/api/quotations?';
     if (status) {
       apiUrl += `상태코드=${status}&`;
     }
@@ -340,7 +340,7 @@ $(document).ready(function () {
     try {
       // 견적 마스터+상세 조회 (기존 API 사용)
       const masterRes = await fetch(
-        `http://localhost:3000/api/quotations/${quotationDate}/${quotationNo}`,
+        `/api/quotations/${quotationDate}/${quotationNo}`,
       );
       const masterData = await masterRes.json();
 
@@ -477,7 +477,7 @@ async function editQuotation(quotationDate, quotationNo) {
   try {
     // 현재 견적 정보 조회 (마스터 + 상세)
     const response = await fetch(
-      `http://localhost:3000/api/quotations/${quotationDate}/${quotationNo}`,
+      `/api/quotations/${quotationDate}/${quotationNo}`,
     );
     const result = await response.json();
 
@@ -684,7 +684,7 @@ async function searchMaterials() {
     }
 
     // 자재 목록 조회
-    const response = await fetch('http://localhost:3000/api/materials');
+    const response = await fetch('/api/materials');
     const result = await response.json();
 
     if (!result.success || !result.data) {
@@ -941,7 +941,7 @@ async function loadActualPriceHistory() {
     if (!매출처코드) return;
 
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/price-history/${매출처코드}`,
     );
@@ -1011,13 +1011,23 @@ async function loadQuotationPriceHistory() {
     if (!selectedMaterial) return;
 
     const 자재코드 = selectedMaterial.분류코드 + selectedMaterial.세부코드;
-    const quotationEditModal = document.getElementById('quotationEditModal');
-    const 매출처코드 = quotationEditModal.dataset.매출처코드;
+
+    // 매출처코드 가져오기 (신규 견적서 또는 견적 수정)
+    let 매출처코드;
+
+    if (isNewQuotationMode) {
+      // 신규 견적서 작성 모드
+      매출처코드 = document.getElementById('selectedCustomerCode').value;
+    } else {
+      // 견적 수정 모드
+      const quotationEditModal = document.getElementById('quotationEditModal');
+      매출처코드 = quotationEditModal.dataset.매출처코드;
+    }
 
     if (!매출처코드) return;
 
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/quotation-history/${매출처코드}`,
     );
@@ -1362,7 +1372,7 @@ async function submitQuotationEdit() {
     const 출고희망일자 = deliveryDateInput ? deliveryDateInput.replace(/-/g, '') : '';
 
     const masterResponse = await fetch(
-      `http://localhost:3000/api/quotations/${quotationDate}/${quotationNo}`,
+      `/api/quotations/${quotationDate}/${quotationNo}`,
       {
         method: 'PUT',
         headers: {
@@ -1422,7 +1432,7 @@ async function submitQuotationEdit() {
       console.log('✅ 견적 상세 저장 데이터:', detailPayload);
 
       const detailResponse = await fetch(
-        `http://localhost:3000/api/quotations/${quotationDate}/${quotationNo}/details`,
+        `/api/quotations/${quotationDate}/${quotationNo}/details`,
         {
           method: 'PUT',
           headers: {
@@ -1489,7 +1499,7 @@ async function confirmQuotationDelete() {
 
   try {
     const response = await fetch(
-      `http://localhost:3000/api/quotations/${quotationDate}/${quotationNo}`,
+      `/api/quotations/${quotationDate}/${quotationNo}`,
       {
         method: 'DELETE',
       },
@@ -1548,7 +1558,7 @@ async function confirmQuotationApprove() {
 
   try {
     const response = await fetch(
-      `http://localhost:3000/api/quotations/${quotationDate}/${quotationNo}/approve`,
+      `/api/quotations/${quotationDate}/${quotationNo}/approve`,
       {
         method: 'PUT',
         headers: {
@@ -1686,7 +1696,7 @@ async function searchQuotationCustomers() {
     const searchText = document.getElementById('quotationCustomerSearchInput').value.trim();
 
     const response = await fetch(
-      `http://localhost:3000/api/customers?search=${encodeURIComponent(searchText)}`,
+      `/api/customers?search=${encodeURIComponent(searchText)}`,
       { credentials: 'include' } // 세션 쿠키 포함
     );
     const result = await response.json();
@@ -1821,7 +1831,7 @@ async function searchMaterialsForQuotation() {
     const searchText = document.getElementById('materialSearchInput2').value.trim();
 
     const response = await fetch(
-      `http://localhost:3000/api/materials?search=${encodeURIComponent(searchText)}`,
+      `/api/materials?search=${encodeURIComponent(searchText)}`,
     );
     const result = await response.json();
 
@@ -1951,7 +1961,7 @@ async function showPriceHistoryForNewQuotation(material) {
 async function loadActualPriceHistoryForNewQuotation(자재코드, 매출처코드) {
   try {
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/price-history/${매출처코드}`,
     );
@@ -2193,7 +2203,7 @@ async function submitQuotation(event) {
     console.log('✅ 견적서 저장 요청:', quotationData);
 
     // API 호출
-    const response = await fetch('http://localhost:3000/api/quotations_add', {
+    const response = await fetch('/api/quotations_add', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2372,7 +2382,7 @@ async function searchNewMaterials() {
       return;
     }
 
-    const response = await fetch('http://localhost:3000/api/materials');
+    const response = await fetch('/api/materials');
     const result = await response.json();
 
     if (!result.success || !result.data) {
@@ -2665,7 +2675,7 @@ async function loadNewActualPriceHistory() {
     if (!매출처코드) return;
 
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/price-history/${매출처코드}`,
     );
@@ -2740,7 +2750,7 @@ async function loadNewQuotationPriceHistory() {
     if (!매출처코드) return;
 
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/quotation-history/${매출처코드}`,
     );

@@ -10,6 +10,11 @@ function initDataTable(tableId, url, columns) {
     return;
   }
 
+  // 기존 DataTable 인스턴스가 있으면 파괴
+  if ($.fn.DataTable.isDataTable('#' + tableId)) {
+    $table.DataTable().destroy();
+  }
+
   return $table.DataTable({
     ajax: { url, dataSrc: 'data' },
     columns,

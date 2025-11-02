@@ -9,7 +9,6 @@ const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const BASE_PATH = process.env.BASE_PATH || '/sales-management-api';
 
 const path = require('path');
 
@@ -42,8 +41,7 @@ app.use(
   }),
 );
 
-// 정적 파일을 동적 베이스 경로에서 제공
-app.use(BASE_PATH, express.static(path.join(__dirname))); // index.html 및 css/js 제공
+app.use(express.static(path.join(__dirname))); // index.html 및 css/js 제공
 
 // SQL Server 연결 설정 - 환경변수 사용
 const dbConfig = {
@@ -95,8 +93,7 @@ connectDB()
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Server running at http://0.0.0.0:${PORT}`);
       console.log(`✅ Network access available at http://<SERVER_IP>:${PORT}`);
-      console.log(`✅ Static files served at: http://localhost:${PORT}${BASE_PATH}/index.html`);
-      console.log(`✅ API endpoints at: http://localhost:${PORT}/api/*`);
+      console.log('✅ Static files served from project root (index.html 포함)');
     });
   })
   .catch((err) => {
@@ -276,26 +273,6 @@ app.post('/api/auth/logout', async (req, res) => {
     });
   } catch (err) {
     console.error('로그아웃 에러:', err);
-    res.status(500).json({ success: false, message: '서버 오류' });
-  }
-});
-
-// 현재 로그인한 사용자 정보 조회
-app.get('/api/auth/me', (req, res) => {
-  try {
-    if (!req.session.user) {
-      return res.status(401).json({
-        success: false,
-        message: '로그인이 필요합니다.',
-      });
-    }
-
-    res.json({
-      success: true,
-      data: req.session.user,
-    });
-  } catch (err) {
-    console.error('사용자 정보 조회 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
@@ -2610,7 +2587,6 @@ app.delete('/api/orders/:date/:no', async (req, res) => {
 app.get('/api/materials', async (req, res) => {
   try {
     const { search, 분류코드 } = req.query;
-    const 사업장코드 = req.session?.user?.사업장코드 || '01';
 
     let query = `
             SELECT
@@ -2618,15 +2594,14 @@ app.get('/api/materials', async (req, res) => {
                 m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
                 m.바코드, m.과세구분, m.적요,
                 c.분류명,
-                ml.입고단가1, ml.출고단가1, ml.출고단가2, ml.출고단가3
+                ml.출고단가1, ml.출고단가2, ml.출고단가3
             FROM 자재 m
             LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
-            LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = @사업장코드
+            LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = '01'
             WHERE m.사용구분 = 0
         `;
 
-    const request = pool.request()
-      .input('사업장코드', sql.VarChar(2), 사업장코드);
+    const request = pool.request();
 
     if (분류코드) {
       request.input('분류코드', sql.VarChar(2), 분류코드);
@@ -2654,131 +2629,6 @@ app.get('/api/materials', async (req, res) => {
 });
 
 // 자재 상세 조회 (재고 정보 포함)
-app.get('/api/materials/transaction-history', async (req, res) => {
-  console.log('🔍 [자재내역조회 API] 호출됨');
-  console.log('📥 Query params:', req.query);
-
-  try {
-    const { materialCode, startDate, endDate, 입출고구분, supplierCode, customerCode } = req.query;
-
-    if (!materialCode) {
-      console.log('❌ 자재코드 누락');
-      return res.status(400).json({ success: false, message: '자재코드는 필수입니다.' });
-    }
-
-    // materialCode 파싱
-    // 자재 테이블: 분류코드(2자) + 세부코드(18자) = 총 20자
-    // 예: "0101CODE04489" → 분류코드="01", 세부코드="01CODE04489" 또는 "CODE04489"
-    //
-    // ⚠️ 데이터 불일치: 세부코드에 "01" 접두사가 있는 경우와 없는 경우가 혼재
-    // - VB6.0 버그로 일부 데이터에는 "01CODE04489" (사업장코드 포함)
-    // - 일부 데이터에는 "CODE04489" (사업장코드 미포함)
-    // 따라서 두 가지 경우를 모두 조회해야 함
-
-    const 분류코드 = materialCode.substring(0, 2);
-    const 세부코드 = materialCode.substring(2);
-    const 사업장코드 = req.session?.user?.사업장코드 || '01';
-
-    console.log('📊 파싱된 코드:', { 사업장코드, 분류코드, 세부코드 });
-
-    let query = `
-      SELECT
-        t.사업장코드,
-        t.분류코드,
-        t.세부코드,
-        (t.분류코드 + t.세부코드) AS 자재코드,
-        m.자재명,
-        m.규격,
-        m.단위,
-        t.입출고구분,
-        CASE t.입출고구분
-          WHEN 1 THEN '입고'
-          WHEN 2 THEN '출고'
-          ELSE '기타'
-        END AS 입출고구분명,
-        t.입출고일자,
-        t.거래일자,
-        t.거래번호,
-        t.입고수량,
-        t.입고단가,
-        t.입고부가,
-        (t.입고수량 * t.입고단가) AS 입고공급가액,
-        (t.입고수량 * t.입고단가 + t.입고부가) AS 입고합계,
-        t.출고수량,
-        t.출고단가,
-        t.출고부가,
-        (t.출고수량 * t.출고단가) AS 출고공급가액,
-        (t.출고수량 * t.출고단가 + t.출고부가) AS 출고합계,
-        t.매입처코드,
-        s.매입처명,
-        t.매출처코드,
-        c.매출처명,
-        t.적요,
-        t.수정일자,
-        u.사용자명
-      FROM 자재입출내역 t
-      LEFT JOIN 자재 m ON t.분류코드 = m.분류코드
-        AND t.세부코드 = m.세부코드
-      LEFT JOIN 매입처 s ON t.매입처코드 = s.매입처코드
-      LEFT JOIN 매출처 c ON t.매출처코드 = c.매출처코드
-      LEFT JOIN 사용자 u ON t.사용자코드 = u.사용자코드
-      WHERE t.사용구분 = 0
-        AND t.사업장코드 = @사업장코드
-        AND t.분류코드 = @분류코드
-        AND t.세부코드 = @세부코드
-    `;
-
-    const request = pool.request()
-      .input('사업장코드', sql.VarChar(2), 사업장코드)
-      .input('분류코드', sql.VarChar(2), 분류코드)
-      .input('세부코드', sql.VarChar(18), 세부코드);
-
-    // 날짜 필터 (거래일자 기준)
-    if (startDate) {
-      query += ` AND t.거래일자 >= @startDate`;
-      request.input('startDate', sql.VarChar(8), startDate.replace(/-/g, ''));
-    }
-    if (endDate) {
-      query += ` AND t.거래일자 <= @endDate`;
-      request.input('endDate', sql.VarChar(8), endDate.replace(/-/g, ''));
-    }
-
-    // 입출고구분 필터
-    if (입출고구분 && 입출고구분 !== '전체') {
-      query += ` AND t.입출고구분 = @입출고구분`;
-      request.input('입출고구분', sql.TinyInt, parseInt(입출고구분));
-    }
-
-    // 거래처 필터
-    if (supplierCode) {
-      query += ` AND t.매입처코드 = @supplierCode`;
-      request.input('supplierCode', sql.VarChar(8), supplierCode);
-    }
-    if (customerCode) {
-      query += ` AND t.매출처코드 = @customerCode`;
-      request.input('customerCode', sql.VarChar(8), customerCode);
-    }
-
-    query += ` ORDER BY t.거래일자 DESC, t.거래번호 DESC`;
-
-    console.log('🔄 SQL 쿼리 실행 중...');
-    const result = await request.query(query);
-
-    console.log('✅ 조회 성공! 결과:', result.recordset.length, '건');
-
-    res.json({
-      success: true,
-      data: result.recordset,
-      total: result.recordset.length
-    });
-  } catch (err) {
-    console.error('❌ ❌ ❌ 자재내역조회 에러 ❌ ❌ ❌');
-    console.error('에러 메시지:', err.message);
-    console.error('에러 스택:', err.stack);
-    console.error('에러 전체:', err);
-    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
-  }
-});
 app.get('/api/materials/:code', async (req, res) => {
   try {
     const { code } = req.params;
@@ -3136,6 +2986,140 @@ app.delete('/api/material-categories/:code', async (req, res) => {
 });
 
 // 자재내역조회 (자재 입출고 이력)
+app.get('/api/materials/transaction-history', async (req, res) => {
+  console.log('🔍 [자재내역조회 API] 호출됨');
+  console.log('📥 Query params:', req.query);
+
+  try {
+    const { materialCode, startDate, endDate, 입출고구분, supplierCode, customerCode } = req.query;
+
+    if (!materialCode) {
+      console.log('❌ 자재코드 누락');
+      return res.status(400).json({ success: false, message: '자재코드는 필수입니다.' });
+    }
+
+    // materialCode 파싱
+    // 자재 테이블: 분류코드(2자) + 세부코드(18자) = 총 20자
+    // 예: "0101CODE04489" → 분류코드="01", 세부코드="01CODE04489" 또는 "CODE04489"
+    //
+    // ⚠️ 데이터 불일치: 세부코드에 "01" 접두사가 있는 경우와 없는 경우가 혼재
+    // - VB6.0 버그로 일부 데이터에는 "01CODE04489" (사업장코드 포함)
+    // - 일부 데이터에는 "CODE04489" (사업장코드 미포함)
+    // 따라서 두 가지 경우를 모두 조회해야 함
+
+    const 분류코드 = materialCode.substring(0, 2);      // "01"
+    const 세부코드_전체 = materialCode.substring(2);     // "01CODE04489"
+    const 세부코드_순수 = 세부코드_전체.substring(2);    // "CODE04489" (01 제거)
+
+    // 사업장코드 추출
+    const 사업장코드 = 세부코드_전체.substring(0, 2);   // "01"
+
+    console.log('📊 파싱된 코드:', {
+      사업장코드,
+      분류코드,
+      세부코드_전체,
+      세부코드_순수
+    });
+
+    let query = `
+      SELECT
+        t.사업장코드,
+        t.분류코드,
+        t.세부코드,
+        (t.분류코드 + t.세부코드) AS 자재코드,
+        m.자재명,
+        m.규격,
+        m.단위,
+        t.입출고구분,
+        CASE t.입출고구분
+          WHEN 1 THEN '입고'
+          WHEN 2 THEN '출고'
+          ELSE '기타'
+        END AS 입출고구분명,
+        t.입출고일자,
+        t.거래일자,
+        t.거래번호,
+        t.입고수량,
+        t.입고단가,
+        t.입고부가,
+        (t.입고수량 * t.입고단가) AS 입고공급가액,
+        (t.입고수량 * t.입고단가 + t.입고부가) AS 입고합계,
+        t.출고수량,
+        t.출고단가,
+        t.출고부가,
+        (t.출고수량 * t.출고단가) AS 출고공급가액,
+        (t.출고수량 * t.출고단가 + t.출고부가) AS 출고합계,
+        t.매입처코드,
+        s.매입처명,
+        t.매출처코드,
+        c.매출처명,
+        t.적요,
+        t.수정일자,
+        u.사용자명
+      FROM 자재입출내역 t
+      LEFT JOIN 자재 m ON t.분류코드 = m.분류코드
+        AND t.세부코드 = m.세부코드
+      LEFT JOIN 매입처 s ON t.매입처코드 = s.매입처코드
+      LEFT JOIN 매출처 c ON t.매출처코드 = c.매출처코드
+      LEFT JOIN 사용자 u ON t.사용자코드 = u.사용자코드
+      WHERE t.사용구분 = 0
+        AND t.사업장코드 = @사업장코드
+        AND t.분류코드 = @분류코드
+        AND (t.세부코드 = @세부코드_전체 OR t.세부코드 = @세부코드_순수)
+    `;
+
+    const request = pool.request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드_전체', sql.VarChar(18), 세부코드_전체)
+      .input('세부코드_순수', sql.VarChar(18), 세부코드_순수);
+
+    // 날짜 필터 (거래일자 기준)
+    if (startDate) {
+      query += ` AND t.거래일자 >= @startDate`;
+      request.input('startDate', sql.VarChar(8), startDate.replace(/-/g, ''));
+    }
+    if (endDate) {
+      query += ` AND t.거래일자 <= @endDate`;
+      request.input('endDate', sql.VarChar(8), endDate.replace(/-/g, ''));
+    }
+
+    // 입출고구분 필터
+    if (입출고구분 && 입출고구분 !== '전체') {
+      query += ` AND t.입출고구분 = @입출고구분`;
+      request.input('입출고구분', sql.TinyInt, parseInt(입출고구분));
+    }
+
+    // 거래처 필터
+    if (supplierCode) {
+      query += ` AND t.매입처코드 = @supplierCode`;
+      request.input('supplierCode', sql.VarChar(8), supplierCode);
+    }
+    if (customerCode) {
+      query += ` AND t.매출처코드 = @customerCode`;
+      request.input('customerCode', sql.VarChar(8), customerCode);
+    }
+
+    query += ` ORDER BY t.거래일자 DESC, t.거래번호 DESC`;
+
+    console.log('🔄 SQL 쿼리 실행 중...');
+    const result = await request.query(query);
+
+    console.log('✅ 조회 성공! 결과:', result.recordset.length, '건');
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length
+    });
+  } catch (err) {
+    console.error('❌ ❌ ❌ 자재내역조회 에러 ❌ ❌ ❌');
+    console.error('에러 메시지:', err.message);
+    console.error('에러 스택:', err.stack);
+    console.error('에러 전체:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
 
 // 재고 현황 조회
 app.get('/api/inventory/:workplace', async (req, res) => {

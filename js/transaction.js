@@ -41,7 +41,7 @@ async function loadTransactions() {
     if (endDate) query.append('endDate', endDate);
     if (status) query.append('status', status);
 
-    const res = await fetch(`http://localhost:3000/api/transactions?${query.toString()}`, {
+    const res = await fetch(`/api/transactions?${query.toString()}`, {
       credentials: 'include' // 세션 쿠키 포함
     });
     const data = await res.json();
@@ -240,7 +240,7 @@ async function openTransactionDetailModal(transactionNo) {
     // 명세서번호 형식: "YYYYMMDD-번호" 를 분리
     const [date, no] = transactionNo.split('-');
 
-    const res = await fetch(`http://localhost:3000/api/transactions/${date}/${no}`, { credentials: 'include' });
+    const res = await fetch(`/api/transactions/${date}/${no}`, { credentials: 'include' });
     const result = await res.json();
 
     if (!result.success) throw new Error(result.message || '상세 정보를 불러올 수 없습니다.');
@@ -277,8 +277,8 @@ async function openTransactionDetailModal(transactionNo) {
           defaultContent: '-',
           render: (d) => {
             if (!d) return '-';
-            // 자재코드에서 사업장코드(2자리) + 분류코드(2자리) 제거, 세부코드만 표시
-            return d.length > 4 ? d.substring(4) : d;
+            // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
+            return d.length > 2 ? d.substring(2) : d;
           }
         },
         { data: '자재명', defaultContent: '-' },
@@ -393,7 +393,7 @@ async function searchTransactionCustomers() {
     const searchText = document.getElementById('transactionCustomerSearchInput').value.trim();
 
     const response = await fetch(
-      `http://localhost:3000/api/customers?search=${encodeURIComponent(searchText)}`,
+      `/api/customers?search=${encodeURIComponent(searchText)}`,
     );
     const result = await response.json();
 
@@ -472,7 +472,7 @@ async function searchTransactionMaterials() {
     const searchText = document.getElementById('transactionCreateMaterialSearchInput').value.trim();
 
     const response = await fetch(
-      `http://localhost:3000/api/materials?search=${encodeURIComponent(searchText)}`,
+      `/api/materials?search=${encodeURIComponent(searchText)}`,
     );
     const result = await response.json();
 
@@ -502,6 +502,18 @@ async function searchTransactionMaterials() {
         <td style="padding: 12px;">${material.규격 || '-'}</td>
         <td style="padding: 12px; text-align: right;">${(material.출고단가1 || 0).toLocaleString()}</td>
         <td style="padding: 12px; text-align: center;">
+          <button onclick='showTransactionPriceHistory(${JSON.stringify(material).replace(/'/g, '&apos;')})' style="
+            padding: 6px 16px;
+            background: #f59e0b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            margin-right: 4px;
+          " onmouseover="this.style.background='#d97706';"
+             onmouseout="this.style.background='#f59e0b';">이전단가</button>
           <button onclick='selectTransactionMaterial(${JSON.stringify(material).replace(/'/g, '&apos;')})' style="
             padding: 6px 16px;
             background: #2563eb;
@@ -689,7 +701,7 @@ async function submitTransactionCreate(event) {
     console.log('✅ 거래명세서 저장 요청:', transactionData);
 
     // API 호출
-    const response = await fetch('http://localhost:3000/api/transactions', {
+    const response = await fetch('/api/transactions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -779,7 +791,7 @@ async function editTransaction(transactionDate, transactionNo) {
 
   try {
     // 현재 거래명세서 정보 조회
-    const res = await fetch(`http://localhost:3000/api/transactions/${transactionDate}/${transactionNo}`);
+    const res = await fetch(`/api/transactions/${transactionDate}/${transactionNo}`);
     const result = await res.json();
 
     if (!result.success || !result.data) {
@@ -832,8 +844,8 @@ async function editTransaction(transactionDate, transactionNo) {
           defaultContent: '-',
           render: (d) => {
             if (!d) return '-';
-            // 자재코드에서 사업장코드(2자리) + 분류코드(2자리) 제거, 세부코드만 표시
-            return d.length > 4 ? d.substring(4) : d;
+            // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
+            return d.length > 2 ? d.substring(2) : d;
           }
         },
         { data: '자재명', defaultContent: '-' },
@@ -958,7 +970,7 @@ async function submitTransactionEdit() {
   console.log('✅ 전송할 데이터:', { 입출고구분: parseInt(입출고구분), details });
 
   try {
-    const response = await fetch(`http://localhost:3000/api/transactions/${거래일자}/${거래번호}`, {
+    const response = await fetch(`/api/transactions/${거래일자}/${거래번호}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include', // 세션 쿠키 포함
@@ -1025,7 +1037,7 @@ async function searchTransactionMaterials() {
       return;
     }
 
-    const response = await fetch(`http://localhost:3000/api/materials?search=${encodeURIComponent(searchKeyword)}`);
+    const response = await fetch(`/api/materials?search=${encodeURIComponent(searchKeyword)}`);
     const result = await response.json();
 
     if (!result.success || !result.data) {
@@ -1045,13 +1057,24 @@ async function searchTransactionMaterials() {
     tbody.innerHTML = materials
       .map(
         (material) => `
-      <tr onclick='selectTransactionMaterial(${JSON.stringify(material).replace(/'/g, "&apos;")})' style="
-        cursor: pointer;
-        transition: background 0.15s;
-      " onmouseover="this.style.background='#f0f9ff';" onmouseout="this.style.background='white';">
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${material.자재코드 || '-'}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: 500;">${material.자재명 || '-'}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #6b7280;">${material.규격 || '-'}</td>
+      <tr style="border-bottom: 1px solid #e5e7eb;">
+        <td style="padding: 12px;">${material.자재코드 || '-'}</td>
+        <td style="padding: 12px;">${material.자재명 || '-'}</td>
+        <td style="padding: 12px;">${material.규격 || '-'}</td>
+        <td style="padding: 12px; text-align: right;">${(material.출고단가1 || 0).toLocaleString()}</td>
+        <td style="padding: 12px; text-align: center;">
+          <button onclick='selectTransactionMaterial(${JSON.stringify(material).replace(/'/g, '&apos;')})' style="
+            padding: 6px 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+          " onmouseover="this.style.background='#1d4ed8';"
+             onmouseout="this.style.background='#2563eb';">선택</button>
+        </td>
       </tr>
     `,
       )
@@ -1383,7 +1406,7 @@ async function confirmTransactionDelete() {
   const { 거래일자, 거래번호 } = window.deletingTransaction;
 
   try {
-    const res = await fetch(`http://localhost:3000/api/transactions/${거래일자}/${거래번호}`, {
+    const res = await fetch(`/api/transactions/${거래일자}/${거래번호}`, {
       method: 'DELETE',
     });
 
@@ -1438,7 +1461,7 @@ async function searchNewTransactionMaterials() {
   }
 
   try {
-    const response = await fetch(`http://localhost:3000/api/materials?search=${encodeURIComponent(searchKeyword)}`);
+    const response = await fetch(`/api/materials?search=${encodeURIComponent(searchKeyword)}`);
     const result = await response.json();
 
     if (!result.success) {
@@ -1562,8 +1585,8 @@ function confirmNewTransactionDetailAdd() {
 
   const newRow = tbody.insertRow();
 
-  // 자재코드에서 사업장코드(2자리) + 분류코드(2자리) 제거, 세부코드만 표시
-  const 세부코드 = material.자재코드.length > 4 ? material.자재코드.substring(4) : material.자재코드;
+  // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
+  const 세부코드 = material.자재코드.length > 2 ? material.자재코드.substring(2) : material.자재코드;
 
   newRow.innerHTML = `
     <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">${tbody.rows.length}</td>

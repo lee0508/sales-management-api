@@ -1,0 +1,236 @@
+자재 단가 조회 시스템 분석 보고서
+=====================================
+
+## 1. 백엔드 API 엔드포인트 요약
+
+### 1.1 자재 검색 API
+위치: server.js 라인 2587-2629
+엔드포인트: GET /api/materials?search=...&분류코드=...
+
+응답 필드:
+- 자재코드: "0101MOFS105" (분류코드 + 세부코드)
+- 분류코드: "01" (2자리)
+- 세부코드: "01MOFS105" (18자리, 이미 사업장코드 포함)
+- 자재명, 규격, 단위
+- 출고단가1, 출고단가2, 출고단가3 (자재원장에서 JOIN)
+- [❌ 입고단가는 없음]
+
+문제:
+1. 입고단가 필드 부재 → 발주 시 기본값이 항상 0
+2. 사업장코드 '01' 하드코딩
+3. 자재원장 JOIN 시 사업장코드와 세부코드 길이 불일치 위험
+
+---
+
+### 1.2 자재 출고 가격 이력 API
+위치: server.js 라인 1937-1978
+엔드포인트: GET /api/materials/:materialCode/price-history/:customerCode
+
+파라미터 처리:
+const 분류코드 = materialCode.substring(0, 2);  // "01"
+const 세부코드 = materialCode.substring(2);      // "01MOFS105"
+
+데이터 소스: 자재입출내역 테이블 (입출고구분 = 2 = 출고)
+응답: [{입출고일자, 입출고시간, 출고수량, 출고단가, 출고부가, 금액, 적요}, ...]
+
+호출 위치: 아직 프론트엔드에서 사용 안 함 (TODO)
+
+---
+
+### 1.3 견적 제안가 이력 API
+위치: server.js 라인 1984-2018
+엔드포인트: GET /api/materials/:materialCode/quotation-history/:customerCode
+
+파라미터 처리:
+.input('자재코드', sql.VarChar(18), materialCode)
+// 예: "0101MOFS105" 전체를 18자리 자재코드로 비교
+// 문제: 전달되는 코드는 20자리인데 SQL은 18자리 기대!
+
+데이터 소스: 견적내역 + 견적 테이블 조인
+응답: [{견적일자, 견적번호, 출고단가, 수량, 금액, 상태코드}, ...]
+
+호출 위치: 아직 프론트엔드에서 사용 안 함 (TODO)
+
+---
+
+### 1.4 발주 입고 가격 이력 API
+위치: server.js 라인 2024-2065
+엔드포인트: GET /api/materials/:materialCode/purchase-price-history/:supplierCode
+
+파라미터 처리:
+const 분류코드 = materialCode.substring(0, 2);   // "01"
+const 세부코드 = materialCode.substring(2);       // "01MOFS105"
+
+데이터 소스: 자재입출내역 테이블 (입출고구분 = 1 = 입고)
+응답: [{입출고일자, 입출고시간, 입고수량, 입고단가, 입고부가, 금액, 적요}, ...]
+
+호출 위치:
+- js/order.js 라인 1310-1314 (loadActualPurchasePriceHistory)
+- js/order.js 라인 2448 (편집 시 호출)
+
+---
+
+### 1.5 발주 제안가 이력 API
+위치: server.js 라인 2071-2105
+엔드포인트: GET /api/materials/:materialCode/order-history/:supplierCode
+
+파라미터 처리:
+.input('자재코드', sql.VarChar(18), materialCode)
+// 예: "0101MOFS105" 전체를 18자리 자재코드로 비교
+// 문제: 동일하게 20자리 vs 18자리 불일치!
+
+데이터 소스: 발주내역 + 발주 테이블 조인
+응답: [{발주일자, 발주번호, 입고단가, 발주량, 금액, 상태코드}, ...]
+
+호출 위치:
+- js/order.js 라인 1380-1384 (loadOrderPriceHistory)
+- js/order.js 라인 2681 (편집 시 호출)
+
+---
+
+## 2. 자재코드 형식 처리 분석
+
+### 데이터베이스 테이블별 자재코드 저장
+테이블 | 분류코드 | 세부코드 | 비고
+자재 | 2자리 | 18자리 (사업장코드 포함) | 분류+세부 = 20자리
+자재원장 | 2자리 | 16자리 (순수코드) | 사업장코드 별도 필드
+자재입출내역 | 2자리 | 16자리 (순수코드) | 사업장코드 별도 필드
+견적내역 | - | 18자리 (자재코드) | 직접 저장, 분류 미분리
+발주내역 | - | 18자리 (자재코드) | 직접 저장, 분류 미분리
+
+### 프론트엔드 자재코드 생성
+js/order.js 라인 1114:
+const 자재코드 = material.분류코드 + material.세부코드;
+// "01" + "01MOFS105" = "0101MOFS105"
+
+js/quotation.js 라인 698, 757, 927 등에서도 동일
+
+### API 파라미터로 전달 시 문제
+1. 출고/입고 이력 API:
+   - 받음: 자재코드 (20자리) → substring(0,2) + substring(2)로 분리
+   - 쿼리: WHERE 분류코드 = "01" AND 세부코드 = "01MOFS105"
+   - 문제: 세부코드는 16자리 기대인데 18자리 전달됨!
+
+2. 견적/발주 이력 API:
+   - 받음: 자재코드 (20자리)
+   - 쿼리: WHERE 자재코드 = @자재코드 (18자리 기대)
+   - 문제: 20자리와 18자리 자료형 불일치 매칭 실패!
+
+---
+
+## 3. 사업장코드 처리
+
+### 현재 구현
+server.js 라인 2600:
+LEFT JOIN 자재원장 ml ON ... AND ml.사업장코드 = '01'
+
+모든 API가 사업장코드 '01' 하드코딩 (no session 사용)
+
+### 프론트엔드
+로그인 후 session.user.사업장코드에 저장됨 (CLAUDE.md)
+하지만 API 호출 시 전달하지 않음
+
+### 문제
+다중 사업장 환경에서 모두 '01'만 조회됨
+
+---
+
+## 4. 프론트엔드 발주 단가 조회 흐름
+
+searchOrderMaterials() 호출 (라인 1080)
+  ↓
+GET /api/materials?search=검색어 호출
+  ↓
+응답: {자재코드, 분류코드, 세부코드, ..., 출고단가1, 출고단가2, 출고단가3}
+  ↓ ⚠️ 입고단가 없음
+테이블 표시 (라인 1108-1152)
+  ↓
+selectOrderMaterialForAdd(material) 호출 (라인 1139)
+  ↓
+입고단가 필드: material.입고단가 || '0' → 항상 0 (라인 1187)
+  ↓
+confirmAddOrderDetail() 호출 (라인 1207)
+  ↓
+DataTable에 행 추가
+
+[선택사항] showPriceHistoryForOrder() 호출
+  ↓
+loadActualPurchasePriceHistory() 호출 (라인 1293)
+  ↓
+GET /api/materials/{자재코드}/purchase-price-history/{공급업체}
+  ↓
+이전 입고가 이력 테이블 표시 (라인 1321-1366)
+  ↓
+selectPriceFromOrderHistory() 호출 (라인 1345)
+  ↓
+수량 prompt → 단가 prompt (라인 1468-1477)
+
+---
+
+## 5. 프론트엔드 견적 단가 조회 흐름
+
+searchMaterial() 호출 (라인 708, js/quotation.js)
+  ↓
+GET /api/materials?search=검색어 호출
+  ↓
+응답: {자재코드, 분류코드, 세부코드, ..., 출고단가1}
+  ↓
+테이블 표시
+  ↓
+selectMaterial(material) 호출 (라인 733)
+  ↓
+window.selectedMaterial = material 저장 (라인 769)
+  ↓
+수량 prompt (라인 2052)
+  ↓
+단가 prompt (기본값: material.출고단가1) (라인 2059)
+  ↓
+newQuotationDetails에 추가 (라인 2067-2073)
+
+[미구현] 이전 거래 단가 조회
+  - price-history API 있지만 호출 안 함
+
+---
+
+## 6. 심각한 문제점
+
+### P0 - CRITICAL
+
+1. 자재 검색 API에 입고단가 필드 부재
+   파일: server.js 라인 2597-2600
+   영향: 발주 시 입고단가 항상 0
+   원인: 자재원장 JOIN에서 입고단가 미포함
+
+2. 자재코드 형식 불일치
+   파일: server.js 라인 2028-2030, 1991, 2078
+   문제: 프론트엔드는 20자리, API는 18자리 기대
+   결과: quotation-history, order-history API 매칭 실패 위험
+
+3. 사업장코드 하드코딩
+   파일: server.js 라인 2600 및 모든 자재 API
+   문제: '01'만 하드코딩
+   영향: 다중 사업장 환경 오류
+
+### P1 - HIGH
+
+4. 하드코딩된 서버 주소
+   파일: js/order.js 라인 1311-1313, 1381-1383
+   코드: http://localhost:3000/api/materials/...
+   영향: 프로덕션 CORS 오류
+
+5. 존재하지 않는 필드 사용
+   파일: js/order.js 라인 1187-1188
+   코드: material.입고단가 || '0', material.출고단가 || '0'
+   결과: 항상 0 또는 undefined
+
+---
+
+## 7. API 가용성 현황
+
+API | 구현 | 프론트엔드 | 상태
+GET /api/materials | ✅ | ✅ | 사용 중 (문제 있음)
+GET .../price-history/:customerCode | ✅ | ❌ | 미구현
+GET .../quotation-history/:customerCode | ✅ | ❌ | 미구현 (위험)
+GET .../purchase-price-history/:supplierCode | ✅ | ✅ | 사용 중
+GET .../order-history/:supplierCode | ✅ | ✅ | 사용 중
+

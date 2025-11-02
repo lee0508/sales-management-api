@@ -34,7 +34,7 @@ $(document).ready(function () {
     const status = document.getElementById('orderStatusFilter').value;
 
     // API URL 구성
-    let apiUrl = 'http://localhost:3000/api/orders?';
+    let apiUrl = '/api/orders?';
     if (status) {
       apiUrl += `상태코드=${status}&`;
     }
@@ -1308,7 +1308,7 @@ async function showPriceHistoryForOrder(material) {
 async function loadActualPurchasePriceHistory(자재코드, 매입처코드) {
   try {
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/purchase-price-history/${매입처코드}`,
     );
@@ -1378,7 +1378,7 @@ async function loadActualPurchasePriceHistory(자재코드, 매입처코드) {
 async function loadOrderPriceHistory(자재코드, 매입처코드) {
   try {
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/order-history/${매입처코드}`,
     );
@@ -1646,7 +1646,7 @@ async function showEditOrderPriceHistory() {
 async function loadActualPurchasePriceHistoryForAddModal(자재코드, 매입처코드) {
   try {
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/purchase-price-history/${매입처코드}`,
     );
@@ -1906,7 +1906,7 @@ function filterOrders() {
 
   // DataTable URL 파라미터 업데이트
   const table = $('#orderTable').DataTable();
-  let url = 'http://localhost:3000/api/orders?';
+  let url = '/api/orders?';
 
   if (status) {
     url += `상태코드=${status}&`;
@@ -2136,7 +2136,7 @@ async function searchOrderSuppliers() {
     const searchText = document.getElementById('orderSupplierSearchInput').value.trim();
 
     const response = await fetch(
-      `http://localhost:3000/api/suppliers?search=${encodeURIComponent(searchText)}`,
+      `/api/suppliers?search=${encodeURIComponent(searchText)}`,
     );
     const result = await response.json();
 
@@ -2282,7 +2282,7 @@ async function searchNewOrderMaterials() {
       return;
     }
 
-    const response = await fetch('http://localhost:3000/api/materials');
+    const response = await fetch('/api/materials');
     const result = await response.json();
 
     if (!result.success || !result.data) {
@@ -2443,7 +2443,7 @@ async function showNewOrderPriceHistory() {
 async function loadActualPurchasePriceHistoryForNewOrder(자재코드, 매입처코드) {
   try {
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/purchase-price-history/${매입처코드}`,
     );
@@ -2601,7 +2601,7 @@ async function loadNewOrderActualPriceHistory() {
     if (!매입처코드) return;
 
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/price-history/${매입처코드}`,
     );
@@ -2676,7 +2676,7 @@ async function loadNewOrderPriceHistory() {
     if (!매입처코드) return;
 
     const response = await fetch(
-      `http://localhost:3000/api/materials/${encodeURIComponent(
+      `/api/materials/${encodeURIComponent(
         자재코드,
       )}/order-history/${매입처코드}`,
     );

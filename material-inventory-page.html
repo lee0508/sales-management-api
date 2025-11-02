@@ -1,0 +1,60 @@
+<!-- 자재재고관리 페이지 -->
+<div class="page-content hidden" id="materialInventoryPage">
+  <h2 style="display: none;">자재재고관리</h2>
+
+  <!-- 검색 영역 -->
+  <div class="toolbar" style="margin-bottom: 20px;">
+    <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+      <!-- 사업장 선택 -->
+      <div>
+        <label style="display: block; margin-bottom: 4px; font-weight: 600;">사업장</label>
+        <select id="inventoryWorkplaceFilter" class="form-control" style="width: 200px;" onchange="loadMaterialInventory()">
+          <option value="">사업장 선택</option>
+        </select>
+      </div>
+
+      <!-- 버튼 -->
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-primary" onclick="loadMaterialInventory()" style="height: 40px;">조회</button>
+        <button class="btn btn-secondary" onclick="resetInventorySearch()" style="height: 40px;">초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 요약 정보 -->
+  <div class="summary-bar" style="margin: 16px 0; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+    <div style="display: flex; gap: 24px; font-size: 14px;">
+      <span>
+        총 자재 수: <strong id="totalMaterialCount" style="color: #007bff; font-size: 16px;">0</strong> 개
+      </span>
+      <span>
+        재고 부족: <strong id="lowStockCount" style="color: #dc3545; font-size: 16px;">0</strong> 개
+      </span>
+      <span>
+        재고 주의: <strong id="warningStockCount" style="color: #ffc107; font-size: 16px;">0</strong> 개
+      </span>
+    </div>
+  </div>
+
+  <!-- 재고 현황 DataTable -->
+  <table id="materialInventoryTable" class="display" style="width: 100%;">
+    <thead>
+      <tr>
+        <th>순번</th>
+        <th>자재코드</th>
+        <th>자재명</th>
+        <th>규격</th>
+        <th>단위</th>
+        <th>현재고</th>
+        <th>총입고</th>
+        <th>총출고</th>
+        <th>적정재고</th>
+        <th>최저재고</th>
+        <th>상태</th>
+        <th>최종입고일</th>
+        <th>최종출고일</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>

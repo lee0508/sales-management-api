@@ -1,0 +1,131 @@
+<!-- 자재분류관리 페이지 -->
+<div class="page-content hidden" id="materialCategoryPage">
+  <h2 style="display: none;">자재분류관리</h2>
+
+  <!-- 툴바 영역 -->
+  <div class="toolbar" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+    <div class="summary-bar" style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+      <span style="font-size: 14px;">
+        총 분류 수: <strong id="totalCategoryCount" style="color: #007bff; font-size: 16px;">0</strong> 개
+      </span>
+    </div>
+
+    <button class="btn btn-success" onclick="openNewCategoryModal()" style="
+      padding: 10px 20px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;">
+      <span style="font-size: 18px; margin-right: 4px;">+</span> 자재분류 등록
+    </button>
+  </div>
+
+  <!-- 자재분류 목록 DataTable -->
+  <table id="materialCategoryTable" class="display" style="width: 100%;">
+    <thead>
+      <tr>
+        <th>순번</th>
+        <th>분류코드</th>
+        <th>분류명</th>
+        <th>적요</th>
+        <th>수정일자</th>
+        <th>관리</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- 자재분류 등록/수정 모달 -->
+<div id="categoryModal" class="modal hidden">
+  <div class="modal-content" style="max-width: 500px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+      <h2 id="categoryModalTitle" style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">자재분류 등록</h2>
+      <button onclick="closeCategoryModal()" style="
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #f3f4f6;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #6b7280;
+        transition: all 0.2s;"
+        onmouseover="this.style.background='#e5e7eb';"
+        onmouseout="this.style.background='#f3f4f6';">
+        &times;
+      </button>
+    </div>
+
+    <form id="categoryForm" onsubmit="event.preventDefault(); saveMaterialCategory();">
+      <input type="hidden" id="categoryModalMode" value="create">
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">
+          분류코드 <span style="color: #dc3545;">*</span>
+        </label>
+        <input
+          type="text"
+          id="category분류코드"
+          class="form-control"
+          placeholder="2자리 코드 입력 (예: 01)"
+          maxlength="2"
+          required
+          style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+        />
+        <small style="color: #6b7280; font-size: 12px;">2자리 숫자 또는 문자</small>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">
+          분류명 <span style="color: #dc3545;">*</span>
+        </label>
+        <input
+          type="text"
+          id="category분류명"
+          class="form-control"
+          placeholder="분류명 입력"
+          required
+          style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+        />
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">
+          적요
+        </label>
+        <textarea
+          id="category적요"
+          class="form-control"
+          placeholder="비고 입력 (선택사항)"
+          rows="3"
+          style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; resize: vertical;"
+        ></textarea>
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button
+          type="button"
+          onclick="closeCategoryModal()"
+          style="padding: 10px 20px; background: #f3f4f6; color: #374151; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;"
+          onmouseover="this.style.background='#e5e7eb';"
+          onmouseout="this.style.background='#f3f4f6';">
+          취소
+        </button>
+        <button
+          type="submit"
+          style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;"
+          onmouseover="this.style.background='#1d4ed8';"
+          onmouseout="this.style.background='#2563eb';">
+          저장
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

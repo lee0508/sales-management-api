@@ -247,6 +247,132 @@ function logInfo(message, data) {
 }
 ```
 
+## 우선순위 7: 로그인 날짜 세션 관리 (Medium Priority)
+
+### 7.1 로그인 접속일자를 세션에 저장 및 활용
+
+**현재 문제:**
+- 로그인 시 사용자가 선택한 접속일자가 세션에 저장되지 않음
+- 각 모달(거래명세서, 발주서, 매입전표 등)이 열릴 때 시스템의 오늘 날짜가 자동 입력됨
+- 사용자가 과거 날짜로 로그인해도 문서 작성 시 오늘 날짜로 리셋됨
+
+**개선 방안:**
+
+**Backend (server.js) - 로그인 API 수정:**
+```javascript
+// POST /api/auth/login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { userId, password, loginDate } = req.body;
+
+    // ... 기존 인증 로직 ...
+
+    // 세션에 사용자 정보 + 접속일자 저장
+    req.session.user = {
+      사용자코드: user.사용자코드,
+      사용자명: user.사용자명,
+      사용자권한: user.사용자권한,
+      사업장코드: user.사업장코드,
+      사업장명: user.사업장명,
+      접속일자: loginDate  // ✅ 추가
+    };
+
+    res.json({
+      success: true,
+      data: {
+        // ... 기존 응답 ...
+        접속일자: loginDate  // ✅ 추가
+      }
+    });
+  } catch (err) {
+    // ...
+  }
+});
+```
+
+**Backend - 세션 날짜 조회 API 추가:**
+```javascript
+// GET /api/session/login-date
+app.get('/api/session/login-date', (req, res) => {
+  if (!req.session?.user?.접속일자) {
+    return res.json({
+      success: false,
+      loginDate: new Date().toISOString().slice(0, 10)  // fallback to today
+    });
+  }
+
+  res.json({
+    success: true,
+    loginDate: req.session.user.접속일자
+  });
+});
+```
+
+**Frontend - 로그인 성공 후 접속일자 저장:**
+```javascript
+// index.html - 로그인 폼 제출 시
+const response = await fetch('http://localhost:3000/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
+  body: JSON.stringify({ userId, password, loginDate })
+});
+
+const data = await response.json();
+if (data.success) {
+  // localStorage에 접속일자 저장 (브라우저 새로고침 시에도 유지)
+  localStorage.setItem('loginDate', data.data.접속일자);
+  // ...
+}
+```
+
+**Frontend - 각 모달에서 접속일자 사용:**
+```javascript
+// transaction.js - 거래명세서 작성 모달
+function openNewTransactionModal() {
+  document.getElementById('transactionCreateForm').reset();
+
+  // ❌ 기존: 시스템 오늘 날짜
+  // const today = new Date().toISOString().split('T')[0];
+
+  // ✅ 개선: 로그인 시 선택한 날짜 사용
+  const loginDate = localStorage.getItem('loginDate') || new Date().toISOString().split('T')[0];
+  document.getElementById('transactionCreateDate').value = loginDate;
+
+  // ...
+}
+
+// 동일하게 적용할 파일:
+// - quotation.js (견적서 작성)
+// - order.js (발주서 작성)
+// - purchase.js (매입전표 작성)
+```
+
+**Frontend - 로그아웃 시 정리:**
+```javascript
+// index.html - 로그아웃 시
+async function logout() {
+  // ...
+  localStorage.removeItem('loginDate');  // ✅ 저장된 날짜 삭제
+  // ...
+}
+```
+
+**구현 파일 위치:**
+- `server.js:212` - 로그인 세션 저장 부분
+- `server.js` - 새 API 엔드포인트 추가 (세션 날짜 조회)
+- `index.html:3707` - 로그인 폼 제출 로직
+- `js/transaction.js:343` - 거래명세서 작성 모달
+- `js/quotation.js` - 견적서 작성 모달
+- `js/order.js` - 발주서 작성 모달
+- `js/purchase.js` - 매입전표 작성 모달
+
+**추가 고려사항:**
+- 접속일자는 날짜 변경 없이 계속 사용할지, 아니면 사용자가 수동으로 변경 가능하게 할지 결정 필요
+- 접속일자 변경 UI 추가 여부 (예: 헤더에 날짜 표시 + 변경 버튼)
+
+---
+
 ## 구현 순서 권장
 
 1. **1단계 (긴급)**: 보안 강화 (1.1, 1.2)
@@ -254,6 +380,7 @@ function logInfo(message, data) {
 3. **3단계 (안정화)**: 입력 검증 (3.1, 3.2, 3.3)
 4. **4단계 (정리)**: 코드 일관성 (4.1, 4.2, 4.3)
 5. **5단계 (선택)**: 세금 처리, 로그 개선 (5.1, 6.1, 6.2)
+6. **6단계 (UX 개선)**: 로그인 날짜 세션 관리 (7.1)
 
 ## 참고 문서
 

@@ -22,7 +22,11 @@
   <script src="js/order.js?v=1031M" defer></script>
   <script src="js/postoffice.js?v=1031M" defer></script>
   <script src="js/transaction.js?v=1031M" defer></script>
+  <script src="js/transaction-price-history.js?v=1101" defer></script>
   <script src="js/purchase.js?v=1031M" defer></script>
+  <script src="js/material-history.js?v=1101" defer></script>
+  <script src="js/material-inventory.js?v=1101" defer></script>
+  <script src="js/material-category.js?v=1101" defer></script>
 
   <link rel="stylesheet" href="css/onstyles.css?v=5" />
   <!-- <link rel="stylesheet" href="css/shadcn-ui.css" /> -->
@@ -173,9 +177,9 @@
             <span class="arrow">▼</span>
           </a>
           <div class="submenu" id="itemsSubmenu">
-            <a class="submenu-link" onclick="showPage('item-catagory')">자재분류관리</a>
-            <a class="submenu-link" onclick="showPage('item-history')">자재내역관리</a>
-            <a class="submenu-link" onclick="showPage('item-stock')">자재재고관리</a>
+            <a class="submenu-link" onclick="showPage('material-category')">자재분류관리</a>
+            <a class="submenu-link" onclick="showPage('material-history')">자재내역관리</a>
+            <a class="submenu-link" onclick="showPage('material-inventory')">자재재고관리</a>
           </div>
         </div>
 
@@ -243,7 +247,28 @@
     <!-- 메인 컨텐츠 -->
     <main class="main-content">
       <div class="top-bar">
-        <h1 id="pageTitle">대시보드</h1>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <h1 id="pageTitle">대시보드</h1>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+            <span style="font-size: 16px;">📅</span>
+            <span id="currentWorkingDate" style="font-size: 14px; font-weight: 600; color: #1e40af;">2025-11-01</span>
+            <span style="font-size: 12px; color: #6b7280;" id="currentWorkingDay">(금)</span>
+            <button onclick="openDateChangeModal()" style="
+              padding: 4px 12px;
+              background: white;
+              border: 1px solid #bfdbfe;
+              border-radius: 6px;
+              font-size: 12px;
+              cursor: pointer;
+              color: #2563eb;
+              font-weight: 500;
+              margin-left: 8px;
+            " onmouseover="this.style.background='#eff6ff';"
+               onmouseout="this.style.background='white';">
+              변경
+            </button>
+          </div>
+        </div>
         <div class="user-info">
           <div class="user-avatar" id="userAvatar">U</div>
           <span id="userName">사용자</span>
@@ -297,8 +322,19 @@
                 <span>📋 오늘의 견적서</span>
                 <span id="todayQuotationCount" style="font-size: 14px; color: #007bff; font-weight: normal;">0건</span>
               </h3>
-              <div id="todayQuotationList" style="max-height: 300px; overflow-y: auto;">
-                <p style="color: var(--text-gray); text-align: center; padding: 20px;">데이터 로딩중...</p>
+              <div style="height: 400px; overflow: hidden;">
+                <div style="height: 100%; overflow-y: auto;">
+                  <table id="todayQuotationTable" class="display" style="width: 100%; font-size: 13px;">
+                    <thead>
+                      <tr>
+                        <th style="width: 60px;">번호</th>
+                        <th>매출처</th>
+                        <th style="width: 100px;">금액</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -308,8 +344,19 @@
                 <span>📦 오늘의 발주서</span>
                 <span id="todayOrderCount" style="font-size: 14px; color: #28a745; font-weight: normal;">0건</span>
               </h3>
-              <div id="todayOrderList" style="max-height: 300px; overflow-y: auto;">
-                <p style="color: var(--text-gray); text-align: center; padding: 20px;">데이터 로딩중...</p>
+              <div style="height: 400px; overflow: hidden;">
+                <div style="height: 100%; overflow-y: auto;">
+                  <table id="todayOrderTable" class="display" style="width: 100%; font-size: 13px;">
+                    <thead>
+                      <tr>
+                        <th style="width: 60px;">번호</th>
+                        <th>매입처</th>
+                        <th style="width: 100px;">금액</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -319,8 +366,19 @@
                 <span>📄 오늘의 거래명세서</span>
                 <span id="todayTransactionCount" style="font-size: 14px; color: #ffc107; font-weight: normal;">0건</span>
               </h3>
-              <div id="todayTransactionList" style="max-height: 300px; overflow-y: auto;">
-                <p style="color: var(--text-gray); text-align: center; padding: 20px;">데이터 로딩중...</p>
+              <div style="height: 400px; overflow: hidden;">
+                <div style="height: 100%; overflow-y: auto;">
+                  <table id="todayTransactionTable" class="display" style="width: 100%; font-size: 13px;">
+                    <thead>
+                      <tr>
+                        <th style="width: 60px;">번호</th>
+                        <th>매출처</th>
+                        <th style="width: 100px;">금액</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -1751,14 +1809,31 @@
               </div>
 
               <div>
-                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">출고단가</label>
-                <input type="number" id="transactionAddDetailPrice" style="
-                  width: 100%;
-                  padding: 10px 12px;
-                  border: 2px solid #e5e7eb;
-                  border-radius: 8px;
-                  font-size: 14px;
-                " placeholder="단가 입력" value="0" min="0" step="0.01" oninput="calculateTransactionDetailAmount()" />
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">출고단가 *</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="number" id="transactionAddDetailPrice" style="
+                    flex: 1;
+                    padding: 10px 12px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  " placeholder="단가 입력" value="0" min="0" step="0.01" oninput="calculateTransactionDetailAmount()" />
+                  <button onclick="showTransactionEditPriceHistoryButton()" style="
+                    padding: 10px 20px;
+                    background: #9333ea;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                    white-space: nowrap;
+                  " onmouseover="this.style.background='#7e22ce';"
+                     onmouseout="this.style.background='#9333ea';">
+                    이전 단가
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -2283,18 +2358,35 @@
                   " />
               </div>
 
-              <!-- ✅ 단가 입력 -->
+              <!-- ✅ 단가 입력 + 이전단가 버튼 -->
               <div>
-                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">단가 (원) *</label>
-                <input type="number" id="newTransactionAddDetailPrice" value="0" min="0" step="1"
-                  oninput="calculateNewTransactionDetailAmount()"
-                  style="
-                    width: 100%;
-                    padding: 10px 12px;
-                    border: 2px solid #e5e7eb;
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">출고단가 (원) *</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="number" id="newTransactionAddDetailPrice" value="0" min="0" step="1"
+                    oninput="calculateNewTransactionDetailAmount()"
+                    style="
+                      flex: 1;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                    " />
+                  <button onclick="showNewTransactionPriceHistory()" style="
+                    padding: 10px 20px;
+                    background: #9333ea;
+                    border: none;
                     border-radius: 8px;
                     font-size: 14px;
-                  " />
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                    white-space: nowrap;
+                  " onmouseover="this.style.background='#7e22ce';"
+                     onmouseout="this.style.background='#9333ea';">
+                    이전 단가
+                  </button>
+                </div>
               </div>
 
               <!-- ✅ 공급가액 표시 (읽기 전용) -->
@@ -2587,6 +2679,392 @@
           </div>
         </div>
 
+        <!-- ✅ 거래명세서 이전단가 조회 모달 -->
+        <div id="transactionPriceHistoryModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 700px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">출고단가 이력</h2>
+              <button onclick="closeTransactionPriceHistoryModal()" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                 onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <!-- 자재 정보 -->
+            <div style="background: #fef3c7; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 2px solid #fbbf24;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 12px; color: #92400e; font-weight: 600; margin-bottom: 4px;">선택된 자재</div>
+                  <div style="font-weight: 600; color: #78350f;" id="transactionPriceHistoryMaterialName">-</div>
+                  <div style="font-size: 12px; color: #92400e; margin-top: 2px;" id="transactionPriceHistoryMaterialCode">-</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 탭 메뉴 -->
+            <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <button style="
+                padding: 12px 20px;
+                background: #3b82f6;
+                border: none;
+                border-bottom: 3px solid #3b82f6;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: default;
+                color: white;
+                flex: 1;
+              ">
+                실제 출고가
+              </button>
+            </div>
+
+            <!-- 이력 테이블 -->
+            <div style="margin-bottom: 16px;">
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
+                이 거래처에 실제 출고한 이력 (클릭하여 단가 선택)
+              </label>
+              <div style="max-height: 300px; overflow-y: auto; border: 2px solid #e5e7eb; border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <thead style="background: #f9fafb; position: sticky; top: 0;">
+                    <tr>
+                      <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고일자</th>
+                      <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고단가</th>
+                      <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고수량</th>
+                      <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">적요</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactionPriceHistoryTableBody">
+                    <tr>
+                      <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
+                        이 거래처에 출고한 이력이 없습니다
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 2px solid #e5e7eb;">
+              <button onclick="closeTransactionPriceHistoryModal()" style="
+                padding: 12px 24px;
+                background: #f3f4f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: #374151;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 거래명세서 수정 - 이전단가 조회 모달 -->
+        <div id="transactionEditPriceHistoryModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 700px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">출고단가 이력</h2>
+              <button onclick="closeTransactionEditPriceHistoryModal()" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                 onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <!-- 자재 정보 -->
+            <div style="background: #fef3c7; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 2px solid #fbbf24;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 12px; color: #92400e; font-weight: 600; margin-bottom: 4px;">선택된 자재</div>
+                  <div style="font-weight: 600; color: #78350f;" id="transactionEditPriceHistoryMaterialName">-</div>
+                  <div style="font-size: 12px; color: #92400e; margin-top: 2px;" id="transactionEditPriceHistoryMaterialCode">-</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 탭 메뉴 -->
+            <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <button style="
+                padding: 12px 20px;
+                background: #3b82f6;
+                border: none;
+                border-bottom: 3px solid #3b82f6;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: default;
+                color: white;
+                flex: 1;
+              ">
+                실제 출고가
+              </button>
+            </div>
+
+            <!-- 이력 테이블 -->
+            <div style="margin-bottom: 16px;">
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">
+                이 거래처에 실제 출고한 이력 (클릭하여 단가 선택)
+              </label>
+              <div style="max-height: 300px; overflow-y: auto; border: 2px solid #e5e7eb; border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <thead style="background: #f9fafb; position: sticky; top: 0;">
+                    <tr>
+                      <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고일자</th>
+                      <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고단가</th>
+                      <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고수량</th>
+                      <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">적요</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactionEditPriceHistoryTableBody">
+                    <tr>
+                      <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
+                        이 거래처에 출고한 이력이 없습니다
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 2px solid #e5e7eb;">
+              <button onclick="closeTransactionEditPriceHistoryModal()" style="
+                padding: 12px 24px;
+                background: #f3f4f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: #374151;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 거래명세서 삭제 확인 모달 -->
+        <div id="transactionDeleteModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 400px;">
+            <h3 style="margin-bottom: 16px;">거래명세서 삭제</h3>
+            <p id="deleteTransactionInfo" style="margin-bottom: 20px;"></p>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+              <button onclick="closeTransactionDeleteModal()" class="btn btn-secondary">취소</button>
+              <button onclick="confirmTransactionDelete()" class="btn btn-danger">삭제</button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+
+    <!-- ✅ 메인 스크립트 (페이지 라우팅 및 이벤트 핸들러) -->
+    <script>
+      // 페이지 라우팅
+      const pageMap = {
+        dashboard: {
+          element: document.getElementById('dashboardPage'),
+          title: '대시보드',
+          menu: null,
+          loadFunc: null,
+        },
+        quotation: {
+          element: document.getElementById('quotationPage'),
+          title: '견적관리',
+          menu: 'sales',
+          loadFunc: null,
+        },
+        transaction: {
+          element: document.getElementById('transactionPage'),
+          title: '거래명세서관리',
+          menu: 'sales',
+          loadFunc: null,
+        },
+        receivable: {
+          element: document.getElementById('receivablePage'),
+          title: '미수금관리',
+          menu: 'sales',
+          loadFunc: null,
+        },
+        customer: {
+          element: document.getElementById('customerPage'),
+          title: '매출처관리',
+          menu: 'sales',
+          loadFunc: null,
+        },
+        order: {
+          element: document.getElementById('orderPage'),
+          title: '구매관리',
+          menu: 'purchase',
+          loadFunc: null,
+        },
+        payable: {
+          element: document.getElementById('payablePage'),
+          title: '미지급금관리',
+          menu: 'purchase',
+          loadFunc: null,
+        },
+        supplier: {
+          element: document.getElementById('supplierPage'),
+          title: '매입처관리',
+          menu: 'purchase',
+          loadFunc: null,
+        },
+        materialCategory: {
+          element: document.getElementById('materialCategoryPage'),
+          title: '자재분류관리',
+          menu: 'material',
+          loadFunc: null,
+        },
+        materialHistory: {
+          element: document.getElementById('materialHistoryPage'),
+          title: '자재내역조회',
+          menu: 'material',
+          loadFunc: null,
+        },
+        materialInventory: {
+          element: document.getElementById('materialInventoryPage'),
+          title: '자재재고관리',
+          menu: 'material',
+          loadFunc: null,
+        },
+        financialClosing: {
+          element: document.getElementById('financialClosingPage'),
+          title: '회계마감관리',
+          menu: 'accounting',
+          loadFunc: null,
+        },
+        settings: {
+          element: document.getElementById('settingsPage'),
+          title: '시스템설정',
+          menu: 'settings',
+          loadFunc: null,
+        },
+      };
+
+      let currentPage = 'dashboard';
+
+      function showPage(pageName) {
+        // 모든 페이지 숨김
+        Object.values(pageMap).forEach(page => {
+          if (page.element) {
+            page.element.classList.add('hidden');
+          }
+        });
+
+        // 모든 사이드바 메뉴 비활성화
+        document.querySelectorAll('.sidebar-menu li').forEach(item => {
+          item.classList.remove('active');
+        });
+
+        // 선택한 페이지 표시
+        const selectedPage = pageMap[pageName];
+        if (selectedPage && selectedPage.element) {
+          selectedPage.element.classList.remove('hidden');
+
+          // 선택한 메뉴 활성화
+          const menuItem = document.querySelector(`[onclick="showPage('${pageName}')"]`)?.closest('li');
+          if (menuItem) {
+            menuItem.classList.add('active');
+          }
+
+          // loadFunc 실행
+          if (selectedPage.loadFunc) {
+            selectedPage.loadFunc();
+          }
+
+          currentPage = pageName;
+        }
+      }
+
+      // 사이드바 메뉴 토글
+      function toggleMenu(menuId) {
+        const menuElement = document.getElementById(menuId);
+        if (menuElement) {
+          menuElement.classList.toggle('active');
+        }
+      }
+
+      // 로그인 체크
+      async function checkAuth() {
+        try {
+          const response = await fetch('/api/auth/me', { credentials: 'include' });
+          const result = await response.json();
+
+          if (!result.success) {
+            // 로그인 페이지 표시
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'none';
+            return;
+          }
+
+          const user = result.data;
+          document.getElementById('userName').textContent = user.사용자명 || '사용자';
+        } catch (err) {
+          console.error('인증 확인 오류:', err);
+          // 로그인 페이지 표시
+          document.getElementById('loginPage').style.display = 'flex';
+          document.getElementById('dashboard').style.display = 'none';
+        }
+      }
+
+      // 로그아웃
+      async function logout() {
+        try {
+          await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+          // 로그인 페이지 표시
+          document.getElementById('loginPage').style.display = 'flex';
+          document.getElementById('dashboard').style.display = 'none';
+          // 폼 초기화
+          document.getElementById('loginForm').reset();
+        } catch (err) {
+          console.error('로그아웃 오류:', err);
+        }
+      }
+
+      // 초기 로드
+      document.addEventListener('DOMContentLoaded', () => {
+        checkAuth();
+        showPage('dashboard');
+      });
+    </script>
+  </body>
+</html>
+              </p>
+            </div>
+          </div>
+        </div>
+
         <!-- 발주관리 페이지 -->
         <div class="page-content hidden" id="orderPage">
           <h2 style="display: none;">발주관리</h2>
@@ -2727,6 +3205,289 @@
             <tbody id="purchaseStatementTableBody">
             </tbody>
           </table>
+        </div>
+
+        <!-- 자재내역관리 페이지 -->
+        <div class="page-content hidden" id="materialHistoryPage">
+          <h2 style="display: none;">자재내역관리</h2>
+
+          <!-- 검색 영역 -->
+          <div class="toolbar" style="margin-bottom: 20px;">
+            <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+              <!-- 자재 검색 -->
+              <div style="flex: 1; min-width: 300px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 600;">자재 검색</label>
+                <div style="display: flex; gap: 8px;">
+                  <input
+                    type="text"
+                    id="historyMaterialSearchInput"
+                    class="form-control"
+                    placeholder="자재코드 또는 자재명으로 검색..."
+                    onkeypress="if(event.key === 'Enter') searchAndLoadMaterialHistory()"
+                    style="flex: 1;"
+                  />
+                  <button class="btn btn-primary" onclick="searchAndLoadMaterialHistory()" style="white-space: nowrap;">
+                    검색
+                  </button>
+                </div>
+                <input type="hidden" id="historySelectedMaterialCode" />
+              </div>
+
+              <!-- 날짜 필터 -->
+              <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 600;">조회 기간</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="date" id="historyStartDate" class="form-control" style="width: 150px;" />
+                  <span>~</span>
+                  <input type="date" id="historyEndDate" class="form-control" style="width: 150px;" />
+                </div>
+              </div>
+
+              <!-- 입출고구분 필터 -->
+              <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 600;">입출고구분</label>
+                <select id="history입출고구분Filter" class="form-control" style="width: 120px;">
+                  <option value="전체">전체</option>
+                  <option value="1">입고</option>
+                  <option value="2">출고</option>
+                </select>
+              </div>
+
+              <!-- 버튼 -->
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary" onclick="loadMaterialHistory()" style="height: 40px;">조회</button>
+                <button class="btn btn-secondary" onclick="resetMaterialHistorySearch()" style="height: 40px;">
+                  초기화
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 요약 정보 -->
+          <div class="summary-bar" style="margin: 16px 0; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+            <div style="display: flex; gap: 24px; font-size: 14px;">
+              <span>
+                총 입고수량: <strong id="totalInQty" style="color: #28a745; font-size: 16px;">0</strong>
+              </span>
+              <span>
+                총 출고수량: <strong id="totalOutQty" style="color: #007bff; font-size: 16px;">0</strong>
+              </span>
+              <span>
+                조회 건수: <strong id="historyCount" style="font-size: 16px;">0</strong> 건
+              </span>
+            </div>
+          </div>
+
+          <!-- 입출고 이력 DataTable -->
+          <table id="materialHistoryTable" class="display" style="width: 100%;">
+            <thead>
+              <tr>
+                <th>순번</th>
+                <th>입출고일자</th>
+                <th>구분</th>
+                <th>거래처</th>
+                <th>수량</th>
+                <th>단가</th>
+                <th>금액</th>
+                <th>적요</th>
+                <th>작성자</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- 자재재고관리 페이지 -->
+        <div class="page-content hidden" id="materialInventoryPage">
+          <h2 style="display: none;">자재재고관리</h2>
+
+          <!-- 검색 영역 -->
+          <div class="toolbar" style="margin-bottom: 20px;">
+            <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+              <!-- 사업장 선택 -->
+              <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 600;">사업장</label>
+                <select id="inventoryWorkplaceFilter" class="form-control" style="width: 200px;" onchange="loadMaterialInventory()">
+                  <option value="">사업장 선택</option>
+                </select>
+              </div>
+
+              <!-- 버튼 -->
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary" onclick="loadMaterialInventory()" style="height: 40px;">조회</button>
+                <button class="btn btn-secondary" onclick="resetInventorySearch()" style="height: 40px;">초기화</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 요약 정보 -->
+          <div class="summary-bar" style="margin: 16px 0; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+            <div style="display: flex; gap: 24px; font-size: 14px;">
+              <span>
+                총 자재 수: <strong id="totalMaterialCount" style="color: #007bff; font-size: 16px;">0</strong> 개
+              </span>
+              <span>
+                재고 부족: <strong id="lowStockCount" style="color: #dc3545; font-size: 16px;">0</strong> 개
+              </span>
+              <span>
+                재고 주의: <strong id="warningStockCount" style="color: #ffc107; font-size: 16px;">0</strong> 개
+              </span>
+            </div>
+          </div>
+
+          <!-- 재고 현황 DataTable -->
+          <table id="materialInventoryTable" class="display" style="width: 100%;">
+            <thead>
+              <tr>
+                <th>순번</th>
+                <th>자재코드</th>
+                <th>자재명</th>
+                <th>규격</th>
+                <th>단위</th>
+                <th>현재고</th>
+                <th>총입고</th>
+                <th>총출고</th>
+                <th>적정재고</th>
+                <th>최저재고</th>
+                <th>상태</th>
+                <th>최종입고일</th>
+                <th>최종출고일</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- 자재분류관리 페이지 -->
+        <div class="page-content hidden" id="materialCategoryPage">
+          <h2 style="display: none;">자재분류관리</h2>
+
+          <!-- 툴바 영역 -->
+          <div class="toolbar" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="summary-bar" style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+              <span style="font-size: 14px;">
+                총 분류 수: <strong id="totalCategoryCount" style="color: #007bff; font-size: 16px;">0</strong> 개
+              </span>
+            </div>
+
+            <button class="btn btn-success" onclick="openNewCategoryModal()" style="
+              padding: 10px 20px;
+              background: #28a745;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;">
+              <span style="font-size: 18px; margin-right: 4px;">+</span> 자재분류 등록
+            </button>
+          </div>
+
+          <!-- 자재분류 목록 DataTable -->
+          <table id="materialCategoryTable" class="display" style="width: 100%;">
+            <thead>
+              <tr>
+                <th>순번</th>
+                <th>분류코드</th>
+                <th>분류명</th>
+                <th>적요</th>
+                <th>수정일자</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- 자재분류 등록/수정 모달 -->
+        <div id="categoryModal" class="modal hidden">
+          <div class="modal-content" style="max-width: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <h2 id="categoryModalTitle" style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">자재분류 등록</h2>
+              <button onclick="closeCategoryModal()" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;"
+                onmouseover="this.style.background='#e5e7eb';"
+                onmouseout="this.style.background='#f3f4f6';">
+                &times;
+              </button>
+            </div>
+
+            <form id="categoryForm" onsubmit="event.preventDefault(); saveMaterialCategory();">
+              <input type="hidden" id="categoryModalMode" value="create">
+
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">
+                  분류코드 <span style="color: #dc3545;">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="category분류코드"
+                  class="form-control"
+                  placeholder="2자리 코드 입력 (예: 01)"
+                  maxlength="2"
+                  required
+                  style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+                />
+                <small style="color: #6b7280; font-size: 12px;">2자리 숫자 또는 문자</small>
+              </div>
+
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">
+                  분류명 <span style="color: #dc3545;">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="category분류명"
+                  class="form-control"
+                  placeholder="분류명 입력"
+                  required
+                  style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+                />
+              </div>
+
+              <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #374151;">
+                  적요
+                </label>
+                <textarea
+                  id="category적요"
+                  class="form-control"
+                  placeholder="비고 입력 (선택사항)"
+                  rows="3"
+                  style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; resize: vertical;"
+                ></textarea>
+              </div>
+
+              <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button
+                  type="button"
+                  onclick="closeCategoryModal()"
+                  style="padding: 10px 20px; background: #f3f4f6; color: #374151; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;"
+                  onmouseover="this.style.background='#e5e7eb';"
+                  onmouseout="this.style.background='#f3f4f6';">
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;"
+                  onmouseover="this.style.background='#1d4ed8';"
+                  onmouseout="this.style.background='#2563eb';">
+                  저장
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
 
         <!-- ✅ 매입전표 상세보기 모달 -->
@@ -3355,6 +4116,77 @@
           </div>
         </div>
 
+        <!-- 작업일자 변경 모달 -->
+        <div id="dateChangeModal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 400px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">작업일자 변경</h2>
+              <button onclick="closeDateChangeModal()" style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: #f3f4f6;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                color: #6b7280;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                 onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151;">작업일자 선택</label>
+              <input type="date" id="newWorkingDate" style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              " />
+              <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+                선택한 날짜가 모든 문서 작성 시 기본 날짜로 사용됩니다.
+              </p>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+              <button type="button" onclick="closeDateChangeModal()" style="
+                padding: 12px 24px;
+                background: #f3f4f6;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: #374151;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#e5e7eb';"
+                 onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button type="button" onclick="confirmDateChange()" style="
+                padding: 12px 24px;
+                background: #2563eb;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s;
+              " onmouseover="this.style.background='#1d4ed8';"
+                 onmouseout="this.style.background='#2563eb';">
+                변경
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- 매입처관리 페이지 -->
         <div id="supplierPage" class="page-content hidden">
           <h2 style="display: none;">매입처관리</h2>
@@ -3712,6 +4544,9 @@
         if (result.success) {
           currentUser = result.data;
 
+          // 작업일자 localStorage에 저장
+          localStorage.setItem('workingDate', loginDate);
+
           messageEl.textContent = result.message;
 
           setTimeout(() => {
@@ -3725,6 +4560,9 @@
             if (currentUser.사업장명) {
               document.getElementById('workplaceNameSidebar').textContent = currentUser.사업장명;
             }
+
+            // 작업일자 표시
+            updateWorkingDateDisplay(loginDate);
 
             // 대시보드 통계 로드
             loadDashboardStats();
@@ -3793,41 +4631,64 @@
     async function loadTodayQuotations(today) {
       try {
         const result = await apiCall(`/quotations?startDate=${today}&endDate=${today}`);
-
-        const listEl = document.getElementById('todayQuotationList');
         const countEl = document.getElementById('todayQuotationCount');
 
-        if (result.success && result.data && result.data.length > 0) {
-          countEl.textContent = `${result.data.length}건`;
-
-          listEl.innerHTML = result.data.map(item => `
-            <div style="
-              padding: 12px;
-              border-bottom: 1px solid #f0f0f0;
-              cursor: pointer;
-              transition: background 0.2s;
-            " onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='transparent'"
-               onclick="showPage('quotation')">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <div style="font-weight: 500; color: #333;">${item.견적번호}</div>
-                  <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                    ${item.매출처명 || '-'} | ${formatCurrency(item.합계금액 || 0)}
-                  </div>
-                </div>
-                <div style="font-size: 11px; color: #999;">
-                  ${formatDate(item.견적일자)}
-                </div>
-              </div>
-            </div>
-          `).join('');
-        } else {
-          countEl.textContent = '0건';
-          listEl.innerHTML = '<p style="color: var(--text-gray); text-align: center; padding: 20px;">오늘 등록된 견적서가 없습니다.</p>';
+        // 기존 DataTable 파괴
+        if (window.todayQuotationTableInstance) {
+          window.todayQuotationTableInstance.destroy();
         }
+
+        const tableData = result.success && result.data ? result.data : [];
+        countEl.textContent = `${tableData.length}건`;
+
+        // DataTable 초기화
+        window.todayQuotationTableInstance = $('#todayQuotationTable').DataTable({
+          data: tableData,
+          columns: [
+            {
+              data: '견적번호',
+              defaultContent: '-',
+              render: (data) => data || '-'
+            },
+            {
+              data: '매출처명',
+              defaultContent: '-',
+              render: (data) => data || '-'
+            },
+            {
+              data: '합계금액',
+              defaultContent: '0',
+              render: (data) => formatCurrency(data || 0),
+              className: 'dt-right'
+            }
+          ],
+          language: {
+            emptyTable: '오늘 등록된 견적서가 없습니다.',
+            search: '검색:',
+            lengthMenu: '페이지당 _MENU_ 개',
+            info: '_START_-_END_ / 총 _TOTAL_건',
+            paginate: { previous: '이전', next: '다음' }
+          },
+          order: [[0, 'desc']], // 견적번호 내림차순
+          paging: true,
+          pageLength: 10,
+          searching: false,
+          lengthChange: false,
+          info: false,
+          responsive: true,
+          autoWidth: false,
+          scrollY: '320px',
+          scrollCollapse: true
+        });
+
+        // 행 클릭 이벤트
+        $('#todayQuotationTable tbody').on('click', 'tr', function() {
+          showPage('quotation');
+        });
+
       } catch (error) {
         console.error('견적서 로드 실패:', error);
-        document.getElementById('todayQuotationList').innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">로드 실패</p>';
+        document.getElementById('todayQuotationCount').textContent = '0건';
       }
     }
 
@@ -3835,41 +4696,64 @@
     async function loadTodayOrders(today) {
       try {
         const result = await apiCall(`/orders?startDate=${today}&endDate=${today}`);
-
-        const listEl = document.getElementById('todayOrderList');
         const countEl = document.getElementById('todayOrderCount');
 
-        if (result.success && result.data && result.data.length > 0) {
-          countEl.textContent = `${result.data.length}건`;
-
-          listEl.innerHTML = result.data.map(item => `
-            <div style="
-              padding: 12px;
-              border-bottom: 1px solid #f0f0f0;
-              cursor: pointer;
-              transition: background 0.2s;
-            " onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='transparent'"
-               onclick="showPage('order')">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <div style="font-weight: 500; color: #333;">${item.발주번호}</div>
-                  <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                    ${item.매입처명 || '-'} | ${formatCurrency(item.합계금액 || 0)}
-                  </div>
-                </div>
-                <div style="font-size: 11px; color: #999;">
-                  ${formatDate(item.발주일자)}
-                </div>
-              </div>
-            </div>
-          `).join('');
-        } else {
-          countEl.textContent = '0건';
-          listEl.innerHTML = '<p style="color: var(--text-gray); text-align: center; padding: 20px;">오늘 등록된 발주서가 없습니다.</p>';
+        // 기존 DataTable 파괴
+        if (window.todayOrderTableInstance) {
+          window.todayOrderTableInstance.destroy();
         }
+
+        const tableData = result.success && result.data ? result.data : [];
+        countEl.textContent = `${tableData.length}건`;
+
+        // DataTable 초기화
+        window.todayOrderTableInstance = $('#todayOrderTable').DataTable({
+          data: tableData,
+          columns: [
+            {
+              data: '발주번호',
+              defaultContent: '-',
+              render: (data) => data || '-'
+            },
+            {
+              data: '매입처명',
+              defaultContent: '-',
+              render: (data) => data || '-'
+            },
+            {
+              data: '합계금액',
+              defaultContent: '0',
+              render: (data) => formatCurrency(data || 0),
+              className: 'dt-right'
+            }
+          ],
+          language: {
+            emptyTable: '오늘 등록된 발주서가 없습니다.',
+            search: '검색:',
+            lengthMenu: '페이지당 _MENU_ 개',
+            info: '_START_-_END_ / 총 _TOTAL_건',
+            paginate: { previous: '이전', next: '다음' }
+          },
+          order: [[0, 'desc']], // 발주번호 내림차순
+          paging: true,
+          pageLength: 10,
+          searching: false,
+          lengthChange: false,
+          info: false,
+          responsive: true,
+          autoWidth: false,
+          scrollY: '320px',
+          scrollCollapse: true
+        });
+
+        // 행 클릭 이벤트
+        $('#todayOrderTable tbody').on('click', 'tr', function() {
+          showPage('order');
+        });
+
       } catch (error) {
         console.error('발주서 로드 실패:', error);
-        document.getElementById('todayOrderList').innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">로드 실패</p>';
+        document.getElementById('todayOrderCount').textContent = '0건';
       }
     }
 
@@ -3877,41 +4761,64 @@
     async function loadTodayTransactions(today) {
       try {
         const result = await apiCall(`/transactions?startDate=${today}&endDate=${today}`);
-
-        const listEl = document.getElementById('todayTransactionList');
         const countEl = document.getElementById('todayTransactionCount');
 
-        if (result.success && result.data && result.data.length > 0) {
-          countEl.textContent = `${result.data.length}건`;
-
-          listEl.innerHTML = result.data.map(item => `
-            <div style="
-              padding: 12px;
-              border-bottom: 1px solid #f0f0f0;
-              cursor: pointer;
-              transition: background 0.2s;
-            " onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='transparent'"
-               onclick="showPage('transaction')">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <div style="font-weight: 500; color: #333;">${item.거래번호}</div>
-                  <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                    ${item.거래처명 || '-'} | ${formatCurrency(item.합계금액 || 0)}
-                  </div>
-                </div>
-                <div style="font-size: 11px; color: #999;">
-                  ${formatDate(item.거래일자)}
-                </div>
-              </div>
-            </div>
-          `).join('');
-        } else {
-          countEl.textContent = '0건';
-          listEl.innerHTML = '<p style="color: var(--text-gray); text-align: center; padding: 20px;">오늘 등록된 거래명세서가 없습니다.</p>';
+        // 기존 DataTable 파괴
+        if (window.todayTransactionTableInstance) {
+          window.todayTransactionTableInstance.destroy();
         }
+
+        const tableData = result.success && result.data ? result.data : [];
+        countEl.textContent = `${tableData.length}건`;
+
+        // DataTable 초기화
+        window.todayTransactionTableInstance = $('#todayTransactionTable').DataTable({
+          data: tableData,
+          columns: [
+            {
+              data: '거래번호',
+              defaultContent: '-',
+              render: (data) => data || '-'
+            },
+            {
+              data: '매출처명',
+              defaultContent: '-',
+              render: (data) => data || '-'
+            },
+            {
+              data: '합계금액',
+              defaultContent: '0',
+              render: (data) => formatCurrency(data || 0),
+              className: 'dt-right'
+            }
+          ],
+          language: {
+            emptyTable: '오늘 등록된 거래명세서가 없습니다.',
+            search: '검색:',
+            lengthMenu: '페이지당 _MENU_ 개',
+            info: '_START_-_END_ / 총 _TOTAL_건',
+            paginate: { previous: '이전', next: '다음' }
+          },
+          order: [[0, 'desc']], // 거래번호 내림차순
+          paging: true,
+          pageLength: 10,
+          searching: false,
+          lengthChange: false,
+          info: false,
+          responsive: true,
+          autoWidth: false,
+          scrollY: '320px',
+          scrollCollapse: true
+        });
+
+        // 행 클릭 이벤트
+        $('#todayTransactionTable tbody').on('click', 'tr', function() {
+          showPage('transaction');
+        });
+
       } catch (error) {
         console.error('거래명세서 로드 실패:', error);
-        document.getElementById('todayTransactionList').innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">로드 실패</p>';
+        document.getElementById('todayTransactionCount').textContent = '0건';
       }
     }
 
@@ -4200,6 +5107,42 @@
           menu: 'sales',
           loadFunc: null,
         },
+        'material-history': {
+          element: 'materialHistoryPage',
+          title: '자재내역조회',
+          menu: 'item',
+          loadFunc: () => {
+            if (typeof initMaterialHistoryTable === 'function') {
+              initMaterialHistoryTable();
+            }
+          },
+        },
+        'material-inventory': {
+          element: 'materialInventoryPage',
+          title: '자재재고관리',
+          menu: 'item',
+          loadFunc: () => {
+            if (typeof initMaterialInventoryTable === 'function') {
+              initMaterialInventoryTable();
+            }
+            if (typeof loadWorkplacesForInventory === 'function') {
+              loadWorkplacesForInventory();
+            }
+          },
+        },
+        'material-category': {
+          element: 'materialCategoryPage',
+          title: '자재분류관리',
+          menu: 'item',
+          loadFunc: () => {
+            if (typeof initMaterialCategoryTable === 'function') {
+              initMaterialCategoryTable();
+            }
+            if (typeof loadMaterialCategories === 'function') {
+              loadMaterialCategories();
+            }
+          },
+        },
       };
 
       if (pageMap[pageName]) {
@@ -4212,6 +5155,9 @@
         } else if (pageMap[pageName].menu === 'sales') {
           document.getElementById('salesMenu').classList.add('open');
           document.getElementById('salesSubmenu').classList.add('open');
+        } else if (pageMap[pageName].menu === 'item') {
+          document.getElementById('itemMenu').classList.add('open');
+          document.getElementById('itemsSubmenu').classList.add('open');
         }
 
         // 페이지별 데이터 로드
@@ -4219,6 +5165,67 @@
           pageMap[pageName].loadFunc();
         }
       }
+    }
+
+    // ==================== 작업일자 관리 함수 ====================
+
+    // 작업일자 표시 업데이트
+    function updateWorkingDateDisplay(dateStr) {
+      const dateEl = document.getElementById('currentWorkingDate');
+      const dayEl = document.getElementById('currentWorkingDay');
+
+      if (!dateEl || !dayEl) return;
+
+      dateEl.textContent = dateStr;
+
+      // 요일 계산
+      const date = new Date(dateStr);
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      const dayOfWeek = days[date.getDay()];
+      dayEl.textContent = `(${dayOfWeek})`;
+    }
+
+    // 작업일자 가져오기
+    function getWorkingDate() {
+      return localStorage.getItem('workingDate') || new Date().toISOString().slice(0, 10);
+    }
+
+    // 작업일자 변경 모달 열기
+    function openDateChangeModal() {
+      const modal = document.getElementById('dateChangeModal');
+      const dateInput = document.getElementById('newWorkingDate');
+
+      // 현재 작업일자로 초기화
+      dateInput.value = getWorkingDate();
+
+      modal.style.display = 'flex';
+    }
+
+    // 작업일자 변경 모달 닫기
+    function closeDateChangeModal() {
+      document.getElementById('dateChangeModal').style.display = 'none';
+    }
+
+    // 작업일자 변경 확인
+    function confirmDateChange() {
+      const newDate = document.getElementById('newWorkingDate').value;
+
+      if (!newDate) {
+        alert('날짜를 선택해주세요.');
+        return;
+      }
+
+      // localStorage 업데이트
+      localStorage.setItem('workingDate', newDate);
+
+      // 화면 표시 업데이트
+      updateWorkingDateDisplay(newDate);
+
+      // 모달 닫기
+      closeDateChangeModal();
+
+      // 성공 메시지
+      alert(`작업일자가 ${newDate}로 변경되었습니다.`);
     }
 
     // 로그아웃
@@ -4231,6 +5238,10 @@
         }
 
         currentUser = null;
+
+        // 작업일자 localStorage 삭제
+        localStorage.removeItem('workingDate');
+
         document.getElementById('dashboard').classList.remove('active');
         document.getElementById('loginPage').style.display = 'flex';
         document.getElementById('loginForm').reset();

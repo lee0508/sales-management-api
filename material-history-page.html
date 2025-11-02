@@ -1,0 +1,157 @@
+<!-- 자재내역관리 페이지 -->
+<div class="page-content hidden" id="materialHistoryPage">
+  <h2 style="display: none;">자재내역관리</h2>
+
+  <!-- 검색 영역 -->
+  <div class="toolbar" style="margin-bottom: 20px;">
+    <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+      <!-- 자재 선택 -->
+      <div style="flex: 1; min-width: 300px;">
+        <label style="display: block; margin-bottom: 4px; font-weight: 600;">자재</label>
+        <div style="display: flex; gap: 8px;">
+          <input
+            type="text"
+            id="selectedMaterialCode"
+            class="form-control"
+            placeholder="자재코드"
+            readonly
+            style="flex: 1;"
+          />
+          <input
+            type="text"
+            id="selectedMaterialName"
+            class="form-control"
+            placeholder="자재명"
+            readonly
+            style="flex: 2;"
+          />
+          <button class="btn btn-primary" onclick="openMaterialSearchModal()" style="white-space: nowrap;">
+            자재 선택
+          </button>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 4px;">
+          <input
+            type="text"
+            id="selectedMaterialSpec"
+            class="form-control"
+            placeholder="규격"
+            readonly
+            style="flex: 1;"
+          />
+          <input
+            type="text"
+            id="selectedMaterialUnit"
+            class="form-control"
+            placeholder="단위"
+            readonly
+            style="flex: 0 0 80px;"
+          />
+        </div>
+      </div>
+
+      <!-- 날짜 필터 -->
+      <div>
+        <label style="display: block; margin-bottom: 4px; font-weight: 600;">조회 기간</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="date" id="historyStartDate" class="form-control" style="width: 150px;" />
+          <span>~</span>
+          <input type="date" id="historyEndDate" class="form-control" style="width: 150px;" />
+        </div>
+      </div>
+
+      <!-- 입출고구분 필터 -->
+      <div>
+        <label style="display: block; margin-bottom: 4px; font-weight: 600;">입출고구분</label>
+        <select id="history입출고구분Filter" class="form-control" style="width: 120px;">
+          <option value="전체">전체</option>
+          <option value="1">입고</option>
+          <option value="2">출고</option>
+        </select>
+      </div>
+
+      <!-- 버튼 -->
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-primary" onclick="loadMaterialHistory()" style="height: 40px;">조회</button>
+        <button class="btn btn-secondary" onclick="resetMaterialHistorySearch()" style="height: 40px;">
+          초기화
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 요약 정보 -->
+  <div class="summary-bar" style="margin: 16px 0; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+    <div style="display: flex; gap: 24px; font-size: 14px;">
+      <span>
+        총 입고수량: <strong id="totalInQty" style="color: #28a745; font-size: 16px;">0</strong>
+      </span>
+      <span>
+        총 출고수량: <strong id="totalOutQty" style="color: #007bff; font-size: 16px;">0</strong>
+      </span>
+      <span>
+        조회 건수: <strong id="historyCount" style="font-size: 16px;">0</strong> 건
+      </span>
+    </div>
+  </div>
+
+  <!-- 입출고 이력 DataTable -->
+  <table id="materialHistoryTable" class="display" style="width: 100%;">
+    <thead>
+      <tr>
+        <th>순번</th>
+        <th>입출고일자</th>
+        <th>구분</th>
+        <th>거래처</th>
+        <th>수량</th>
+        <th>단가</th>
+        <th>금액</th>
+        <th>적요</th>
+        <th>작성자</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- 자재 검색 모달 -->
+<div id="materialSearchModal" class="modal hidden">
+  <div class="modal-content" style="max-width: 800px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h3>자재 선택</h3>
+      <button onclick="closeMaterialSearchModal()" class="btn-close">&times;</button>
+    </div>
+
+    <!-- 검색 입력 -->
+    <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+      <input
+        type="text"
+        id="materialSearchKeyword"
+        class="form-control"
+        placeholder="자재코드, 자재명, 규격으로 검색..."
+        onkeypress="if(event.key === 'Enter') searchMaterials()"
+        style="flex: 1;"
+      />
+      <button class="btn btn-primary" onclick="searchMaterials()">검색</button>
+    </div>
+
+    <!-- 검색 결과 테이블 -->
+    <div style="max-height: 400px; overflow-y: auto;">
+      <table class="table" style="width: 100%;">
+        <thead style="position: sticky; top: 0; background: white; z-index: 1;">
+          <tr>
+            <th>자재코드</th>
+            <th>자재명</th>
+            <th>규격</th>
+            <th>단위</th>
+            <th>표준단가</th>
+          </tr>
+        </thead>
+        <tbody id="materialSearchTableBody">
+          <tr>
+            <td colspan="5" style="text-align: center; padding: 40px;">검색어를 입력하세요</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

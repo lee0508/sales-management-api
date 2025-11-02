@@ -1,0 +1,297 @@
+## 8. 상세 코드 위치 및 문제 분석
+
+### 백엔드 (server.js)
+
+#### 자재 검색 API (라인 2587-2629)
+문제 1: 입고단가 필드 없음
+```
+라인 2597: ml.출고단가1, ml.출고단가2, ml.출고단가3
+          (입고단가는 없음 - 자재원장에 입고단가 필드 없을 가능성)
+```
+
+문제 2: 사업장코드 하드코딩
+```
+라인 2600: AND ml.사업장코드 = '01'
+          (모든 요청이 사업장 '01'만 조회)
+```
+
+#### 출고 가격 이력 API (라인 1937-1978)
+사용 문제: 자재코드 형식 불일치
+```
+라인 1942-1943:
+const 분류코드 = materialCode.substring(0, 2);  // "01"
+const 세부코드 = materialCode.substring(2);      // "01MOFS105" (18자)
+
+라인 1949:
+.input('세부코드', sql.VarChar(18), 세부코드)
+// 세부코드는 16자 기대이지만 18자 저장됨
+// 자재입출내역 테이블의 세부코드는 16자인데 불일치!
+```
+
+#### 견적 제안가 이력 API (라인 1984-2018)
+위험한 형식 불일치:
+```
+라인 1991:
+.input('자재코드', sql.VarChar(18), materialCode)
+
+라인 2002:
+WHERE qd.자재코드 = @자재코드
+
+문제: 
+- 프론트엔드에서 20자리 "0101MOFS105" 전달
+- 견적내역.자재코드는 18자리 저장
+- WHERE 절이 20자 == 18자 비교하므로 매칭 실패!
+```
+
+#### 입고 가격 이력 API (라인 2024-2065)
+동일한 형식 불일치 문제
+```
+라인 2028-2030:
+const 분류코드 = materialCode.substring(0, 2);   // "01"
+const 세부코드 = materialCode.substring(2);       // "01MOFS105" (18자)
+
+라인 2036:
+.input('세부코드', sql.VarChar(18), 세부코드)
+// 자재입출내역.세부코드는 16자인데 18자 저장됨
+```
+
+#### 발주 제안가 이력 API (라인 2071-2105)
+동일한 위험한 불일치:
+```
+라인 2078:
+.input('자재코드', sql.VarChar(18), materialCode)
+
+라인 2089:
+WHERE od.자재코드 = @자재코드
+
+문제: 
+- 프론트엔드에서 20자리 전달
+- 발주내역.자재코드는 18자리 저장
+- 매칭 실패!
+```
+
+---
+
+### 프론트엔드 (js/order.js)
+
+#### 발주 자재 검색 (라인 1080-1160)
+```
+라인 1090:
+const result = await apiCall(`/materials?search=${encodeURIComponent(searchKeyword)}`);
+
+라인 1114:
+const 자재코드 = material.분류코드 + material.세부코드;
+// "01" + "01MOFS105" = "0101MOFS105" (20자리)
+
+라인 1136:
+<td>${(material.입고단가 || 0).toLocaleString()}원</td>
+⚠️ 문제: API 응답에 입고단가 필드 없음!
+```
+
+#### 발주 자재 선택 (라인 1165-1194)
+```
+라인 1187-1188:
+document.getElementById('addOrderDetailInPrice').value = material.입고단가 || '0';
+document.getElementById('addOrderDetailOutPrice').value = material.출고단가 || '0';
+⚠️ 문제: 두 필드 모두 API에서 없음!
+결과: 항상 '0' 설정됨
+```
+
+#### 단가 이력 모달 열기 (라인 1259-1303)
+```
+라인 1263:
+const 매입처코드 = modal.dataset.매입처코드;
+
+라인 1293:
+await loadActualPurchasePriceHistory(material.자재코드, 매입처코드);
+// 자재코드는 20자리
+
+라인 1310-1313:
+const response = await fetch(
+  `http://localhost:3000/api/materials/${encodeURIComponent(자재코드)}/purchase-price-history/${매입처코드}`
+);
+⚠️ 문제: http://localhost:3000 하드코딩!
+         프로덕션에서 CORS 오류 발생
+```
+
+#### 실제 입고가 이력 로드 (라인 1308-1373)
+```
+라인 1310-1313:
+const response = await fetch(
+  `http://localhost:3000/api/materials/${encodeURIComponent(자재코드)}/purchase-price-history/${매입처코드}`
+);
+// 자재코드: "0101MOFS105" (20자리)
+// API 서버: substring(0,2) + substring(2)로 분리
+// 결과: 분류="01", 세부="01MOFS105" (18자)
+// 데이터베이스: 세부코드는 16자
+// 결과: 데이터 미조회 또는 부분 조회
+
+라인 1334-1366:
+// 테이블 표시
+tr.onclick = function () {
+  selectPriceFromOrderHistory(item.입고단가);
+};
+```
+
+#### 발주 제안가 이력 로드 (라인 1378-1454)
+```
+라인 1381-1383:
+const response = await fetch(
+  `http://localhost:3000/api/materials/${encodeURIComponent(자재코드)}/order-history/${매입처코드}`
+);
+// 동일한 문제: 하드코딩 + 자재코드 형식 불일치
+```
+
+#### 단가 선택 (라인 1459+)
+```
+라인 1459-1500:
+function selectPriceFromOrderHistory(price) {
+  closeOrderPriceHistoryModal();
+  
+  if (!tempMaterialForOrder) {
+    alert('자재 정보를 찾을 수 없습니다.');
+    return;
+  }
+  
+  const 수량 = prompt(`${tempMaterialForOrder.자재명}\n발주량을 입력하세요:`, '1');
+  
+  if (!수량 || isNaN(수량) || parseFloat(수량) <= 0) {
+    alert('유효한 수량을 입력해주세요.');
+    tempMaterialForOrder = null;
+    return;
+  }
+  
+  const 출고단가 = prompt(
+    `${tempMaterialForOrder.자재명}\n출고단가를 입력하세요:`,
+    price  // 선택한 이력 가격이 기본값
+  );
+  
+  // ... 행 추가 로직
+}
+```
+
+---
+
+### 프론트엔드 (js/quotation.js)
+
+#### 견적 자재 검색 (라인 676-770)
+```
+라인 708:
+const result = await apiCall(`/materials?search=${encodeURIComponent(searchKeyword)}`);
+
+라인 698:
+const 자재코드 = m.분류코드 + m.세부코드;
+// "01" + "01MOFS105" = "0101MOFS105" (20자리)
+
+라인 731:
+<td style="...>${자재코드}</td>
+```
+
+#### 견적 자재 선택 (라인 757-780)
+```
+라인 757-769:
+const 자재코드 = material.분류코드 + material.세부코드;
+document.getElementById('selectedMaterialName').textContent = material.자재명;
+document.getElementById('selectedMaterialCode').textContent = `[${자재코드}] ${material.규격 || ''}`;
+
+window.selectedMaterial = material;
+```
+
+#### 견적 자재 추가 - 단가 입력 (라인 2052-2079)
+```
+라인 2059:
+const 단가 = prompt(
+  `${material.자재명}\n출고단가를 입력하세요:`,
+  material.출고단가1 || '0'  // 자재원장의 기본 출고단가
+);
+
+문제: 거래처별 이전 거래 단가를 조회하지 않음
+      API exists: /api/materials/:materialCode/quotation-history/:customerCode
+      하지만 호출하지 않음 (미구현)
+```
+
+---
+
+## 9. 자재코드 길이 불일치 상세 분석
+
+### 자재 테이블에서의 자재코드
+```
+분류코드: "01" (2자리)
+세부코드: "01MOFS105" (18자리 - 이미 사업장코드 "01" 포함)
+자재코드: "0101MOFS105" (20자리 = 분류 + 세부)
+
+예: 0101MOFS105
+    ││└─ 세부코드 (18자리)
+    │└─ 분류코드 (2자리)
+```
+
+### 자재입출내역 테이블에서의 코드
+```
+사업장코드: "01" (2자리, 별도 필드)
+분류코드: "01" (2자리)
+세부코드: "MOFS105" (16자리, 순수 코드만)
+
+총 3개 필드로 분리됨!
+```
+
+### 견적내역 테이블에서의 자재코드
+```
+자재코드: 18자리 직접 저장 (분류코드 미분리)
+예: "01MOFS105"
+    └─ 세부코드 (16자리) + 분류코드 (2자리)
+
+분류코드가 앞에 붙음: "01" + "MOFS105"
+```
+
+### 문제: API 호출 시 형식
+```
+프론트엔드 자재 검색 API 응답: "0101MOFS105" (20자리)
+  분류: "01"
+  세부: "01MOFS105"
+
+이를 다른 API 파라미터로 그대로 전달:
+
+quotation-history API:
+  .input('자재코드', sql.VarChar(18), "0101MOFS105")
+  WHERE qd.자재코드 = @자재코드
+  
+  문제: "0101MOFS105" (20자) != "01MOFS105" (18자)
+        매칭 실패!
+
+purchase-price-history API:
+  const 분류코드 = "0101MOFS105".substring(0, 2);  // "01"
+  const 세부코드 = "0101MOFS105".substring(2);      // "01MOFS105" (18자)
+  
+  WHERE 분류코드 = "01" AND 세부코드 = "01MOFS105"
+  
+  데이터베이스 자재입출내역:
+    분류코드: "01" ✓ 맞음
+    세부코드: "MOFS105" (16자) ✗ 불일치!
+```
+
+---
+
+## 10. 수정 우선순위
+
+### 우선순위 1 (즉시 필요)
+1. 자재 검색 API에 입고단가 필드 추가
+   - server.js 라인 2600 근처
+   - ml.입고단가 또는 다른 소스 필요
+
+2. 하드코딩된 서버 주소 변경
+   - js/order.js 모든 fetch() 호출
+   - http://localhost:3000 → 상대경로 /api
+
+### 우선순위 2 (중요)
+3. 자재코드 형식 표준화
+   - quotation-history, order-history API 파라미터 검증
+   - 또는 API 수정 (세부코드 16자로 제한)
+
+4. 사업장코드 파라미터화
+   - 모든 API에서 session 사업장코드 사용
+
+### 우선순위 3 (개선)
+5. 견적/거래명세서에서도 가격 이력 조회 구현
+   - quotation-history, price-history API 활용
+   - 기존 code 참고 (order.js의 패턴 사용)
+
