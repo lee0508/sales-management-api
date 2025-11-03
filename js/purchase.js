@@ -8,25 +8,29 @@ let selectedPurchaseStatementForDelete = null;
 let newPurchaseStatementDetails = []; // 신규 작성 시 품목 목록
 
 document.addEventListener('DOMContentLoaded', () => {
-  // 페이지 로드 시 매입전표 목록 불러오기
-  const today = new Date();
-  const endDate = today.toISOString().slice(0, 10);
-  const startDate = today.toISOString().slice(0, 10);
-
-  document.getElementById('purchaseStatementStartDate').value = startDate;
-  document.getElementById('purchaseStatementEndDate').value = endDate;
-
-  // 매입전표 작성 폼 초기 날짜 설정
-  const createDateInput = document.getElementById('purchaseStatementCreateDate');
-  if (createDateInput) {
-    createDateInput.value = today.toISOString().slice(0, 10);
-  }
-
-  loadPurchaseStatements();
+  // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
+  window.loadPurchaseStatements = loadPurchaseStatements;
 });
 
 // ✅ 매입전표 목록 불러오기
 async function loadPurchaseStatements() {
+  // 페이지가 표시될 때마다 날짜 초기화
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const startDateInput = document.getElementById('purchaseStatementStartDate');
+  const endDateInput = document.getElementById('purchaseStatementEndDate');
+  const createDateInput = document.getElementById('purchaseStatementCreateDate');
+
+  if (startDateInput && !startDateInput.value) {
+    startDateInput.value = todayStr;
+  }
+  if (endDateInput && !endDateInput.value) {
+    endDateInput.value = todayStr;
+  }
+  if (createDateInput && !createDateInput.value) {
+    createDateInput.value = todayStr;
+  }
   try {
     const startDate = document.getElementById('purchaseStatementStartDate').value;
     const endDate = document.getElementById('purchaseStatementEndDate').value;

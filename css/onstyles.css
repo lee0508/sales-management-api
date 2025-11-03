@@ -398,12 +398,17 @@ body {
   margin-bottom: 16px;
 }
 
+/* 페이지 표시/숨김 관리 */
 .page-content {
   display: none;
 }
 
 .page-content.active {
-  display: block;
+  display: block !important;
+}
+
+.hidden {
+  display: none !important;
 }
 
 .toolbar {

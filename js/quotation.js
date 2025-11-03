@@ -1,14 +1,7 @@
 /**
  * 견적관리 DataTable 초기화 및 관리
  */
-document.addEventListener('DOMContentLoaded', () => {
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-
-  // 시작일과 종료일 모두 오늘 날짜로 설정
-  document.getElementById('quotationStartDate').value = todayStr;
-  document.getElementById('quotationEndDate').value = todayStr;
-});
+// 날짜 초기화는 loadQuotations() 함수에서 처리
 
 $(document).ready(function () {
   let table;
@@ -274,13 +267,27 @@ $(document).ready(function () {
 
   // ✅ 견적 데이터 로드 함수
   async function loadQuotations() {
+    // 페이지가 표시될 때마다 날짜 초기화
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+
+    const startDateInput = document.getElementById('quotationStartDate');
+    const endDateInput = document.getElementById('quotationEndDate');
+
+    if (startDateInput && !startDateInput.value) {
+      startDateInput.value = todayStr;
+    }
+    if (endDateInput && !endDateInput.value) {
+      endDateInput.value = todayStr;
+    }
+
     // 이미 DataTable이 존재하면 파괴
     if (table) {
       table.destroy();
     }
     // 날짜 필터 값 가져오기
-    const startDate = document.getElementById('quotationStartDate').value.replace(/-/g, '');
-    const endDate = document.getElementById('quotationEndDate').value.replace(/-/g, '');
+    const startDate = document.getElementById('quotationStartDate')?.value.replace(/-/g, '') || '';
+    const endDate = document.getElementById('quotationEndDate')?.value.replace(/-/g, '') || '';
     const status = document.getElementById('quotationStatusFilter').value;
 
     // API URL 구성

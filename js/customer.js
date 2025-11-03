@@ -93,8 +93,8 @@ $(document).ready(function () {
     ]);
   }
 
-  // 최초 로드
-  loadCustomers();
+  // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
+  window.loadCustomers = loadCustomers;
 
   // 새로고침 버튼
   $('#btnReload').on('click', () => table.ajax.reload(null, false));

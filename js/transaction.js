@@ -1,14 +1,7 @@
 // ✅ 거래명세서관리 스크립트 (transaction.js)
 document.addEventListener('DOMContentLoaded', () => {
-  // 페이지 로드 시 거래명세서 목록 불러오기
-  const today = new Date();
-  const endDate = today.toISOString().slice(0, 10);
-  const startDate = today.toISOString().slice(0, 10);
-
-  document.getElementById('transactionStartDate').value = startDate;
-  document.getElementById('transactionEndDate').value = endDate;
-
-  loadTransactions();
+  // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
+  window.loadTransactions = loadTransactions;
 
   // ✅ 수정 모달 닫기 버튼 이벤트
   $(document).on('click', '#closeTransactionEditModalBtn', () => {
@@ -31,6 +24,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ✅ 거래명세서 목록 불러오기
 async function loadTransactions() {
+  // 페이지가 표시될 때마다 날짜 초기화
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const startDateInput = document.getElementById('transactionStartDate');
+  const endDateInput = document.getElementById('transactionEndDate');
+
+  if (startDateInput && !startDateInput.value) {
+    startDateInput.value = todayStr;
+  }
+  if (endDateInput && !endDateInput.value) {
+    endDateInput.value = todayStr;
+  }
   try {
     const startDate = document.getElementById('transactionStartDate').value;
     const endDate = document.getElementById('transactionEndDate').value;

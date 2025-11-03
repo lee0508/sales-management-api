@@ -92,8 +92,8 @@ $(document).ready(function () {
     ]);
   }
 
-  // 최초 로드
-  loadSuppliers();
+  // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
+  window.loadSuppliers = loadSuppliers;
 
   // 새로고침 버튼
   $('#btnReloadSupplier').on('click', () => table.ajax.reload(null, false));

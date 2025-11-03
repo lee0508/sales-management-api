@@ -23,14 +23,17 @@ $(document).ready(function () {
 
   // 발주 목록 로드 (DataTable 초기화)
   function loadOrders() {
+    // 페이지가 표시될 때마다 날짜 초기화
+    setDefaultDates();
+
     // 이미 DataTable이 존재하면 파괴
     if (table) {
       table.destroy();
     }
 
     // 날짜 필터 값 가져오기
-    const startDate = document.getElementById('orderStartDate').value.replace(/-/g, '');
-    const endDate = document.getElementById('orderEndDate').value.replace(/-/g, '');
+    const startDate = document.getElementById('orderStartDate')?.value.replace(/-/g, '') || '';
+    const endDate = document.getElementById('orderEndDate')?.value.replace(/-/g, '') || '';
     const status = document.getElementById('orderStatusFilter').value;
 
     // API URL 구성
@@ -226,15 +229,12 @@ $(document).ready(function () {
     }
   });
 
-  // 페이지 로드 시 실행
-  setDefaultDates(); // 날짜 자동 설정
-  loadOrders(); // 데이터 로드
-
   // 닫기 버튼 이벤트 핸들러
   $('#closeOrderDetailModal').off('click').on('click', closeOrderDetailModal);
   $('#closeOrderModal').off('click').on('click', closeOrderModal);
 
   // 전역으로 접근 가능하도록 window에 등록
+  // loadOrders 호출은 페이지가 표시될 때 showPage()에서 실행됨
   window.loadOrders = loadOrders;
 });
 

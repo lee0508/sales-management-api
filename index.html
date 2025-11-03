@@ -35,7 +35,7 @@
 
 <body>
   <!-- 로그인 페이지 -->
-  <div class="login-container" id="loginPage">
+  <div class="login-container" id="loginPage" style="display: flex;">
     <div class="login-box">
       <div class="login-header">
         <h1>판매관리 시스템</h1>
@@ -87,7 +87,7 @@
   </div>
 
   <!-- 대시보드 -->
-  <div class="dashboard" id="dashboard">
+  <div class="dashboard" id="dashboard" style="display: none;">
     <!-- 사이드바 -->
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -2890,82 +2890,133 @@
 
     <!-- ✅ 메인 스크립트 (페이지 라우팅 및 이벤트 핸들러) -->
     <script>
+      // 전역 변수 선언
+      let currentUser = null;
+
       // 페이지 라우팅
       const pageMap = {
         dashboard: {
-          element: document.getElementById('dashboardPage'),
+          element: 'dashboardPage',
           title: '대시보드',
           menu: null,
           loadFunc: null,
         },
         quotation: {
-          element: document.getElementById('quotationPage'),
+          element: 'quotationPage',
           title: '견적관리',
           menu: 'sales',
-          loadFunc: null,
+          loadFunc: () => {
+            if (typeof window.loadQuotations === 'function') {
+              window.loadQuotations();
+            }
+          },
         },
         transaction: {
-          element: document.getElementById('transactionPage'),
+          element: 'transactionPage',
           title: '거래명세서관리',
           menu: 'sales',
-          loadFunc: null,
+          loadFunc: () => {
+            if (typeof window.loadTransactions === 'function') {
+              window.loadTransactions();
+            }
+          },
         },
         receivable: {
-          element: document.getElementById('receivablePage'),
+          element: 'receivablePage',
           title: '미수금관리',
           menu: 'sales',
           loadFunc: null,
         },
         customer: {
-          element: document.getElementById('customerPage'),
+          element: 'customerPage',
           title: '매출처관리',
           menu: 'sales',
-          loadFunc: null,
+          loadFunc: () => {
+            if (typeof window.loadCustomers === 'function') {
+              window.loadCustomers();
+            }
+          },
         },
         order: {
-          element: document.getElementById('orderPage'),
-          title: '구매관리',
+          element: 'orderPage',
+          title: '발주관리',
           menu: 'purchase',
-          loadFunc: null,
+          loadFunc: () => {
+            if (typeof window.loadOrders === 'function') {
+              window.loadOrders();
+            }
+          },
+        },
+        purchase: {
+          element: 'purchaseStatementPage',
+          title: '매입전표관리',
+          menu: 'purchase',
+          loadFunc: () => {
+            if (typeof window.loadPurchaseStatements === 'function') {
+              window.loadPurchaseStatements();
+            }
+          },
         },
         payable: {
-          element: document.getElementById('payablePage'),
+          element: 'payablePage',
           title: '미지급금관리',
           menu: 'purchase',
           loadFunc: null,
         },
         supplier: {
-          element: document.getElementById('supplierPage'),
+          element: 'supplierPage',
           title: '매입처관리',
           menu: 'purchase',
-          loadFunc: null,
+          loadFunc: () => {
+            if (typeof window.loadSuppliers === 'function') {
+              window.loadSuppliers();
+            }
+          },
         },
         materialCategory: {
-          element: document.getElementById('materialCategoryPage'),
+          element: 'materialCategoryPage',
           title: '자재분류관리',
           menu: 'material',
-          loadFunc: null,
+          loadFunc: () => {
+            if (typeof initMaterialCategoryTable === 'function') {
+              initMaterialCategoryTable();
+            }
+            if (typeof loadMaterialCategories === 'function') {
+              loadMaterialCategories();
+            }
+          },
         },
         materialHistory: {
-          element: document.getElementById('materialHistoryPage'),
+          element: 'materialHistoryPage',
           title: '자재내역조회',
           menu: 'material',
-          loadFunc: null,
+          loadFunc: () => {
+            if (typeof initMaterialHistoryTable === 'function') {
+              initMaterialHistoryTable();
+            }
+          },
         },
         materialInventory: {
-          element: document.getElementById('materialInventoryPage'),
+          element: 'materialInventoryPage',
           title: '자재재고관리',
           menu: 'material',
-          loadFunc: null,
+          loadFunc: () => {
+            if (typeof initMaterialInventoryTable === 'function') {
+              initMaterialInventoryTable();
+            }
+            if (typeof loadWorkplacesForInventory === 'function') {
+              loadWorkplacesForInventory();
+            }
+          },
         },
         financialClosing: {
-          element: document.getElementById('financialClosingPage'),
+          element: 'financialClosingPage',
           title: '회계마감관리',
           menu: 'accounting',
           loadFunc: null,
         },
         settings: {
-          element: document.getElementById('settingsPage'),
+          element: 'settingsPage',
           title: '시스템설정',
           menu: 'settings',
           loadFunc: null,
@@ -2975,11 +3026,10 @@
       let currentPage = 'dashboard';
 
       function showPage(pageName) {
-        // 모든 페이지 숨김
-        Object.values(pageMap).forEach(page => {
-          if (page.element) {
-            page.element.classList.add('hidden');
-          }
+        // 모든 페이지 숨김 (.active 클래스 제거, .hidden 클래스 추가)
+        document.querySelectorAll('.page-content').forEach(page => {
+          page.classList.remove('active');
+          page.classList.add('hidden');
         });
 
         // 모든 사이드바 메뉴 비활성화
@@ -2990,20 +3040,30 @@
         // 선택한 페이지 표시
         const selectedPage = pageMap[pageName];
         if (selectedPage && selectedPage.element) {
-          selectedPage.element.classList.remove('hidden');
+          const pageElement = document.getElementById(selectedPage.element);
+          if (pageElement) {
+            pageElement.classList.remove('hidden');
+            pageElement.classList.add('active');
 
-          // 선택한 메뉴 활성화
-          const menuItem = document.querySelector(`[onclick="showPage('${pageName}')"]`)?.closest('li');
-          if (menuItem) {
-            menuItem.classList.add('active');
+            // 페이지 제목 업데이트
+            const pageTitleEl = document.getElementById('pageTitle');
+            if (pageTitleEl && selectedPage.title) {
+              pageTitleEl.textContent = selectedPage.title;
+            }
+
+            // 선택한 메뉴 활성화
+            const menuItem = document.querySelector(`[onclick="showPage('${pageName}')"]`)?.closest('li');
+            if (menuItem) {
+              menuItem.classList.add('active');
+            }
+
+            // loadFunc 실행 (로그인 여부와 상관없이 실행)
+            if (selectedPage.loadFunc) {
+              selectedPage.loadFunc();
+            }
+
+            currentPage = pageName;
           }
-
-          // loadFunc 실행
-          if (selectedPage.loadFunc) {
-            selectedPage.loadFunc();
-          }
-
-          currentPage = pageName;
         }
       }
 
@@ -3019,43 +3079,109 @@
       async function checkAuth() {
         try {
           const response = await fetch('/api/auth/me', { credentials: 'include' });
+
+          // ✅ HTTP 상태 코드 먼저 확인
+          if (!response.ok) {
+            // 401 Unauthorized 또는 기타 에러 - 로그인 페이지 표시
+            console.log('🔴 로그인 필요 - 로그인 페이지 표시');
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'none';
+            console.log('loginPage display:', document.getElementById('loginPage').style.display);
+            console.log('dashboard display:', document.getElementById('dashboard').style.display);
+            return false;
+          }
+
           const result = await response.json();
 
           if (!result.success) {
             // 로그인 페이지 표시
+            console.log('🔴 인증 실패 - 로그인 페이지 표시');
             document.getElementById('loginPage').style.display = 'flex';
             document.getElementById('dashboard').style.display = 'none';
-            return;
+            return false;
           }
 
           const user = result.data;
+
+          // currentUser에 사용자 정보 저장
+          currentUser = user;
+
           document.getElementById('userName').textContent = user.사용자명 || '사용자';
+
+          // 로그인된 상태 - 대시보드 표시
+          console.log('✅ 로그인 성공 - 대시보드 표시');
+          document.getElementById('loginPage').style.display = 'none';
+          document.getElementById('dashboard').style.display = 'flex';
+          return true;
         } catch (err) {
           console.error('인증 확인 오류:', err);
           // 로그인 페이지 표시
+          console.log('🔴 에러 발생 - 로그인 페이지 표시');
           document.getElementById('loginPage').style.display = 'flex';
           document.getElementById('dashboard').style.display = 'none';
+          return false;
         }
+      }
+
+      // 로그인 날짜 자동 설정 함수
+      function setLoginDateToToday() {
+        const today = new Date();
+        const formatted = today.toISOString().slice(0, 10); // YYYY-MM-DD 형식
+
+        const loginDateText = document.getElementById("loginDateText");
+        const loginDatePicker = document.getElementById("loginDatePicker");
+
+        // 두 입력창 모두 오늘 날짜 자동 설정
+        if (loginDateText) loginDateText.value = formatted;
+        if (loginDatePicker) loginDatePicker.value = formatted;
+
+        console.log(`✅ 로그인 날짜 자동 설정 완료: ${formatted}`);
       }
 
       // 로그아웃
       async function logout() {
+        if (!confirm('로그아웃 하시겠습니까?')) {
+          return;
+        }
+
         try {
+          // 서버에 로그아웃 요청
           await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+
+          // currentUser 초기화
+          if (typeof currentUser !== 'undefined') {
+            currentUser = null;
+          }
+
+          // localStorage 정리
+          localStorage.removeItem('workingDate');
+
           // 로그인 페이지 표시
           document.getElementById('loginPage').style.display = 'flex';
           document.getElementById('dashboard').style.display = 'none';
+
           // 폼 초기화
           document.getElementById('loginForm').reset();
+
+          // 날짜 자동 설정
+          setLoginDateToToday();
+
+          console.log('✅ 로그아웃 완료');
         } catch (err) {
           console.error('로그아웃 오류:', err);
+          alert('로그아웃 중 오류가 발생했습니다.');
         }
       }
 
       // 초기 로드
-      document.addEventListener('DOMContentLoaded', () => {
-        checkAuth();
-        showPage('dashboard');
+      document.addEventListener('DOMContentLoaded', async () => {
+        // 로그인 날짜 초기 설정
+        setLoginDateToToday();
+
+        const isLoggedIn = await checkAuth();
+        if (isLoggedIn) {
+          showPage('dashboard');
+        }
       });
     </script>
   </body>
@@ -4293,19 +4419,12 @@
   <script>
     // 모달을 body 직속으로 이동 (dashboard CSS 영향 회피)
     document.addEventListener('DOMContentLoaded', function () {
-      
-      const today = new Date();
-      const formatted = today.toISOString().slice(0, 10); // YYYY-MM-DD 형식
 
-      const loginDateText = document.getElementById("loginDateText");
-      const loginDatePicker = document.getElementById("loginDatePicker");
+      // 로그인 날짜 자동 설정 (함수 호출)
+      if (typeof setLoginDateToToday === 'function') {
+        setLoginDateToToday();
+      }
 
-      // 두 입력창 모두 오늘 날짜 자동 설정
-      if (loginDateText) loginDateText.value = formatted;
-      if (loginDatePicker) loginDatePicker.value = formatted;
-
-      console.log(`✅ 로그인 날짜 자동 설정 완료: ${formatted}`);
-      
       const customerModal = document.getElementById('customerModal');
       const supplierModal = document.getElementById('supplierModal');
 
@@ -4327,8 +4446,8 @@
       ? `${window.location.origin}/api`
       : 'http://localhost:3000/api';
 
-    // 현재 로그인 사용자 정보
-    let currentUser = null;
+    // 현재 로그인 사용자 정보 (이미 위에 선언됨)
+    // let currentUser = null;
 
     let currentCustomerPage = 1;
     let customerPageSizeSelected = 10;
@@ -4551,7 +4670,7 @@
 
           setTimeout(() => {
             document.getElementById('loginPage').style.display = 'none';
-            document.getElementById('dashboard').classList.add('active');
+            document.getElementById('dashboard').style.display = 'flex';
 
             document.getElementById('userName').textContent = currentUser.사용자명;
             document.getElementById('userAvatar').textContent = currentUser.사용자명.charAt(0);
@@ -5051,121 +5170,7 @@
       submenu.classList.toggle('open');
     }
 
-    // 페이지 전환
-    function showPage(pageName) {
-      document.querySelectorAll('.page-content').forEach((page) => {
-        page.classList.remove('active');
-      });
-
-      document.querySelectorAll('.menu-link').forEach((link) => {
-        link.classList.remove('active');
-      });
-      document.querySelectorAll('.submenu-link').forEach((link) => {
-        link.classList.remove('active');
-      });
-
-      const pageMap = {
-        dashboard: {
-          element: 'dashboardPage',
-          title: '대시보드',
-          menu: null,
-          loadFunc: loadDashboardStats,
-        },
-        supplier: {
-          element: 'supplierPage',
-          title: '매입처관리',
-          menu: 'purchase',
-          loadFunc: null, // ✅ supplier.js의 DataTable이 자동으로 로드
-        },
-        order: {
-          element: 'orderPage',
-          title: '발주관리',
-          menu: 'purchase',
-          loadFunc: null, // ✅ order.js의 DataTable이 자동으로 로드
-        },
-        purchase: {
-          element: 'purchaseStatementPage',
-          title: '매입전표관리',
-          menu: 'purchase',
-          loadFunc: null, // ✅ purchase.js의 DataTable이 자동으로 로드
-        },
-        customer: {
-          element: 'customerPage',
-          title: '매출처관리',
-          menu: 'sales',
-          loadFunc: null, // ✅ customer.js의 DataTable이 자동으로 로드
-        },
-        quotation: {
-          element: 'quotationPage',
-          title: '견적관리',
-          menu: 'sales',
-          loadFunc: null, // ✅ quotation.js의 DataTable이 자동으로 로드
-        },
-        transaction: {
-          element: 'transactionPage',
-          title: '거래명세서관리',
-          menu: 'sales',
-          loadFunc: null,
-        },
-        'material-history': {
-          element: 'materialHistoryPage',
-          title: '자재내역조회',
-          menu: 'item',
-          loadFunc: () => {
-            if (typeof initMaterialHistoryTable === 'function') {
-              initMaterialHistoryTable();
-            }
-          },
-        },
-        'material-inventory': {
-          element: 'materialInventoryPage',
-          title: '자재재고관리',
-          menu: 'item',
-          loadFunc: () => {
-            if (typeof initMaterialInventoryTable === 'function') {
-              initMaterialInventoryTable();
-            }
-            if (typeof loadWorkplacesForInventory === 'function') {
-              loadWorkplacesForInventory();
-            }
-          },
-        },
-        'material-category': {
-          element: 'materialCategoryPage',
-          title: '자재분류관리',
-          menu: 'item',
-          loadFunc: () => {
-            if (typeof initMaterialCategoryTable === 'function') {
-              initMaterialCategoryTable();
-            }
-            if (typeof loadMaterialCategories === 'function') {
-              loadMaterialCategories();
-            }
-          },
-        },
-      };
-
-      if (pageMap[pageName]) {
-        document.getElementById(pageMap[pageName].element).classList.add('active');
-        document.getElementById('pageTitle').textContent = pageMap[pageName].title;
-
-        if (pageMap[pageName].menu === 'purchase') {
-          document.getElementById('purchaseMenu').classList.add('open');
-          document.getElementById('purchaseSubmenu').classList.add('open');
-        } else if (pageMap[pageName].menu === 'sales') {
-          document.getElementById('salesMenu').classList.add('open');
-          document.getElementById('salesSubmenu').classList.add('open');
-        } else if (pageMap[pageName].menu === 'item') {
-          document.getElementById('itemMenu').classList.add('open');
-          document.getElementById('itemsSubmenu').classList.add('open');
-        }
-
-        // 페이지별 데이터 로드
-        if (currentUser && pageMap[pageName].loadFunc) {
-          pageMap[pageName].loadFunc();
-        }
-      }
-    }
+    // ⚠️ 중복된 showPage() 함수 제거됨 - 첫 번째 정의만 사용
 
     // ==================== 작업일자 관리 함수 ====================
 
@@ -5228,26 +5233,7 @@
       alert(`작업일자가 ${newDate}로 변경되었습니다.`);
     }
 
-    // 로그아웃
-    async function logout() {
-      if (confirm('로그아웃 하시겠습니까?')) {
-        try {
-          await apiCall('/auth/logout', 'POST', { userId: currentUser.사용자코드 });
-        } catch (error) {
-          console.error('로그아웃 에러:', error);
-        }
-
-        currentUser = null;
-
-        // 작업일자 localStorage 삭제
-        localStorage.removeItem('workingDate');
-
-        document.getElementById('dashboard').classList.remove('active');
-        document.getElementById('loginPage').style.display = 'flex';
-        document.getElementById('loginForm').reset();
-        document.getElementById('loginMessage').classList.remove('show');
-      }
-    }
+    // ⚠️ 중복된 logout() 함수 제거됨 - 첫 번째 정의만 사용
 
     // 상세 조회 함수들
     // ==================== 매출처 상세보기/수정/삭제 기능 ====================

@@ -243,17 +243,20 @@ app.post('/api/auth/login', async (req, res) => {
 // 로그아웃
 app.post('/api/auth/logout', async (req, res) => {
   try {
-    const userId = req.body.userId || (req.session.user && req.session.user.사용자코드);
+    // 세션에서 사용자 정보 가져오기
+    const userId = req.session?.user?.사용자코드 || req.body?.userId;
 
     if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: '사용자 정보가 없습니다.',
+      // 세션이 없어도 로그아웃 성공 처리 (이미 로그아웃 상태)
+      return res.json({
+        success: true,
+        message: '로그아웃 되었습니다.',
       });
     }
 
     const 종료일시 = new Date().toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
 
+    // 사용자 테이블 업데이트
     await pool
       .request()
       .input('사용자코드', sql.VarChar(4), userId)
@@ -262,6 +265,8 @@ app.post('/api/auth/logout', async (req, res) => {
                 SET 종료일시 = @종료일시, 로그인여부 = 'N'
                 WHERE 사용자코드 = @사용자코드
             `);
+
+    console.log(`✅ 로그아웃 성공 - 사용자코드: ${userId}`);
 
     // 세션 삭제
     req.session.destroy((err) => {
@@ -483,7 +488,7 @@ app.get('/api/customers/:code', async (req, res) => {
 });
 
 // 매출처 신규 등록
-app.post('/api/customers', async (req, res) => {
+app.post('/api/customers', requireAuth, async (req, res) => {
   try {
     const {
       매출처코드,
@@ -630,7 +635,7 @@ app.post('/api/customers', async (req, res) => {
 });
 
 // 매출처 수정
-app.put('/api/customers/:code', async (req, res) => {
+app.put('/api/customers/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
     const {
@@ -723,7 +728,7 @@ app.put('/api/customers/:code', async (req, res) => {
 });
 
 // 매출처 삭제 (Soft Delete)
-app.delete('/api/customers/:code', async (req, res) => {
+app.delete('/api/customers/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
 
@@ -921,7 +926,7 @@ app.get('/api/suppliers_search_code/:code', async (req, res) => {
 });
 
 // 매입처 신규 등록 (REST API 표준)
-app.post('/api/suppliers', async (req, res) => {
+app.post('/api/suppliers', requireAuth, async (req, res) => {
   try {
     const {
       사업장코드,
@@ -1073,7 +1078,7 @@ app.post('/api/suppliers', async (req, res) => {
 });
 
 // 매입처 신규 등록 (하위 호환성)
-app.post('/api/suppliers_new', async (req, res) => {
+app.post('/api/suppliers_new', requireAuth, async (req, res) => {
   try {
     const {
       사업장코드,
@@ -1165,7 +1170,7 @@ app.post('/api/suppliers_new', async (req, res) => {
 });
 
 // 매입처 수정
-app.put('/api/suppliers_edit/:code', async (req, res) => {
+app.put('/api/suppliers_edit/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
     const {
@@ -1267,7 +1272,7 @@ app.put('/api/suppliers_edit/:code', async (req, res) => {
 });
 
 // 매입처 수정 (REST API 표준)
-app.put('/api/suppliers/:code', async (req, res) => {
+app.put('/api/suppliers/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
     const {
@@ -1369,7 +1374,7 @@ app.put('/api/suppliers/:code', async (req, res) => {
 });
 
 // 매입처 삭제 (REST API 표준)
-app.delete('/api/suppliers/:code', async (req, res) => {
+app.delete('/api/suppliers/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
 
@@ -1389,7 +1394,7 @@ app.delete('/api/suppliers/:code', async (req, res) => {
 });
 
 // 매입처 삭제 (하위 호환성)
-app.delete('/api/suppliers_delete/:code', async (req, res) => {
+app.delete('/api/suppliers_delete/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
 
@@ -1526,7 +1531,9 @@ app.get('/api/quotations/:date/:no', async (req, res) => {
 });
 
 // 견적 신규 등록
-app.post('/api/quotations_add', async (req, res) => {
+app.post('/api/quotations_add', requireAuth, async (req, res) => {
+  const transaction = new sql.Transaction(pool);
+
   try {
     const { master, details } = req.body;
 
@@ -1543,9 +1550,11 @@ app.post('/api/quotations_add', async (req, res) => {
 
     console.log('✅ 견적 등록 - 세션 정보:', { 사용자코드, 사업장코드 });
 
+    // 트랜잭션 시작
+    await transaction.begin();
+
     // 견적번호 생성 (로그 테이블 사용)
-    const logResult = await pool
-      .request()
+    const logResult = await new sql.Request(transaction)
       .input('테이블명', sql.VarChar(50), '견적')
       .input('베이스코드', sql.VarChar(50), master.견적일자).query(`
                 SELECT 최종로그 FROM 로그
@@ -1560,8 +1569,7 @@ app.post('/api/quotations_add', async (req, res) => {
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     // 마스터 등록
-    await pool
-      .request()
+    await new sql.Request(transaction)
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('견적일자', sql.VarChar(8), master.견적일자)
       .input('견적번호', sql.Real, 견적번호)
@@ -1594,8 +1602,7 @@ app.post('/api/quotations_add', async (req, res) => {
         .replace(/\..+/, '')
         .substring(8);
 
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('견적일자', sql.VarChar(8), master.견적일자)
         .input('견적번호', sql.Real, 견적번호)
@@ -1628,8 +1635,7 @@ app.post('/api/quotations_add', async (req, res) => {
 
     // 로그 업데이트
     if (logResult.recordset.length > 0) {
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('테이블명', sql.VarChar(50), '견적')
         .input('베이스코드', sql.VarChar(50), master.견적일자)
         .input('최종로그', sql.Money, 견적번호)
@@ -1639,8 +1645,7 @@ app.post('/api/quotations_add', async (req, res) => {
                     WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
                 `);
     } else {
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('테이블명', sql.VarChar(50), '견적')
         .input('베이스코드', sql.VarChar(50), master.견적일자)
         .input('최종로그', sql.Money, 견적번호)
@@ -1652,18 +1657,21 @@ app.post('/api/quotations_add', async (req, res) => {
     }
 
     // 사용자명 조회
-    const userResult = await pool.request()
+    const userResult = await new sql.Request(transaction)
       .input('사용자코드', sql.VarChar(4), 사용자코드)
       .query(`SELECT 사용자명 FROM 사용자 WHERE 사용자코드 = @사용자코드`);
 
     const 사용자명 = userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
 
     // 매출처명 조회
-    const customerResult = await pool.request()
+    const customerResult = await new sql.Request(transaction)
       .input('매출처코드', sql.VarChar(8), master.매출처코드)
       .query(`SELECT 매출처명 FROM 매출처 WHERE 매출처코드 = @매출처코드`);
 
     const 매출처명 = customerResult.recordset.length > 0 ? customerResult.recordset[0].매출처명 : '';
+
+    // 트랜잭션 커밋
+    await transaction.commit();
 
     res.json({
       success: true,
@@ -1679,6 +1687,12 @@ app.post('/api/quotations_add', async (req, res) => {
     });
   } catch (err) {
     console.error('견적 등록 에러:', err);
+
+    // 트랜잭션 롤백
+    if (transaction._aborted === false) {
+      await transaction.rollback();
+    }
+
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
@@ -1719,7 +1733,7 @@ app.get('/api/quotations/:date/:no/details', async (req, res) => {
 //---------------------------------------------
 // ✅ 견적 삭제 (소프트 삭제 - 사용구분 변경)
 //---------------------------------------------
-app.delete('/api/quotations/:date/:no', async (req, res) => {
+app.delete('/api/quotations/:date/:no', requireAuth, async (req, res) => {
   try {
     const { date, no } = req.params;
 
@@ -1771,7 +1785,7 @@ app.delete('/api/quotations/:date/:no', async (req, res) => {
 //---------------------------------------------
 // ✅ 견적 승인 (상태코드 변경: 1 -> 2)
 //---------------------------------------------
-app.put('/api/quotations/:date/:no/approve', async (req, res) => {
+app.put('/api/quotations/:date/:no/approve', requireAuth, async (req, res) => {
   try {
     const { date, no } = req.params;
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -1799,7 +1813,7 @@ app.put('/api/quotations/:date/:no/approve', async (req, res) => {
 //---------------------------------------------
 // ✅ 견적 수정 (마스터 정보만)
 //---------------------------------------------
-app.put('/api/quotations/:date/:no', async (req, res) => {
+app.put('/api/quotations/:date/:no', requireAuth, async (req, res) => {
   try {
     const { date, no } = req.params;
     const { 매출처코드, 출고희망일자, 결제방법, 결제예정일자, 유효일수, 제목, 적요 } = req.body;
@@ -1856,7 +1870,7 @@ app.put('/api/quotations/:date/:no', async (req, res) => {
 // ✅ 견적내역 수정 API
 // PUT /api/quotations/:date/:no/details
 //------------------------------------------------------------
-app.put('/api/quotations/:date/:no/details', async (req, res) => {
+app.put('/api/quotations/:date/:no/details', requireAuth, async (req, res) => {
   let transaction;
   try {
     const { date, no } = req.params;
@@ -2251,19 +2265,31 @@ app.get('/api/orders/:date/:no', async (req, res) => {
 
 // 발주 생성 (마스터 + 디테일)
 app.post('/api/orders', async (req, res) => {
+  const transaction = new sql.Transaction(pool);
+
   try {
     const { master, details } = req.body;
 
     console.log('📝 발주서 저장 요청 받음:', { master, details });
 
-    // 세션에서 사용자 정보 가져오기
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
-    const 사업장코드 = master.사업장코드;
+    // 세션 검증 - 견적서와 동일하게 처리
+    const 사용자코드 = req.session?.user?.사용자코드;
+    const 사업장코드 = req.session?.user?.사업장코드;
+
+    if (!사용자코드 || !사업장코드) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
+
+    // 트랜잭션 시작
+    await transaction.begin();
+
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     // 1. 발주번호 생성 (로그 테이블에서 최종번호 조회)
-    const logResult = await pool
-      .request()
+    const logResult = await new sql.Request(transaction)
       .input('테이블명', sql.VarChar(20), '발주')
       .input('베이스코드', sql.VarChar(20), master.발주일자).query(`
         SELECT 최종로그
@@ -2279,8 +2305,7 @@ app.post('/api/orders', async (req, res) => {
     console.log('✅ 발주번호 생성:', { 발주일자: master.발주일자, 발주번호 });
 
     // 2. 발주 마스터 삽입
-    await pool
-      .request()
+    await new sql.Request(transaction)
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('발주일자', sql.VarChar(8), master.발주일자)
       .input('발주번호', sql.Real, 발주번호)
@@ -2312,8 +2337,7 @@ app.post('/api/orders', async (req, res) => {
         .replace(/\..+/, '')
         .substring(8);
 
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('발주일자', sql.VarChar(8), master.발주일자)
         .input('발주번호', sql.Real, 발주번호)
@@ -2340,8 +2364,7 @@ app.post('/api/orders', async (req, res) => {
 
     // 4. 로그 테이블 업데이트
     if (logResult.recordset.length > 0) {
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('테이블명', sql.VarChar(50), '발주')
         .input('베이스코드', sql.VarChar(50), master.발주일자)
         .input('최종로그', sql.Money, 발주번호)
@@ -2352,8 +2375,7 @@ app.post('/api/orders', async (req, res) => {
           WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
         `);
     } else {
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('테이블명', sql.VarChar(50), '발주')
         .input('베이스코드', sql.VarChar(50), master.발주일자)
         .input('최종로그', sql.Money, 발주번호)
@@ -2367,18 +2389,21 @@ app.post('/api/orders', async (req, res) => {
     console.log('✅ 발주서 저장 완료:', { 발주일자: master.발주일자, 발주번호 });
 
     // 사용자명 조회
-    const userResult = await pool.request()
+    const userResult = await new sql.Request(transaction)
       .input('사용자코드', sql.VarChar(4), 사용자코드)
       .query(`SELECT 사용자명 FROM 사용자 WHERE 사용자코드 = @사용자코드`);
 
     const 사용자명 = userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
 
     // 매입처명 조회
-    const supplierResult = await pool.request()
+    const supplierResult = await new sql.Request(transaction)
       .input('매입처코드', sql.VarChar(8), master.매입처코드)
       .query(`SELECT 매입처명 FROM 매입처 WHERE 매입처코드 = @매입처코드`);
 
     const 매입처명 = supplierResult.recordset.length > 0 ? supplierResult.recordset[0].매입처명 : '';
+
+    // 트랜잭션 커밋
+    await transaction.commit();
 
     res.json({
       success: true,
@@ -2393,6 +2418,10 @@ app.post('/api/orders', async (req, res) => {
       },
     });
   } catch (err) {
+    // 트랜잭션 롤백
+    if (transaction._aborted === false) {
+      await transaction.rollback();
+    }
     console.error('❌ 발주 생성 에러:', err);
     console.error('에러 상세:', err.message);
     console.error('에러 스택:', err.stack);
@@ -2401,7 +2430,7 @@ app.post('/api/orders', async (req, res) => {
 });
 
 // 발주 수정 (마스터 + 품목)
-app.put('/api/orders/:date/:no', async (req, res) => {
+app.put('/api/orders/:date/:no', requireAuth, async (req, res) => {
   const transaction = pool.transaction();
 
   try {
@@ -2553,7 +2582,7 @@ app.put('/api/orders/:date/:no', async (req, res) => {
 });
 
 // 발주 삭제 (Soft Delete - 사용구분 변경)
-app.delete('/api/orders/:date/:no', async (req, res) => {
+app.delete('/api/orders/:date/:no', requireAuth, async (req, res) => {
   const transaction = pool.transaction();
 
   try {
@@ -2828,7 +2857,7 @@ app.get('/api/materials/:code', async (req, res) => {
 });
 
 // 자재 등록
-app.post('/api/materials', async (req, res) => {
+app.post('/api/materials', requireAuth, async (req, res) => {
   try {
     const { 분류코드, 세부코드, 자재명, 바코드, 규격, 단위, 폐기율, 과세구분, 적요 } = req.body;
 
@@ -2866,7 +2895,7 @@ app.post('/api/materials', async (req, res) => {
 });
 
 // 자재 수정
-app.put('/api/materials/:code', async (req, res) => {
+app.put('/api/materials/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
     const 분류코드 = code.substring(0, 2);
@@ -2911,7 +2940,7 @@ app.put('/api/materials/:code', async (req, res) => {
 });
 
 // 자재 삭제
-app.delete('/api/materials/:code', async (req, res) => {
+app.delete('/api/materials/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
     const 분류코드 = code.substring(0, 2);
@@ -2985,7 +3014,7 @@ app.get('/api/material-categories/:code', async (req, res) => {
 });
 
 // 자재분류 생성
-app.post('/api/material-categories', async (req, res) => {
+app.post('/api/material-categories', requireAuth, async (req, res) => {
   try {
     const { 분류코드, 분류명, 적요 } = req.body;
     const 사용자코드 = req.session?.user?.사용자코드 || '8080';
@@ -3035,7 +3064,7 @@ app.post('/api/material-categories', async (req, res) => {
 });
 
 // 자재분류 수정
-app.put('/api/material-categories/:code', async (req, res) => {
+app.put('/api/material-categories/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
     const { 분류명, 적요 } = req.body;
@@ -3084,7 +3113,7 @@ app.put('/api/material-categories/:code', async (req, res) => {
 });
 
 // 자재분류 삭제 (소프트 삭제)
-app.delete('/api/material-categories/:code', async (req, res) => {
+app.delete('/api/material-categories/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
     const 사용자코드 = req.session?.user?.사용자코드 || '8080';
@@ -3444,7 +3473,7 @@ app.get('/api/transactions/price-history', async (req, res) => {
 
 // 세금계산서 발행 API
 
-app.post('/api/taxinvoice/create', async (req, res) => {
+app.post('/api/taxinvoice/create', requireAuth, async (req, res) => {
   try {
     const { date, no } = req.body;
     if (!date || !no) {
@@ -3495,7 +3524,7 @@ app.post('/api/taxinvoice/create', async (req, res) => {
 });
 
 // ✅ 거래명세서 수정 (자재입출내역 UPDATE)
-app.put('/api/transactions/:date/:no', async (req, res) => {
+app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
   try {
     const { date: 거래일자, no: 거래번호 } = req.params;
     const { 입출고구분, details } = req.body;
@@ -3603,8 +3632,17 @@ app.put('/api/transactions/:date/:no', async (req, res) => {
 app.post('/api/transactions', async (req, res) => {
   try {
     const { 거래일자, 입출고구분, 매출처코드, 적요, details } = req.body;
-    const 사업장코드 = '01'; // 기본 사업장
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080'; // 세션에서 가져오기, 없으면 기본값
+
+    // 세션 검증
+    const 사용자코드 = req.session?.user?.사용자코드;
+    const 사업장코드 = req.session?.user?.사업장코드;
+
+    if (!사용자코드 || !사업장코드) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
 
     // 유효성 검사
     if (!거래일자 || !매출처코드 || !details || details.length === 0) {
@@ -3746,7 +3784,7 @@ app.post('/api/transactions', async (req, res) => {
 });
 
 // ✅ 거래명세서 삭제
-app.delete('/api/transactions/:date/:no', async (req, res) => {
+app.delete('/api/transactions/:date/:no', requireAuth, async (req, res) => {
   try {
     const { date: 거래일자, no: 거래번호 } = req.params;
 
@@ -3940,8 +3978,17 @@ app.get('/api/purchase-statements/price-history', async (req, res) => {
 app.post('/api/purchase-statements', async (req, res) => {
   try {
     const { 거래일자, 입출고구분, 매입처코드, 적요, details } = req.body;
-    const 사업장코드 = '01';
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+
+    // 세션 검증
+    const 사용자코드 = req.session?.user?.사용자코드;
+    const 사업장코드 = req.session?.user?.사업장코드;
+
+    if (!사용자코드 || !사업장코드) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
 
     // 유효성 검사
     if (!거래일자 || !매입처코드 || !details || details.length === 0) {
@@ -4120,7 +4167,7 @@ app.post('/api/purchase-statements', async (req, res) => {
 });
 
 // ✅ 매입전표 수정
-app.put('/api/purchase-statements/:date/:no', async (req, res) => {
+app.put('/api/purchase-statements/:date/:no', requireAuth, async (req, res) => {
   try {
     const { date: 거래일자, no: 거래번호 } = req.params;
     const { 입출고구분, details } = req.body;
@@ -4224,7 +4271,7 @@ app.put('/api/purchase-statements/:date/:no', async (req, res) => {
 });
 
 // ✅ 매입전표 삭제
-app.delete('/api/purchase-statements/:date/:no', async (req, res) => {
+app.delete('/api/purchase-statements/:date/:no', requireAuth, async (req, res) => {
   try {
     const { date: 거래일자, no: 거래번호 } = req.params;
 
@@ -4303,7 +4350,7 @@ app.get('/api/accounts-payable', async (req, res) => {
 });
 
 // ✅ 미지급금 등록
-app.post('/api/accounts-payable', async (req, res) => {
+app.post('/api/accounts-payable', requireAuth, async (req, res) => {
   try {
     const { 매입처코드, 미지급금지급일자, 미지급금지급금액, 결제방법, 만기일자, 어음번호, 적요 } = req.body;
     const 사업장코드 = '01';
