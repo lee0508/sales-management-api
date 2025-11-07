@@ -218,5 +218,8 @@ function formatNumber(num) {
 // 페이지 로드 시 초기화
 $(document).ready(function () {
   initMaterialInventoryTable();
-  loadWorkplacesForInventory();
+  // loadWorkplacesForInventory()는 페이지가 실제로 표시될 때만 호출되도록 전역 함수로 노출
+  window.loadMaterialInventoryPage = function() {
+    loadWorkplacesForInventory();
+  };
 });

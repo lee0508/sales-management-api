@@ -6,6 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Korean-language sales management system with Node.js/Express REST API backend and vanilla HTML/CSS/JavaScript frontend. Connects to Microsoft SQL Server (YmhDB) with Korean table/column names.
 
+### Business Model: Multi-Branch Enterprise System
+
+This system is designed for **companies with multiple branches/locations** (본사-지사 구조):
+
+**Architecture Principles**:
+1. **Centralized Master Data**: Product catalog (자재, 자재분류) shared across all branches
+2. **Distributed Operations**: Each branch independently manages sales, purchases, inventory, and accounting
+3. **Workplace Isolation**: Transactional data strictly separated by `사업장코드` (workplace code)
+
+**Typical Deployment Scenario**:
+- Company headquarters in Seoul (사업장코드='01')
+- Regional branches in Busan (사업장코드='02'), Daegu (사업장코드='03'), etc.
+- All locations sell same products but with regional pricing and independent inventory
+- Each branch has separate P&L, tax invoicing, and customer/supplier relationships
+
+**Key Benefit**: Combines central product standardization with operational autonomy for each branch.
+
 ## Database Connection
 
 **Technology**: mssql package (node-mssql) v12.0.0
@@ -92,11 +109,17 @@ All database tables and columns use Korean names:
 - 매입처 (Suppliers/Purchase Vendors)
 - 견적 (Quotations) + 견적내역 (Quotation Details)
 - 발주 (Purchase Orders) + 발주내역 (Order Details)
-- 자재 (Materials) + 자재분류 (Material Categories) + 자재원장 (Material Ledger) + **자재입출내역 (Inventory Transactions - 핵심!)**
+- 자재 (Materials) + 자재분류 (Material Categories) + 자재시세 (Material Pricing) + 자재원장 (Material Ledger) + **자재입출내역 (Inventory Transactions - 핵심!)**
 - 세금계산서 (Tax Invoices)
 - 미수금내역 (Accounts Receivable)
 - 미지급금내역 (Accounts Payable)
 - 로그 (Log table for auto-incrementing IDs)
+
+**CRITICAL - Workplace Code (사업장코드) Pattern** (Multi-Branch Architecture):
+- **Centralized Tables** (NO 사업장코드): 자재, 자재분류 - Shared product catalog for all branches
+- **Branch-Isolated Tables** (HAS 사업장코드): All other tables - Branch-specific transactions, pricing, inventory
+- **Business Reason**: Enables central product standardization while maintaining operational independence per branch
+- See detailed section below for query patterns, business context, and implementation examples
 
 ### 자재입출내역 Table - 입출고 구분 (CRITICAL!)
 
@@ -134,6 +157,183 @@ Quotations (견적) and Purchase Orders (발주) follow master-detail architectu
 Uses `사용구분` (usage flag) field:
 - 0 = active/in-use
 - 1 = deleted/inactive
+
+### Workplace Code (사업장코드) Usage Pattern (CRITICAL!)
+
+**IMPORTANT**: Understanding which tables have `사업장코드` field is crucial for proper data isolation and query construction.
+
+#### Business Context: Multi-Branch Enterprise Architecture
+
+This system is designed for companies with **multiple branches/locations** (본사 + 지사 구조):
+- **Headquarters (본사)**: Main office
+- **Branch Offices (지사들)**: Multiple regional/local offices
+
+Each location has its own `사업장코드` (workplace code), but they need to:
+1. **Share common master data** - Materials should be standardized across all locations
+2. **Isolate transactional data** - Each branch manages its own sales, purchases, and inventory separately
+
+**Example Business Scenario**:
+- Company with HQ in Seoul (사업장코드='01') and branches in Busan (사업장코드='02'), Daegu (사업장코드='03')
+- All branches sell the same products (자재) with same specifications
+- But each branch has different pricing (자재시세), inventory levels (자재원장), and transactions (견적, 발주, 자재입출내역)
+- Centralized material management prevents inconsistencies (different product names, specs for same item)
+
+#### Tables WITHOUT 사업장코드 (Centralized/Shared Data):
+These tables are **centrally managed and shared across all workplaces**:
+- **자재** (Materials) - Centralized product master data
+- **자재분류** (Material Categories) - Centralized category structure
+
+**Why centralized?**
+- **Standardization**: All branches use the same product catalog
+- **Consistency**: Product names, specs, units are uniform across the organization
+- **Efficiency**: Add a new product once, available to all branches immediately
+- **Reporting**: Consolidated reports across all locations use the same product codes
+
+**IMPORTANT - When working with 자재 and 자재분류**:
+- ❌ DO NOT use `사업장코드` field - it doesn't exist in these tables
+- ❌ DO NOT filter by `WHERE 사업장코드 = '01'` - this will cause SQL errors
+- ❌ DO NOT include `사업장코드` in INSERT/UPDATE statements for these tables
+- ✅ All workplaces can access the same material master data
+- ✅ Use 자재시세 and 자재원장 for workplace-specific prices and inventory
+- ✅ Even though user is logged into a specific workplace (사업장코드='01'), material CRUD operations don't need it
+
+#### Tables WITH 사업장코드 (Branch-Specific/Isolated Data):
+These tables **require branch-level isolation**:
+- **견적** (Quotations) + **견적내역** (Quotation Details)
+- **발주** (Purchase Orders) + **발주내역** (Order Details)
+- **자재입출내역** (Inventory Transactions) - 입출고 records
+- **자재시세** (Material Pricing) - Branch-specific pricing
+- **자재원장** (Material Ledger) - Branch-specific inventory
+- **자재원장마감** (Material Ledger Closing) - Monthly closing per branch
+- **세금계산서** (Tax Invoices)
+- **미수금내역** (Accounts Receivable)
+- **미지급금내역** (Accounts Payable)
+- **매출처** (Customers)
+- **매입처** (Suppliers)
+
+**Why branch-level isolation?**
+- **Accounting Separation**: Each branch has its own P&L, balance sheet, and tax obligations
+- **Pricing Flexibility**: Same product can have different prices in different regions (Seoul premium, regional discount)
+- **Inventory Independence**: Each branch manages its own stock levels and warehouse
+- **Customer/Supplier Relationships**: Local branches have their own client base
+- **Operational Autonomy**: Branch managers control their own quotations, orders, and transactions
+- **Security & Privacy**: Branch A cannot see Branch B's sales data or customer information
+
+**Real-World Example**:
+```
+Product: "LED 전구 10W" (자재코드: 0101ABC123)
+- 자재 table: Single record, shared by all branches (name, spec, unit)
+- 자재시세:
+  * Seoul branch (01): 매출단가 = 15,000원
+  * Busan branch (02): 매출단가 = 13,000원 (regional pricing)
+- 자재원장:
+  * Seoul (01): 현재고 = 500개
+  * Busan (02): 현재고 = 300개
+- 자재입출내역:
+  * Seoul's sales/purchase transactions (사업장코드='01')
+  * Busan's sales/purchase transactions (사업장코드='02')
+  * Completely separate, cannot mix
+```
+
+#### Query Pattern Implications:
+
+**❌ WRONG - Filtering 자재 by 사업장코드:**
+```sql
+-- This will FAIL because 자재 table has NO 사업장코드 field
+SELECT * FROM 자재
+WHERE 사업장코드 = '01'  -- ERROR: Invalid column name
+```
+
+**✅ CORRECT - Join pattern for workplace-specific material data:**
+```sql
+-- Get materials with workplace-specific pricing/inventory
+SELECT
+  자재.분류코드, 자재.세부코드, 자재.자재명,
+  자재시세.매입단가, 자재시세.매출단가,  -- Workplace-specific prices
+  자재원장.현재고                         -- Workplace-specific stock
+FROM 자재
+  LEFT JOIN 자재시세
+    ON 자재.분류코드 = 자재시세.분류코드
+    AND 자재.세부코드 = 자재시세.세부코드
+    AND 자재시세.사업장코드 = @사업장코드  -- Filter HERE
+  LEFT JOIN 자재원장
+    ON 자재.분류코드 = 자재원장.분류코드
+    AND 자재.세부코드 = 자재원장.세부코드
+    AND 자재원장.사업장코드 = @사업장코드  -- Filter HERE
+WHERE 자재.사용구분 = 0
+```
+
+**Key Rule**:
+- Filter by `사업장코드` in **JOIN conditions** for 자재시세/자재원장, not in WHERE clause for 자재 table
+- All transaction tables (견적, 발주, 자재입출내역, etc.) MUST include `사업장코드` in INSERT/UPDATE/SELECT operations
+
+#### Real-World API Examples:
+
+**Creating a Material (자재 생성) - NO 사업장코드 needed:**
+```javascript
+// ❌ WRONG
+app.post('/api/materials', async (req, res) => {
+  const 사업장코드 = req.session.user.사업장코드; // Don't need this!
+  await pool.request()
+    .input('사업장코드', sql.VarChar(2), 사업장코드) // ERROR: Column doesn't exist
+    .input('자재명', sql.NVarChar(100), req.body.자재명)
+    .query(`INSERT INTO 자재 (사업장코드, 자재명, ...) VALUES (@사업장코드, @자재명, ...)`);
+});
+
+// ✅ CORRECT
+app.post('/api/materials', async (req, res) => {
+  // No 사업장코드 needed - materials are shared across all workplaces
+  await pool.request()
+    .input('분류코드', sql.VarChar(2), req.body.분류코드)
+    .input('세부코드', sql.VarChar(18), req.body.세부코드)
+    .input('자재명', sql.NVarChar(100), req.body.자재명)
+    .query(`INSERT INTO 자재 (분류코드, 세부코드, 자재명, ...) VALUES (@분류코드, @세부코드, @자재명, ...)`);
+});
+```
+
+**Creating a Transaction (거래명세서 생성) - 사업장코드 REQUIRED:**
+```javascript
+// ✅ CORRECT - Transaction tables need 사업장코드
+app.post('/api/transactions', async (req, res) => {
+  const 사업장코드 = req.session.user.사업장코드; // Required for transaction isolation
+
+  await pool.request()
+    .input('사업장코드', sql.VarChar(2), 사업장코드) // Must include
+    .input('거래일자', sql.VarChar(8), req.body.거래일자)
+    .input('매출처코드', sql.VarChar(8), req.body.매출처코드)
+    .query(`
+      INSERT INTO 자재입출내역 (사업장코드, 거래일자, 매출처코드, ...)
+      VALUES (@사업장코드, @거래일자, @매출처코드, ...)
+    `);
+});
+```
+
+**Querying Materials with Workplace-Specific Pricing:**
+```javascript
+// ✅ CORRECT - Get shared materials with workplace-specific prices
+app.get('/api/materials', async (req, res) => {
+  const 사업장코드 = req.session.user.사업장코드;
+
+  const result = await pool.request()
+    .input('사업장코드', sql.VarChar(2), 사업장코드)
+    .query(`
+      SELECT
+        자재.분류코드, 자재.세부코드, 자재.자재명, 자재.규격,
+        자재시세.매입단가, 자재시세.매출단가,  -- Workplace-specific pricing
+        자재원장.현재고                         -- Workplace-specific stock
+      FROM 자재
+        LEFT JOIN 자재시세
+          ON 자재.분류코드 = 자재시세.분류코드
+          AND 자재.세부코드 = 자재시세.세부코드
+          AND 자재시세.사업장코드 = @사업장코드  -- Use 사업장코드 HERE in JOIN
+        LEFT JOIN 자재원장
+          ON 자재.분류코드 = 자재원장.분류코드
+          AND 자재.세부코드 = 자재원장.세부코드
+          AND 자재원장.사업장코드 = @사업장코드  -- Use 사업장코드 HERE in JOIN
+      WHERE 자재.사용구분 = 0  -- No 사업장코드 filter on 자재 table
+    `);
+});
+```
 
 ### Auto-Incrementing Numbers (로그 Table)
 
@@ -216,6 +416,64 @@ if (result.length > 0) {
 Dates stored as VARCHAR(8) in YYYYMMDD format (e.g., "20251022")
 Timestamps as VARCHAR(17) in YYYYMMDDHHMMSSmmm format
 
+### Material Table Join Pattern (CRITICAL)
+
+**IMPORTANT**: When querying material data, you MUST follow the correct join sequence and include all relevant tables.
+
+#### Correct Join Sequence:
+```
+자재분류 (Material Categories - NO 사업장코드)
+    ↓ INNER JOIN
+자재 (Materials - NO 사업장코드)
+    ↓ LEFT JOIN
+자재시세 (Material Pricing - HAS 사업장코드) ← CRITICAL: Do not skip!
+    ↓ LEFT JOIN
+자재원장 (Material Ledger - HAS 사업장코드)
+```
+
+#### Table Characteristics:
+
+| Table | Has 사업장코드? | Purpose |
+|-------|----------------|---------|
+| 자재분류 | ❌ No | Common category structure for all workplaces |
+| 자재 | ❌ No | Common material master data for all workplaces |
+| 자재시세 | ✅ Yes | Workplace-specific pricing (매입단가, 매출단가) |
+| 자재원장 | ✅ Yes | Workplace-specific inventory and actual prices |
+
+#### Correct Query Pattern:
+```sql
+SELECT
+  자재분류.분류코드, 자재분류.분류명,
+  자재.세부코드, 자재.자재명, 자재.규격, 자재.단위,
+  자재시세.매입단가, 자재시세.매출단가,
+  자재원장.입고단가1, 자재원장.출고단가1, 자재원장.현재고
+FROM 자재분류
+  INNER JOIN 자재
+    ON 자재분류.분류코드 = 자재.분류코드
+  LEFT JOIN 자재시세
+    ON 자재.분류코드 = 자재시세.분류코드
+    AND 자재.세부코드 = 자재시세.세부코드
+    AND 자재시세.사업장코드 = @사업장코드
+  LEFT JOIN 자재원장
+    ON 자재.분류코드 = 자재원장.분류코드
+    AND 자재.세부코드 = 자재원장.세부코드
+    AND 자재원장.사업장코드 = @사업장코드
+WHERE 자재.사용구분 = 0
+  AND 자재분류.사용구분 = 0
+```
+
+**Key Points**:
+- 자재분류, 자재: No workplace code (shared across all workplaces)
+- 자재시세, 자재원장: Workplace-specific, MUST filter by 사업장코드
+- 자재시세: Contains standard pricing (매입단가, 매출단가)
+- 자재원장: Contains actual prices and current stock
+
+**Common Mistake**: Skipping 자재시세 table in joins
+- ❌ Wrong: 자재분류 → 자재 → 자재원장 (missing 자재시세)
+- ✅ Correct: 자재분류 → 자재 → 자재시세 → 자재원장
+
+See `MATERIAL_TABLE_JOIN_PATTERN.md` for detailed implementation guide.
+
 ### Material Code Structure (CRITICAL)
 
 **IMPORTANT**: Material codes are stored differently across tables. Understanding this structure is crucial for correct data handling.
@@ -277,6 +535,61 @@ Always use `substring(4)` to display only the pure detail code:
 // For full material code: "0101MOFS105"
 const displayCode = materialCode.substring(4); // "MOFS105"
 ```
+
+### Material Ledger Closing (자재원장마감)
+
+**Purpose**: Monthly inventory closing table for aggregating material transactions.
+
+#### Table Structure:
+```sql
+CREATE TABLE 자재원장마감 (
+  사업장코드 VARCHAR(2),      -- Workplace code
+  분류코드 VARCHAR(2),        -- Category code
+  세부코드 VARCHAR(16),       -- Detail code (pure, without workplace prefix)
+  마감년월 VARCHAR(6),        -- Closing month (YYYYMM)
+  입고누계수량 MONEY,         -- Total incoming quantity for the month
+  출고누계수량 MONEY,         -- Total outgoing quantity for the month
+  수정일자 VARCHAR(8),        -- Last modification date
+  사용자코드 VARCHAR(4),      -- User who performed closing
+  PRIMARY KEY (사업장코드, 분류코드, 세부코드, 마감년월)
+)
+```
+
+#### Usage Pattern:
+1. **Monthly Closing Process**:
+   - User clicks "재고정리" (Inventory Closing) button
+   - System aggregates all transactions from 자재입출내역 for the selected month
+   - Calculates total 입고 (incoming) and 출고 (outgoing) quantities per material
+   - Inserts/updates records in 자재원장마감 table
+
+2. **Data Aggregation Query**:
+```sql
+-- Aggregate transactions for January 2025
+SELECT
+  사업장코드, 분류코드, 세부코드,
+  SUM(CASE WHEN 입출고구분 = 1 THEN 입고수량 ELSE 0 END) AS 입고누계수량,
+  SUM(CASE WHEN 입출고구분 = 2 THEN 출고수량 ELSE 0 END) AS 출고누계수량
+FROM 자재입출내역
+WHERE 거래일자 >= '20250101' AND 거래일자 <= '20250131'
+  AND 사용구분 = 0
+GROUP BY 사업장코드, 분류코드, 세부코드
+```
+
+3. **Current Stock Calculation**:
+```
+Current Stock = Last Closing Stock + (Incoming after closing) - (Outgoing after closing)
+```
+
+#### Key Points:
+- Monthly snapshots of inventory movements
+- One record per material per month
+- Used for historical inventory analysis and reporting
+- Supports trend analysis and stock verification
+- Composite key ensures unique monthly closing per material
+
+**Important**: This is different from 자재원장 (Material Ledger), which contains current prices and real-time stock levels. 자재원장마감 is specifically for monthly closing/aggregation.
+
+See `MATERIAL_LEDGER_CLOSING.md` for detailed implementation guide.
 
 ## Business Process Workflows
 

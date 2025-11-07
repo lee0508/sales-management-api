@@ -161,10 +161,11 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // 사용자 정보 조회 (비밀번호 포함)
+    // 사용자 정보 조회 (비밀번호 및 로그인 상태 포함)
     const userResult = await pool.request().input('사용자코드', sql.VarChar(4), userId).query(`
                 SELECT
                     u.사용자코드, u.사용자명, u.사용자권한, u.사업장코드, u.로그인비밀번호,
+                    u.로그인여부, u.사용구분, u.시작일시,
                     s.사업장명, s.사업자번호, s.대표자명
                 FROM 사용자 u
                 LEFT JOIN 사업장 s ON u.사업장코드 = s.사업장코드
@@ -180,6 +181,14 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = userResult.recordset[0];
+
+    // 중복 로그인 체크
+    if (user.로그인여부 === 'Y') {
+      return res.status(403).json({
+        success: false,
+        message: '이미 로그인되어 있습니다. 다른 세션에서 로그아웃 후 다시 시도해주세요.',
+      });
+    }
     const storedPassword = user.로그인비밀번호;
     let isPasswordValid = false;
 
@@ -560,20 +569,39 @@ app.post('/api/customers', requireAuth, async (req, res) => {
       const maxQuery = `
         SELECT TOP 1 매출처코드
         FROM 매출처
-        WHERE LEN(매출처코드) = 8
+        WHERE 사업장코드 = @사업장코드
+          AND LEN(매출처코드) = 4
         ORDER BY
           SUBSTRING(매출처코드, 1, 1) DESC,
-          CAST(SUBSTRING(매출처코드, 2, 7) AS INT) DESC
+          CAST(SUBSTRING(매출처코드, 2, 3) AS INT) DESC
       `;
 
-      const maxResult = await pool.request().query(maxQuery);
+      const maxResult = await pool.request()
+        .input('사업장코드', sql.VarChar(2), 사업장코드)
+        .query(maxQuery);
 
       if (maxResult.recordset.length > 0) {
         const lastCode = maxResult.recordset[0].매출처코드;
-        const prefix = lastCode.charAt(0);
-        const numPart = lastCode.substring(1);
-        const nextNum = parseInt(numPart) + 1;
-        최종매출처코드 = prefix + String(nextNum).padStart(7, '0');
+        let prefix = lastCode.charAt(0); // 영문 부분 (예: "A")
+        const numPart = lastCode.substring(1); // 숫자 부분 (예: "999")
+        let nextNum = parseInt(numPart) + 1;
+
+        // 숫자가 999를 초과하면 다음 영문자로 변경하고 숫자를 001로 리셋
+        if (nextNum > 999) {
+          const nextCharCode = prefix.charCodeAt(0) + 1;
+
+          // Z를 넘어가면 A로 돌아감
+          if (nextCharCode > 90) { // 'Z'의 ASCII 코드는 90
+            prefix = 'A';
+          } else {
+            prefix = String.fromCharCode(nextCharCode);
+          }
+
+          nextNum = 1;
+          console.log(`  숫자 999 초과 → 영문 변경: ${lastCode.charAt(0)} → ${prefix}, 숫자 리셋: 001`);
+        }
+
+        최종매출처코드 = prefix + String(nextNum).padStart(3, '0');
 
         console.log(`  기존 코드: ${매출처코드} → 새 코드: ${최종매출처코드}`);
       }
@@ -997,20 +1025,39 @@ app.post('/api/suppliers', requireAuth, async (req, res) => {
       const maxQuery = `
         SELECT TOP 1 매입처코드
         FROM 매입처
-        WHERE LEN(매입처코드) = 8
+        WHERE 사업장코드 = @사업장코드
+          AND LEN(매입처코드) = 4
         ORDER BY
           SUBSTRING(매입처코드, 1, 1) DESC,
-          CAST(SUBSTRING(매입처코드, 2, 7) AS INT) DESC
+          CAST(SUBSTRING(매입처코드, 2, 3) AS INT) DESC
       `;
 
-      const maxResult = await pool.request().query(maxQuery);
+      const maxResult = await pool.request()
+        .input('사업장코드', sql.VarChar(2), 최종사업장코드)
+        .query(maxQuery);
 
       if (maxResult.recordset.length > 0) {
         const lastCode = maxResult.recordset[0].매입처코드;
-        const prefix = lastCode.charAt(0);
-        const numPart = lastCode.substring(1);
-        const nextNum = parseInt(numPart) + 1;
-        최종매입처코드 = prefix + String(nextNum).padStart(7, '0');
+        let prefix = lastCode.charAt(0); // 영문 부분 (예: "A")
+        const numPart = lastCode.substring(1); // 숫자 부분 (예: "999")
+        let nextNum = parseInt(numPart) + 1;
+
+        // 숫자가 999를 초과하면 다음 영문자로 변경하고 숫자를 001로 리셋
+        if (nextNum > 999) {
+          const nextCharCode = prefix.charCodeAt(0) + 1;
+
+          // Z를 넘어가면 A로 돌아감
+          if (nextCharCode > 90) { // 'Z'의 ASCII 코드는 90
+            prefix = 'A';
+          } else {
+            prefix = String.fromCharCode(nextCharCode);
+          }
+
+          nextNum = 1;
+          console.log(`  숫자 999 초과 → 영문 변경: ${lastCode.charAt(0)} → ${prefix}, 숫자 리셋: 001`);
+        }
+
+        최종매입처코드 = prefix + String(nextNum).padStart(3, '0');
 
         console.log(`  기존 코드: ${매입처코드} → 새 코드: ${최종매입처코드}`);
       }
@@ -3817,6 +3864,56 @@ app.delete('/api/transactions/:date/:no', requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+// ✅ 거래명세서 확정
+app.put('/api/transactions/:date/:no/approve', requireAuth, async (req, res) => {
+  try {
+    const { date: 거래일자, no: 거래번호 } = req.params;
+
+    console.log(`✅ 거래명세서 확정 요청: ${거래일자}-${거래번호}`);
+
+    // 거래명세서 존재 여부 확인
+    const checkResult = await pool.request()
+      .input('거래일자', sql.VarChar(8), 거래일자)
+      .input('거래번호', sql.Real, parseFloat(거래번호))
+      .query(`
+        SELECT TOP 1 입출고구분
+        FROM 자재입출내역
+        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
+      `);
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '거래명세서를 찾을 수 없습니다.',
+      });
+    }
+
+    // 거래명세서 상태를 확정(2)으로 업데이트
+    const result = await pool.request()
+      .input('거래일자', sql.VarChar(8), 거래일자)
+      .input('거래번호', sql.Real, parseFloat(거래번호))
+      .input('입출고구분', sql.Real, 2) // 2 = 확정
+      .query(`
+        UPDATE 자재입출내역
+        SET 입출고구분 = @입출고구분
+        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
+      `);
+
+    console.log(`✅ 거래명세서 확정 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`);
+
+    res.json({
+      success: true,
+      message: '거래명세서가 확정되었습니다.',
+    });
+  } catch (err) {
+    console.error('❌ 거래명세서 확정 에러:', err);
+    res.status(500).json({
+      success: false,
+      message: '거래명세서 확정 중 오류가 발생했습니다.',
     });
   }
 });

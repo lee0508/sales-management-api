@@ -3,6 +3,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
   window.loadTransactions = loadTransactions;
 
+  // 거래명세서 작성 모달 드래그 기능
+  if (typeof makeModalDraggable === 'function') {
+    makeModalDraggable('transactionCreateModalContent', 'transactionCreateModalHeader');
+    makeModalDraggable('transactionEditModalContent', 'transactionEditModalHeader');
+  }
+
   // ✅ 수정 모달 닫기 버튼 이벤트
   $(document).on('click', '#closeTransactionEditModalBtn', () => {
     closeTransactionEditModal();
@@ -13,12 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.id === 'transactionEditModal') {
       closeTransactionEditModal();
     }
-  });
-
-  // ✅ 전체 선택 체크박스 (수정 모달)
-  $(document).on('change', '#selectAllEditTransactionDetails', function () {
-    const isChecked = $(this).prop('checked');
-    $('.editTransactionDetailCheckbox').prop('checked', isChecked);
   });
 });
 
@@ -118,6 +118,7 @@ async function loadTransactions() {
                 <button class="btn-icon btn-view" onclick="openTransactionDetailModal('${row.명세서번호}')" title="보기">보기</button>
                 <button class="btn-icon btn-edit" style="display: none;" onclick="editTransaction('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon btn-delete" style="display: none;" onclick="deleteTransaction('${row.거래일자}', ${row.거래번호})" title="삭제">삭제</button>
+                <button class="btn-icon btn-approve" style="display: none;" onclick="approveTransaction('${row.거래일자}', ${row.거래번호})" title="확정">확정</button>
               </div>
             `;
           },
@@ -142,7 +143,7 @@ async function loadTransactions() {
       pageLength: 10,
       responsive: true,
       autoWidth: false,
-      drawCallback: function(settings) {
+      drawCallback: function() {
         // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
         $('.transactionCheckbox').each(function() {
           const $checkbox = $(this);
@@ -155,10 +156,12 @@ async function loadTransactions() {
             actionDiv.find('.btn-view').hide();
             actionDiv.find('.btn-edit').show();
             actionDiv.find('.btn-delete').show();
+            actionDiv.find('.btn-approve').show();
           } else {
             actionDiv.find('.btn-view').show();
             actionDiv.find('.btn-edit').hide();
             actionDiv.find('.btn-delete').hide();
+            actionDiv.find('.btn-approve').hide();
           }
         });
       }
@@ -184,16 +187,18 @@ async function loadTransactions() {
         });
 
         if (isChecked) {
-          // 체크됨: 보기 버튼 숨기고 수정/삭제 버튼 표시
+          // 체크됨: 보기 버튼 숨기고 수정/삭제/확정 버튼 표시
           actionDiv.find('.btn-view').hide();
           actionDiv.find('.btn-edit').show();
           actionDiv.find('.btn-delete').show();
-          console.log('✅ 버튼 표시 완료 - 수정/삭제 버튼 visible');
+          actionDiv.find('.btn-approve').show();
+          console.log('✅ 버튼 표시 완료 - 수정/삭제/확정 버튼 visible');
         } else {
-          // 체크 해제: 수정/삭제 버튼 숨기고 보기 버튼 표시
+          // 체크 해제: 수정/삭제/확정 버튼 숨기고 보기 버튼 표시
           actionDiv.find('.btn-view').show();
           actionDiv.find('.btn-edit').hide();
           actionDiv.find('.btn-delete').hide();
+          actionDiv.find('.btn-approve').hide();
           console.log('✅ 버튼 표시 완료 - 보기 버튼 visible');
         }
       });
@@ -354,6 +359,19 @@ function openNewTransactionModal() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('transactionCreateDate').value = today;
 
+  // 매출처 검색 입력 필드 초기화
+  const searchInput = document.getElementById('transactionCreateCustomerSearch');
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.placeholder = '매출처 코드 또는 이름 입력 후 엔터';
+  }
+
+  // 선택된 매출처 표시 영역 숨김
+  const displayDiv = document.getElementById('transactionSelectedCustomerDisplay');
+  if (displayDiv) {
+    displayDiv.style.display = 'none';
+  }
+
   // ✅ 테이블 초기화 (빈 메시지 표시)
   const tbody = document.getElementById('transactionCreateDetailTableBody');
   tbody.innerHTML = `
@@ -383,9 +401,19 @@ function closeTransactionCreateModal() {
 
 // ✅ 매출처 검색 모달 열기 (거래명세서용)
 function openTransactionCustomerSearchModal() {
+  // 검색 입력 필드의 값을 가져와서 모달 검색창에 자동 입력
+  const searchInput = document.getElementById('transactionCreateCustomerSearch');
+  const searchText = searchInput ? searchInput.value.trim() : '';
+
   document.getElementById('transactionCustomerSearchModal').style.display = 'block';
-  document.getElementById('transactionCustomerSearchInput').value = '';
-  console.log('✅ 매출처 검색 모달 열기');
+  document.getElementById('transactionCustomerSearchInput').value = searchText;
+
+  console.log('✅ 매출처 검색 모달 열기 - 검색어:', searchText);
+
+  // 검색어가 있으면 자동으로 검색 실행
+  if (searchText) {
+    searchTransactionCustomers();
+  }
 }
 
 // ✅ 매출처 검색 모달 닫기
@@ -454,10 +482,42 @@ async function searchTransactionCustomers() {
 
 // ✅ 매출처 선택
 function selectTransactionCustomer(customer) {
+  // 숨김 필드에 값 설정
   document.getElementById('transactionCreateCustomerCode').value = customer.매출처코드;
   document.getElementById('transactionCreateCustomerName').value = customer.매출처명;
+
+  // 검색 입력 필드에 선택된 정보 표시
+  const searchInput = document.getElementById('transactionCreateCustomerSearch');
+  searchInput.value = `${customer.매출처명} (${customer.매출처코드})`;
+
+  // 선택된 매출처 표시 영역 업데이트
+  const displayDiv = document.getElementById('transactionSelectedCustomerDisplay');
+  const infoSpan = document.getElementById('transactionSelectedCustomerInfo');
+  infoSpan.textContent = `✓ ${customer.매출처명} (${customer.매출처코드})`;
+  displayDiv.style.display = 'block';
+
   closeTransactionCustomerSearchModal();
   console.log('✅ 매출처 선택:', customer.매출처명);
+}
+
+// ✅ 매출처 선택 취소
+function clearTransactionSelectedCustomer() {
+  // 숨김 필드 초기화
+  document.getElementById('transactionCreateCustomerCode').value = '';
+  document.getElementById('transactionCreateCustomerName').value = '';
+
+  // 검색 입력 필드 초기화
+  const searchInput = document.getElementById('transactionCreateCustomerSearch');
+  searchInput.value = '';
+  searchInput.placeholder = '매출처 코드 또는 이름 입력 후 엔터';
+
+  // 선택된 매출처 표시 영역 숨김
+  document.getElementById('transactionSelectedCustomerDisplay').style.display = 'none';
+
+  // 검색 입력 필드에 포커스
+  searchInput.focus();
+
+  console.log('✅ 매출처 선택 취소');
 }
 
 // ✅ 자재 검색 모달 열기 (거래명세서 작성용)
@@ -838,11 +898,6 @@ async function editTransaction(transactionDate, transactionNo) {
       columns: [
         {
           data: null,
-          orderable: false,
-          render: () => `<input type="checkbox" class="editTransactionDetailCheckbox" />`,
-        },
-        {
-          data: null,
           render: (data, type, row, meta) => meta.row + 1,
         },
         {
@@ -893,7 +948,7 @@ async function editTransaction(transactionDate, transactionNo) {
           },
         },
       ],
-      order: [[1, 'asc']],
+      order: [[0, 'asc']],
       pageLength: 10,
       language: {
         lengthMenu: '페이지당 _MENU_ 개씩 보기',
@@ -1346,35 +1401,36 @@ function closeTransactionDetailDeleteModal() {
 }
 
 // ✅ 선택된 거래명세서 상세 삭제
-function deleteSelectedTransactionDetails() {
-  if (!window.transactionEditDetailTableInstance) return;
-
-  const checkboxes = document.querySelectorAll('.editTransactionDetailCheckbox:checked');
-  if (checkboxes.length === 0) {
-    alert('삭제할 항목을 선택하세요.');
-    return;
-  }
-
-  if (!confirm(`선택한 ${checkboxes.length}개의 항목을 삭제하시겠습니까?`)) {
-    return;
-  }
-
-  // 선택된 행들의 인덱스를 역순으로 삭제 (인덱스가 변경되지 않도록)
-  const rowsToDelete = [];
-  checkboxes.forEach((checkbox) => {
-    const row = $(checkbox).closest('tr');
-    const rowIndex = window.transactionEditDetailTableInstance.row(row).index();
-    rowsToDelete.push(rowIndex);
-  });
-
-  rowsToDelete.sort((a, b) => b - a);
-  rowsToDelete.forEach((index) => {
-    window.transactionEditDetailTableInstance.row(index).remove();
-  });
-
-  window.transactionEditDetailTableInstance.draw();
-  updateTransactionEditTotal();
-}
+// ❌ DEPRECATED: 체크박스 기능 제거로 인해 더 이상 사용되지 않음
+// function deleteSelectedTransactionDetails() {
+//   if (!window.transactionEditDetailTableInstance) return;
+//
+//   const checkboxes = document.querySelectorAll('.editTransactionDetailCheckbox:checked');
+//   if (checkboxes.length === 0) {
+//     alert('삭제할 항목을 선택하세요.');
+//     return;
+//   }
+//
+//   if (!confirm(`선택한 ${checkboxes.length}개의 항목을 삭제하시겠습니까?`)) {
+//     return;
+//   }
+//
+//   // 선택된 행들의 인덱스를 역순으로 삭제 (인덱스가 변경되지 않도록)
+//   const rowsToDelete = [];
+//   checkboxes.forEach((checkbox) => {
+//     const row = $(checkbox).closest('tr');
+//     const rowIndex = window.transactionEditDetailTableInstance.row(row).index();
+//     rowsToDelete.push(rowIndex);
+//   });
+//
+//   rowsToDelete.sort((a, b) => b - a);
+//   rowsToDelete.forEach((index) => {
+//     window.transactionEditDetailTableInstance.row(index).remove();
+//   });
+//
+//   window.transactionEditDetailTableInstance.draw();
+//   updateTransactionEditTotal();
+// }
 
 // ✅ 거래명세서 삭제 함수 (확인 모달 표시)
 function deleteTransaction(transactionDate, transactionNo) {
@@ -1428,6 +1484,37 @@ async function confirmTransactionDelete() {
   } catch (err) {
     console.error('❌ 거래명세서 삭제 오류:', err);
     alert('거래명세서 삭제 중 오류가 발생했습니다.');
+  }
+}
+
+// ✅ 거래명세서 확정 함수
+async function approveTransaction(transactionDate, transactionNo) {
+  const confirmed = confirm(`거래명세서 ${transactionDate}-${transactionNo}를 확정하시겠습니까?\n\n확정 후에는 수정이 불가능합니다.`);
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/transactions/${transactionDate}/${transactionNo}/approve`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
+      alert('거래명세서가 확정되었습니다.');
+      loadTransactions(); // 목록 새로고침
+    } else {
+      alert(`확정 실패: ${result.message}`);
+    }
+  } catch (err) {
+    console.error('❌ 거래명세서 확정 오류:', err);
+    alert('거래명세서 확정 중 오류가 발생했습니다.');
   }
 }
 
