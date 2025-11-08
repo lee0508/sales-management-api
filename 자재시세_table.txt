@@ -1,0 +1,49 @@
+SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '자재시세'
+
+TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	ORDINAL_POSITION	COLUMN_DEFAULT	IS_NULLABLE	DATA_TYPE	CHARACTER_MAXIMUM_LENGTH	CHARACTER_OCTET_LENGTH	NUMERIC_PRECISION	NUMERIC_PRECISION_RADIX	NUMERIC_SCALE	DATETIME_PRECISION	CHARACTER_SET_CATALOG	CHARACTER_SET_SCHEMA	CHARACTER_SET_NAME	COLLATION_CATALOG	COLLATION_SCHEMA	COLLATION_NAME	DOMAIN_CATALOG	DOMAIN_SCHEMA	DOMAIN_NAME
+YmhDB	dbo	자재시세	사업장코드	1	('')	NO	varchar	2	2	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
+YmhDB	dbo	자재시세	분류코드	2	('')	NO	varchar	2	2	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
+YmhDB	dbo	자재시세	세부코드	3	('')	NO	varchar	16	16	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
+YmhDB	dbo	자재시세	매입처코드	4	('')	NO	varchar	8	8	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
+YmhDB	dbo	자재시세	적용일자	5	('')	NO	varchar	8	8	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
+YmhDB	dbo	자재시세	입고단가	6	(0)	NO	money	NULL	NULL	19	10	4	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
+YmhDB	dbo	자재시세	입고부가	7	(0)	NO	money	NULL	NULL	19	10	4	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
+YmhDB	dbo	자재시세	출고단가	8	(0)	NO	money	NULL	NULL	19	10	4	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
+YmhDB	dbo	자재시세	출고부가	9	(0)	NO	money	NULL	NULL	19	10	4	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
+YmhDB	dbo	자재시세	마진율	10	(0.00)	NO	money	NULL	NULL	19	10	4	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
+YmhDB	dbo	자재시세	사용구분	11	(0)	NO	tinyint	NULL	NULL	3	10	0	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
+YmhDB	dbo	자재시세	수정일자	12	('')	NO	varchar	8	8	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
+YmhDB	dbo	자재시세	사용자코드	13	('')	NO	varchar	4	4	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
+
+SELECT [사업장코드]
+      ,[분류코드]
+      ,[세부코드]
+      ,[매입처코드]
+      ,[적용일자]
+      ,[입고단가]
+      ,[입고부가]
+      ,[출고단가]
+      ,[출고부가]
+      ,[마진율]
+      ,[사용구분]
+      ,[수정일자]
+      ,[사용자코드]
+  FROM [YmhDB].[dbo].[자재시세]
+
+SELECT [사업장코드]
+      ,[분류코드]
+      ,[세부코드]
+      ,[매입처코드]
+      ,[적용일자]
+      ,[입고단가]
+      ,[입고부가]
+      ,[출고단가]
+      ,[출고부가]
+      ,[마진율]
+      ,[사용구분]
+      ,[수정일자]
+      ,[사용자코드]
+  FROM [YmhDB].[dbo].[자재시세]
+  WHERE [세부코드] LIKE '%MOF%'
+  AND [사업장코드] = '01'
+  AND [분류코드] = '01'

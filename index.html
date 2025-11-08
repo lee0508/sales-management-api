@@ -235,9 +235,9 @@
               <span class="arrow">▼</span>
             </a>
             <div class="submenu" id="itemsSubmenu">
-              <a class="submenu-link" onclick="showPage('material-category')">자재분류관리</a>
-              <a class="submenu-link" onclick="showPage('material-history')">자재내역관리</a>
-              <a class="submenu-link" onclick="showPage('material-inventory')">자재재고관리</a>
+              <a class="submenu-link" onclick="showPage('materialCategory')">자재분류관리</a>
+              <a class="submenu-link" onclick="showPage('materialHistory')">자재내역관리</a>
+              <a class="submenu-link" onclick="showPage('materialInventory')">자재재고관리</a>
             </div>
           </div>
 
@@ -1616,7 +1616,13 @@
             <div
               id="quotationEditModalContent"
               class="modal-content large"
-              style="max-width: 1200px; max-height: 90vh; overflow-y: auto; padding: 32px; position: relative"
+              style="
+                max-width: 1200px;
+                max-height: 90vh;
+                overflow-y: auto;
+                padding: 32px;
+                position: relative;
+              "
             >
               <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) -->
               <div
@@ -2413,7 +2419,13 @@
             <div
               id="quotationModalContent"
               class="modal-content"
-              style="max-width: 1200px; max-height: 90vh; overflow-y: auto; padding: 32px; position: relative"
+              style="
+                max-width: 1200px;
+                max-height: 90vh;
+                overflow-y: auto;
+                padding: 32px;
+                position: relative;
+              "
             >
               <!-- 헤더 -->
               <div
@@ -3892,7 +3904,13 @@
             <div
               id="transactionEditModalContent"
               class="modal-content large"
-              style="max-width: 1200px; max-height: 90vh; overflow-y: auto; padding: 32px; position: relative"
+              style="
+                max-width: 1200px;
+                max-height: 90vh;
+                overflow-y: auto;
+                padding: 32px;
+                position: relative;
+              "
             >
               <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) -->
               <div
@@ -4785,7 +4803,13 @@
             <div
               id="transactionCreateModalContent"
               class="modal-content"
-              style="max-width: 1200px; max-height: 90vh; overflow-y: auto; padding: 32px; position: relative"
+              style="
+                max-width: 1200px;
+                max-height: 90vh;
+                overflow-y: auto;
+                padding: 32px;
+                position: relative;
+              "
             >
               <!-- 헤더 -->
               <div
@@ -4935,7 +4959,9 @@
                           border-radius: 4px;
                         "
                       >
-                        <div style="display: flex; justify-content: space-between; align-items: center">
+                        <div
+                          style="display: flex; justify-content: space-between; align-items: center"
+                        >
                           <span
                             id="transactionSelectedCustomerInfo"
                             style="font-size: 14px; color: #1e40af; font-weight: 500"
@@ -6447,7 +6473,7 @@
               receivable: {
                 element: 'receivablePage',
                 title: '미수금관리',
-                menu: 'sales',
+                menu: 'ledger',
                 loadFunc: null,
               },
               customer: {
@@ -6511,9 +6537,10 @@
               },
               materialHistory: {
                 element: 'materialHistoryPage',
-                title: '자재내역조회',
+                title: '자재내역관리',
                 menu: 'material',
                 loadFunc: () => {
+                  // 페이지 표시만 하고 데이터는 검색 시에만 로드
                   if (typeof initMaterialHistoryTable === 'function') {
                     initMaterialHistoryTable();
                   }
@@ -6690,6 +6717,13 @@
 
                 // 폼 초기화
                 document.getElementById('loginForm').reset();
+
+                // 로그인 메시지 초기화
+                const loginMessage = document.getElementById('loginMessage');
+                if (loginMessage) {
+                  loginMessage.textContent = '시스템에 오신 것을 환영합니다.';
+                  loginMessage.className = 'login-message';
+                }
 
                 // 날짜 자동 설정
                 setLoginDateToToday();
@@ -7052,54 +7086,119 @@
             <div
               class="toolbar"
               style="
-                margin-bottom: 20px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                margin-bottom: 16px;
               "
             >
-              <div
-                class="summary-bar"
-                style="padding: 12px; background: #f8f9fa; border-radius: 8px"
-              >
-                <span style="font-size: 14px">
-                  총 분류 수:
-                  <strong id="totalCategoryCount" style="color: #007bff; font-size: 16px">0</strong>
-                  개
-                </span>
+              <!-- 왼쪽: 검색 영역 -->
+              <div style="display: flex; gap: 8px; align-items: center">
+                <input
+                  type="text"
+                  id="categoryListSearchInput"
+                  placeholder="분류코드 또는 분류명 검색..."
+                  style="
+                    padding: 10px 16px;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    width: 280px;
+                    outline: none;
+                  "
+                />
+                <button
+                  class="btn btn-primary"
+                  onclick="searchMaterialCategories()"
+                  style="
+                    padding: 10px 20px;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  🔍 검색
+                </button>
+                <button
+                  class="btn btn-light"
+                  onclick="resetCategorySearch()"
+                  style="
+                    padding: 10px 16px;
+                    background: #f8f9fa;
+                    color: #333;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  초기화
+                </button>
               </div>
 
-              <button
-                class="btn btn-success"
-                onclick="openNewCategoryModal()"
-                style="
-                  padding: 10px 20px;
-                  background: #28a745;
-                  color: white;
-                  border: none;
-                  border-radius: 8px;
-                  font-size: 14px;
-                  font-weight: 500;
-                  cursor: pointer;
-                "
-              >
-                <span style="font-size: 18px; margin-right: 4px">+</span> 자재분류 등록
-              </button>
+              <!-- 오른쪽: 액션 버튼 영역 -->
+              <div style="display: flex; gap: 8px">
+                <button
+                  class="btn btn-success"
+                  onclick="openNewCategoryModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #28a745;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  <span style="font-size: 18px; margin-right: 4px">+</span> 신규 등록
+                </button>
+                <button
+                  class="btn btn-secondary"
+                  onclick="exportCategoriesToGoogleSheets()"
+                  style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  <span style="font-size: 18px; margin-right: 4px">📊</span> Google Sheets로 보내기
+                </button>
+              </div>
             </div>
 
             <!-- 자재분류 목록 DataTable -->
             <table id="materialCategoryTable" class="display" style="width: 100%">
               <thead>
                 <tr>
+                  <th style="width: 40px">
+                    <input
+                      type="checkbox"
+                      id="selectAllCategories"
+                      title="전체 선택"
+                      aria-label="전체 선택"
+                    />
+                  </th>
                   <th>순번</th>
                   <th>분류코드</th>
                   <th>분류명</th>
                   <th>적요</th>
+                  <th>사용구분</th>
                   <th>수정일자</th>
-                  <th>관리</th>
+                  <th style="width: 180px">관리</th>
                 </tr>
               </thead>
-              <tbody></tbody>
             </table>
           </div>
 
@@ -7188,115 +7287,286 @@
               <tbody></tbody>
             </table>
           </div>
-        </div>
-        <!-- content-area 끝 -->
-      </main>
-    </div>
-    <!-- dashboard 끝 -->
 
-    <!-- 자재내역관리 페이지 -->
-    <div class="page-content hidden" id="materialHistoryPage">
-      <h2 style="display: none">자재내역관리</h2>
+          <!-- 자재내역관리 페이지 -->
+          <div class="page-content hidden" id="materialHistoryPage">
+            <h2 style="display: none">자재내역관리</h2>
 
-      <!-- 검색 영역 -->
-      <div class="toolbar" style="margin-bottom: 20px">
-        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
-          <!-- 자재 검색 -->
-          <div style="flex: 1; min-width: 300px">
-            <label style="display: block; margin-bottom: 4px; font-weight: 600">자재 검색</label>
-            <div style="display: flex; gap: 8px">
-              <input
-                type="text"
-                id="historyMaterialSearchInput"
-                class="form-control"
-                placeholder="자재코드 또는 자재명으로 검색..."
-                onkeypress="if(event.key === 'Enter') searchAndLoadMaterialHistory()"
-                style="flex: 1"
-              />
-              <button
-                class="btn btn-primary"
-                onclick="searchAndLoadMaterialHistory()"
-                style="white-space: nowrap"
-              >
-                검색
-              </button>
-            </div>
-            <input type="hidden" id="historySelectedMaterialCode" />
-          </div>
-
-          <!-- 날짜 필터 -->
-          <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 600">조회 기간</label>
-            <div style="display: flex; gap: 8px; align-items: center">
-              <input type="date" id="historyStartDate" class="form-control" style="width: 150px" />
-              <span>~</span>
-              <input type="date" id="historyEndDate" class="form-control" style="width: 150px" />
-            </div>
-          </div>
-
-          <!-- 입출고구분 필터 -->
-          <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 600">입출고구분</label>
-            <select id="history입출고구분Filter" class="form-control" style="width: 120px">
-              <option value="전체">전체</option>
-              <option value="1">입고</option>
-              <option value="2">출고</option>
-            </select>
-          </div>
-
-          <!-- 버튼 -->
-          <div style="display: flex; gap: 8px">
-            <button class="btn btn-primary" onclick="loadMaterialHistory()" style="height: 40px">
-              조회
-            </button>
-            <button
-              class="btn btn-secondary"
-              onclick="resetMaterialHistorySearch()"
-              style="height: 40px"
+            <!-- 툴바 영역 -->
+            <div
+              class="toolbar"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 16px;
+              "
             >
-              초기화
-            </button>
+              <!-- 왼쪽: 검색 영역 -->
+              <div style="display: flex; gap: 8px; align-items: center">
+                <input
+                  type="text"
+                  id="historyListSearchInput"
+                  placeholder="세부코드 또는 자재명 검색..."
+                  style="
+                    padding: 10px 16px;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    width: 280px;
+                    outline: none;
+                  "
+                />
+                <button
+                  class="btn btn-primary"
+                  onclick="searchMaterialHistory()"
+                  style="
+                    padding: 10px 20px;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  🔍 검색
+                </button>
+                <button
+                  class="btn btn-light"
+                  onclick="resetHistorySearch()"
+                  style="
+                    padding: 10px 16px;
+                    background: #f8f9fa;
+                    color: #333;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  초기화
+                </button>
+              </div>
+
+              <!-- 오른쪽: 액션 버튼 영역 -->
+              <div style="display: flex; gap: 8px">
+                <button
+                  class="btn btn-success"
+                  onclick="openNewHistoryModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #28a745;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  <span style="font-size: 18px; margin-right: 4px">+</span> 신규 등록
+                </button>
+                <button
+                  class="btn btn-secondary"
+                  onclick="exportHistoryToGoogleSheets()"
+                  style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  <span style="font-size: 18px; margin-right: 4px">📊</span> Google Sheets로 보내기
+                </button>
+              </div>
+            </div>
+
+            <!-- 자재내역 목록 DataTable -->
+            <div style="overflow-x: auto">
+              <table id="materialHistoryTable" class="display" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th style="width: 40px">
+                      <input
+                        type="checkbox"
+                        id="selectAllHistory"
+                        title="전체 선택"
+                        aria-label="전체 선택"
+                      />
+                    </th>
+                    <th>순번</th>
+                    <th>자재코드</th>
+                    <th>자재명</th>
+                    <th>규격</th>
+                    <th>단위</th>
+                    <th>입출고일자</th>
+                    <th>거래일자</th>
+                    <th>입출고구분</th>
+                    <th>수량</th>
+                    <th>단가</th>
+                    <th>거래처</th>
+                    <th style="width: 150px">관리</th>
+                  </tr>
+                </thead>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+        <!-- content-area End -->
+      </main>
+      <!-- main End -->
+    </div>
+    <!-- dashboard End -->
 
-      <!-- 요약 정보 -->
-      <div
-        class="summary-bar"
-        style="margin: 16px 0; padding: 12px; background: #f8f9fa; border-radius: 8px"
-      >
-        <div style="display: flex; gap: 24px; font-size: 14px">
-          <span>
-            총 입고수량: <strong id="totalInQty" style="color: #28a745; font-size: 16px">0</strong>
-          </span>
-          <span>
-            총 출고수량: <strong id="totalOutQty" style="color: #007bff; font-size: 16px">0</strong>
-          </span>
-          <span> 조회 건수: <strong id="historyCount" style="font-size: 16px">0</strong> 건 </span>
+    <!-- 자재분류 상세보기 모달 -->
+    <div id="categoryDetailModal" class="modal" style="display: none">
+      <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+          "
+        >
+          <h2 style="margin: 0; font-size: 24px; font-weight: 700">자재분류 상세정보</h2>
+          <button
+            onclick="closeCategoryDetailModal()"
+            style="background: none; border: none; font-size: 28px; cursor: pointer; color: #999"
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          id="categoryDetailContent"
+          style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px"
+        >
+          <!-- 상세 정보가 여기에 동적으로 로드됩니다 -->
+        </div>
+
+        <div style="margin-top: 24px; display: flex; justify-content: flex-end">
+          <button onclick="closeCategoryDetailModal()" class="btn btn-secondary">닫기</button>
         </div>
       </div>
+    </div>
 
-      <!-- 입출고 이력 DataTable -->
-      <table id="materialHistoryTable" class="display" style="width: 100%">
-        <thead>
-          <tr>
-            <th>순번</th>
-            <th>입출고일자</th>
-            <th>구분</th>
-            <th>거래처</th>
-            <th>수량</th>
-            <th>단가</th>
-            <th>금액</th>
-            <th>적요</th>
-            <th>작성자</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <!-- 자재분류 삭제 확인 모달 -->
+    <div id="categoryDeleteModal" class="modal" style="display: none">
+      <div class="modal-content" style="max-width: 500px">
+        <!-- 헤더 -->
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e5e7eb;
+          "
+        >
+          <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #dc3545">
+            ⚠ 자재분류 삭제 확인
+          </h2>
+          <button
+            onclick="closeCategoryDeleteModal()"
+            style="
+              width: 36px;
+              height: 36px;
+              border-radius: 50%;
+              background: #f3f4f6;
+              border: none;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 20px;
+              color: #6b7280;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background='#e5e7eb';"
+            onmouseout="this.style.background='#f3f4f6';"
+          >
+            ×
+          </button>
+        </div>
+
+        <!-- 경고 메시지 -->
+        <div style="margin-bottom: 24px">
+          <div
+            style="
+              background: #fef2f2;
+              border-left: 4px solid #dc3545;
+              padding: 16px;
+              border-radius: 8px;
+              margin-bottom: 16px;
+            "
+          >
+            <p style="margin: 0; font-size: 14px; color: #991b1b; line-height: 1.5">
+              다음 자재분류를 삭제하시겠습니까?
+            </p>
+          </div>
+
+          <div
+            id="categoryDeleteInfo"
+            style="padding: 12px; background: #f8f9fa; border-radius: 8px"
+          >
+            <!-- 삭제할 분류 정보가 여기에 동적으로 표시됩니다 -->
+          </div>
+        </div>
+
+        <!-- 액션 버튼 -->
+        <div style="display: flex; gap: 8px; justify-content: flex-end">
+          <button
+            type="button"
+            onclick="closeCategoryDeleteModal()"
+            style="
+              padding: 10px 20px;
+              background: #f3f4f6;
+              color: #374151;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+            "
+            onmouseover="this.style.background='#e5e7eb';"
+            onmouseout="this.style.background='#f3f4f6';"
+          >
+            취소
+          </button>
+          <button
+            id="confirmCategoryDeleteBtn"
+            type="button"
+            onclick="confirmDeleteCategory()"
+            style="
+              padding: 10px 20px;
+              background: #dc3545;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+            "
+            onmouseover="this.style.background='#c82333';"
+            onmouseout="this.style.background='#dc3545';"
+          >
+            삭제
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 자재분류 등록/수정 모달 -->
-    <div id="categoryModal" class="modal hidden">
+    <div id="categoryModal" class="modal" style="display: none">
       <div class="modal-content" style="max-width: 500px">
         <div
           style="
@@ -7430,6 +7700,462 @@
             <button
               type="button"
               onclick="closeCategoryModal()"
+              style="
+                padding: 10px 20px;
+                background: #f3f4f6;
+                color: #374151;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+              "
+              onmouseover="this.style.background='#e5e7eb';"
+              onmouseout="this.style.background='#f3f4f6';"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              style="
+                padding: 10px 20px;
+                background: #2563eb;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+              "
+              onmouseover="this.style.background='#1d4ed8';"
+              onmouseout="this.style.background='#2563eb';"
+            >
+              저장
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 자재내역 상세보기 모달 -->
+    <div id="historyDetailModal" class="modal" style="display: none">
+      <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+          "
+        >
+          <h2 style="margin: 0; font-size: 24px; font-weight: 700">자재입출내역 상세정보</h2>
+          <button
+            onclick="closeHistoryDetailModal()"
+            style="background: none; border: none; font-size: 28px; cursor: pointer; color: #999"
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          id="historyDetailContent"
+          style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px"
+        >
+          <!-- 상세 정보가 여기에 동적으로 로드됩니다 -->
+        </div>
+
+        <div style="margin-top: 24px; display: flex; justify-content: flex-end">
+          <button onclick="closeHistoryDetailModal()" class="btn btn-secondary">닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 자재내역 삭제 확인 모달 -->
+    <div id="historyDeleteModal" class="modal" style="display: none">
+      <div class="modal-content" style="max-width: 500px">
+        <!-- 헤더 -->
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e5e7eb;
+          "
+        >
+          <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #dc3545">
+            ⚠ 자재입출내역 삭제 확인
+          </h2>
+          <button
+            onclick="closeHistoryDeleteModal()"
+            style="
+              width: 36px;
+              height: 36px;
+              border-radius: 50%;
+              background: #f3f4f6;
+              border: none;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 20px;
+              color: #6b7280;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background='#e5e7eb';"
+            onmouseout="this.style.background='#f3f4f6';"
+          >
+            ×
+          </button>
+        </div>
+
+        <!-- 경고 메시지 -->
+        <div style="margin-bottom: 24px">
+          <div
+            style="
+              background: #fef2f2;
+              border-left: 4px solid #dc3545;
+              padding: 16px;
+              border-radius: 8px;
+              margin-bottom: 16px;
+            "
+          >
+            <p style="margin: 0; font-size: 14px; color: #991b1b; line-height: 1.5">
+              다음 자재입출내역을 삭제하시겠습니까?
+            </p>
+          </div>
+
+          <div
+            id="historyDeleteInfo"
+            style="padding: 12px; background: #f8f9fa; border-radius: 8px"
+          >
+            <!-- 삭제할 내역 정보가 여기에 동적으로 표시됩니다 -->
+          </div>
+        </div>
+
+        <!-- 액션 버튼 -->
+        <div style="display: flex; gap: 8px; justify-content: flex-end">
+          <button
+            type="button"
+            onclick="closeHistoryDeleteModal()"
+            style="
+              padding: 10px 20px;
+              background: #f3f4f6;
+              color: #374151;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+            "
+            onmouseover="this.style.background='#e5e7eb';"
+            onmouseout="this.style.background='#f3f4f6';"
+          >
+            취소
+          </button>
+          <button
+            id="confirmHistoryDeleteBtn"
+            type="button"
+            onclick="confirmDeleteHistory()"
+            style="
+              padding: 10px 20px;
+              background: #dc3545;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+            "
+            onmouseover="this.style.background='#c82333';"
+            onmouseout="this.style.background='#dc3545';"
+          >
+            삭제
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 자재내역 등록/수정 모달 -->
+    <div id="historyModal" class="modal" style="display: none">
+      <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e5e7eb;
+          "
+        >
+          <h2
+            id="historyModalTitle"
+            style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937"
+          >
+            자재입출내역 등록
+          </h2>
+          <button
+            onclick="closeHistoryModal()"
+            style="
+              width: 36px;
+              height: 36px;
+              border-radius: 50%;
+              background: #f3f4f6;
+              border: none;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 20px;
+              color: #6b7280;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background='#e5e7eb';"
+            onmouseout="this.style.background='#f3f4f6';"
+          >
+            &times;
+          </button>
+        </div>
+
+        <form id="historyForm" onsubmit="event.preventDefault(); saveMaterialHistory();">
+          <input type="hidden" id="historyModalMode" value="create" />
+          <input type="hidden" id="historyOriginalCompositeKey" />
+          <input type="hidden" id="historyOriginal입출고일자" />
+
+          <!-- 입출고구분 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              입출고구분 <span style="color: #dc3545">*</span>
+            </label>
+            <select
+              id="history입출고구분"
+              class="form-control"
+              required
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            >
+              <option value="">선택하세요</option>
+              <option value="1">입고 (매입)</option>
+              <option value="2">출고 (매출)</option>
+            </select>
+          </div>
+
+          <!-- 입출고일자 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              입출고일자 <span style="color: #dc3545">*</span>
+            </label>
+            <input
+              type="date"
+              id="history입출고일자"
+              class="form-control"
+              required
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 거래일자 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              거래일자 <span style="color: #dc3545">*</span>
+            </label>
+            <input
+              type="date"
+              id="history거래일자"
+              class="form-control"
+              required
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 거래번호 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              거래번호 <span style="color: #dc3545">*</span>
+            </label>
+            <input
+              type="number"
+              id="history거래번호"
+              class="form-control"
+              placeholder="거래번호 입력"
+              required
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 자재코드 (분류코드 + 세부코드) -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              자재 정보 <span style="color: #dc3545">*</span>
+            </label>
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px">
+              <input
+                type="text"
+                id="history분류코드"
+                class="form-control"
+                placeholder="분류코드 (2자리)"
+                maxlength="2"
+                required
+                style="
+                  padding: 12px 16px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                "
+              />
+              <input
+                type="text"
+                id="history세부코드"
+                class="form-control"
+                placeholder="세부코드 (16자리)"
+                maxlength="16"
+                required
+                style="
+                  padding: 12px 16px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                "
+              />
+            </div>
+          </div>
+
+          <!-- 수량 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              수량 <span style="color: #dc3545">*</span>
+            </label>
+            <input
+              type="number"
+              id="history수량"
+              class="form-control"
+              placeholder="수량 입력"
+              step="0.01"
+              required
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 단가 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              단가 <span style="color: #dc3545">*</span>
+            </label>
+            <input
+              type="number"
+              id="history단가"
+              class="form-control"
+              placeholder="단가 입력"
+              step="0.01"
+              required
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 부가세 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              부가세
+            </label>
+            <input
+              type="number"
+              id="history부가"
+              class="form-control"
+              placeholder="부가세 입력 (선택)"
+              step="0.01"
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 거래처코드 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              거래처코드
+            </label>
+            <input
+              type="text"
+              id="history거래처코드"
+              class="form-control"
+              placeholder="매입처코드 또는 매출처코드"
+              maxlength="8"
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 적요 -->
+          <div style="margin-bottom: 24px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              적요
+            </label>
+            <textarea
+              id="history적요"
+              class="form-control"
+              placeholder="비고 입력 (선택사항)"
+              rows="3"
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+                resize: vertical;
+              "
+            ></textarea>
+          </div>
+
+          <div style="display: flex; gap: 8px; justify-content: flex-end">
+            <button
+              type="button"
+              onclick="closeHistoryModal()"
               style="
                 padding: 10px 20px;
                 background: #f3f4f6;
@@ -8692,9 +9418,6 @@
         </div>
       </div>
     </div>
-
-    <!-- </main> -->
-    <!-- </div> -->
 
     <script>
       // 모달을 body 직속으로 이동 (dashboard CSS 영향 회피)

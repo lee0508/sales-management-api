@@ -1,9 +1,11 @@
 /**
  * 자재분류관리 (Material Category Management)
- * 자재분류 CRUD 기능
+ * 자재분류 CRUD 기능 - 매출처관리 패턴 적용
  */
 
 let materialCategoryTableInstance = null;
+let currentSearchKeyword = ''; // 현재 검색 키워드
+let categoryToDelete = null; // 삭제할 분류 정보 저장
 
 /**
  * 자재분류관리 DataTable 초기화
@@ -16,26 +18,65 @@ function initMaterialCategoryTable() {
   materialCategoryTableInstance = $('#materialCategoryTable').DataTable({
     data: [],
     columns: [
-      { data: null, render: (data, type, row, meta) => meta.row + 1 },
-      { data: '분류코드', defaultContent: '-' },
-      { data: '분류명', defaultContent: '-' },
-      { data: '적요', defaultContent: '-' },
       {
-        data: '수정일자',
-        render: (data) => {
-          if (!data || data.length !== 8) return '-';
-          return `${data.substring(0, 4)}-${data.substring(4, 6)}-${data.substring(6, 8)}`;
+        // 선택 체크박스
+        data: null,
+        orderable: false,
+        className: 'text-center',
+        render: function (data, type, row) {
+          return (
+            '<input type="checkbox" class="category-checkbox" data-code="' + row.분류코드 + '" />'
+          );
         },
       },
       {
+        // 순번
         data: null,
-        render: (data, type, row) => {
+        orderable: false,
+        className: 'text-center',
+        render: function (data, type, row, meta) {
+          return meta.row + 1;
+        },
+      },
+      { data: '분류코드', className: 'text-center' },
+      { data: '분류명' },
+      { data: '적요', defaultContent: '-' },
+      {
+        // 사용구분
+        data: '사용구분',
+        className: 'text-center',
+        render: function (data, type, row) {
+          if (data === 0) {
+            return '<span class="status-badge status-active">사용중</span>';
+          } else {
+            return '<span class="status-badge status-pending">사용안함</span>';
+          }
+        },
+      },
+      {
+        // 수정일자
+        data: '수정일자',
+        className: 'text-center',
+        defaultContent: '-',
+        render: function (data) {
+          if (!data || data.length !== 8) return '-';
+          return data.substring(0, 4) + '-' + data.substring(4, 6) + '-' + data.substring(6, 8);
+        },
+      },
+      {
+        // 관리 버튼
+        data: null,
+        orderable: false,
+        className: 'text-center',
+        render: function (data, type, row) {
           return `
-            <button class="btn btn-sm btn-primary" onclick="editMaterialCategory('${row.분류코드}')" style="margin-right: 4px;">수정</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteMaterialCategory('${row.분류코드}')">삭제</button>
+            <div class="action-buttons" id="category-actions-${row.분류코드}">
+              <button class="btn-icon btn-view" onclick="viewCategoryDetail('${row.분류코드}')">상세</button>
+              <button class="btn-icon btn-edit" style="display: none;" onclick="editMaterialCategory('${row.분류코드}')">수정</button>
+              <button class="btn-icon btn-delete" style="display: none;" onclick="openCategoryDeleteModal('${row.분류코드}')">삭제</button>
+            </div>
           `;
         },
-        orderable: false,
       },
     ],
     language: {
@@ -45,19 +86,71 @@ function initMaterialCategoryTable() {
       info: '_START_ - _END_ / 총 _TOTAL_건',
       paginate: { previous: '이전', next: '다음' },
     },
-    order: [[1, 'asc']], // 분류코드 기준 정렬
+    order: [[2, 'asc']], // 분류코드 기준 정렬
     responsive: true,
     autoWidth: false,
     pageLength: 25,
+  });
+
+  // 체크박스 이벤트 핸들러
+  setupCategoryCheckboxHandlers();
+}
+
+/**
+ * 체크박스 이벤트 핸들러 설정
+ */
+function setupCategoryCheckboxHandlers() {
+  // 전체 선택 체크박스
+  $('#selectAllCategories').on('change', function () {
+    const isChecked = $(this).prop('checked');
+    $('.category-checkbox').prop('checked', isChecked);
+    updateCategoryActionButtons();
+  });
+
+  // 개별 체크박스 (이벤트 위임)
+  $('#materialCategoryTable').on('change', '.category-checkbox', function () {
+    updateCategoryActionButtons();
+
+    // 전체 선택 체크박스 상태 업데이트
+    const totalCheckboxes = $('.category-checkbox').length;
+    const checkedCheckboxes = $('.category-checkbox:checked').length;
+    $('#selectAllCategories').prop('checked', totalCheckboxes === checkedCheckboxes);
+  });
+}
+
+/**
+ * 체크박스 선택 상태에 따라 액션 버튼 표시/숨김
+ */
+function updateCategoryActionButtons() {
+  const checkedBoxes = $('.category-checkbox:checked');
+
+  checkedBoxes.each(function () {
+    const code = $(this).data('code');
+    $(`#category-actions-${code} .btn-view`).hide();
+    $(`#category-actions-${code} .btn-edit`).show();
+    $(`#category-actions-${code} .btn-delete`).show();
+  });
+
+  // 선택 해제된 항목은 상세 버튼만 표시
+  $('.category-checkbox:not(:checked)').each(function () {
+    const code = $(this).data('code');
+    $(`#category-actions-${code} .btn-view`).show();
+    $(`#category-actions-${code} .btn-edit`).hide();
+    $(`#category-actions-${code} .btn-delete`).hide();
   });
 }
 
 /**
  * 자재분류 목록 로드
  */
-async function loadMaterialCategories() {
+async function loadMaterialCategories(searchKeyword = '') {
   try {
-    const response = await fetch('/api/material-categories', {
+    let url = API_BASE_URL + '/material-categories';
+    if (searchKeyword) {
+      url += `?search=${encodeURIComponent(searchKeyword)}`;
+    }
+
+    const response = await fetch(url, {
       credentials: 'include',
     });
 
@@ -73,12 +166,89 @@ async function loadMaterialCategories() {
       materialCategoryTableInstance.draw();
     }
 
-    // 총 개수 표시
-    document.getElementById('totalCategoryCount').textContent = categories.length;
+    // 체크박스 상태 초기화
+    $('#selectAllCategories').prop('checked', false);
   } catch (err) {
     console.error('자재분류 목록 로드 에러:', err);
     alert('자재분류 목록 조회 중 오류가 발생했습니다: ' + err.message);
   }
+}
+
+/**
+ * 검색 기능
+ */
+function searchMaterialCategories() {
+  const keyword = $('#categoryListSearchInput').val().trim();
+  currentSearchKeyword = keyword;
+  loadMaterialCategories(keyword);
+}
+
+/**
+ * 검색 초기화
+ */
+function resetCategorySearch() {
+  $('#categoryListSearchInput').val('');
+  currentSearchKeyword = '';
+  loadMaterialCategories();
+}
+
+/**
+ * 자재분류 상세보기
+ */
+async function viewCategoryDetail(분류코드) {
+  try {
+    const response = await fetch(API_BASE_URL + `/material-categories/${분류코드}`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) throw new Error('자재분류 조회 실패');
+
+    const data = await response.json();
+    const category = data.data;
+
+    // 상세 정보 HTML 생성
+    const detailHtml = `
+      <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #6c757d; font-size: 12px;">분류코드</label>
+        <p style="margin: 0; font-size: 16px; font-weight: 500;">${category.분류코드}</p>
+      </div>
+      <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #6c757d; font-size: 12px;">분류명</label>
+        <p style="margin: 0; font-size: 16px; font-weight: 500;">${category.분류명}</p>
+      </div>
+      <div style="padding: 12px; background: #f8f9fa; border-radius: 8px; grid-column: span 2;">
+        <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #6c757d; font-size: 12px;">적요</label>
+        <p style="margin: 0; font-size: 14px;">${category.적요 || '-'}</p>
+      </div>
+      <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #6c757d; font-size: 12px;">사용구분</label>
+        <p style="margin: 0; font-size: 14px;">
+          ${category.사용구분 === 0 ? '<span class="status-badge status-active">사용중</span>' : '<span class="status-badge status-pending">사용안함</span>'}
+        </p>
+      </div>
+      <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #6c757d; font-size: 12px;">수정일자</label>
+        <p style="margin: 0; font-size: 14px;">${category.수정일자 ? category.수정일자.substring(0, 4) + '-' + category.수정일자.substring(4, 6) + '-' + category.수정일자.substring(6, 8) : '-'}</p>
+      </div>
+      <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #6c757d; font-size: 12px;">사용자코드</label>
+        <p style="margin: 0; font-size: 14px;">${category.사용자코드 || '-'}</p>
+      </div>
+    `;
+
+    $('#categoryDetailContent').html(detailHtml);
+    $('#categoryDetailModal').show();
+  } catch (err) {
+    console.error('자재분류 상세 조회 에러:', err);
+    alert('자재분류 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+/**
+ * 상세보기 모달 닫기
+ */
+function closeCategoryDetailModal() {
+  $('#categoryDetailModal').hide();
 }
 
 /**
@@ -89,7 +259,7 @@ function openNewCategoryModal() {
   document.getElementById('categoryForm').reset();
   document.getElementById('category분류코드').disabled = false;
   document.getElementById('categoryModalMode').value = 'create';
-  document.getElementById('categoryModal').classList.remove('hidden');
+  document.getElementById('categoryModal').style.display = 'flex';
 }
 
 /**
@@ -97,7 +267,7 @@ function openNewCategoryModal() {
  */
 async function editMaterialCategory(분류코드) {
   try {
-    const response = await fetch(`/api/material-categories/${분류코드}`, {
+    const response = await fetch(API_BASE_URL + `/material-categories/${분류코드}`, {
       credentials: 'include',
     });
 
@@ -114,7 +284,7 @@ async function editMaterialCategory(분류코드) {
     document.getElementById('category분류명').value = category.분류명;
     document.getElementById('category적요').value = category.적요 || '';
 
-    document.getElementById('categoryModal').classList.remove('hidden');
+    document.getElementById('categoryModal').style.display = 'flex';
   } catch (err) {
     console.error('자재분류 조회 에러:', err);
     alert('자재분류 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
@@ -143,11 +313,11 @@ async function saveMaterialCategory() {
   }
 
   const body = { 분류코드, 분류명, 적요 };
-  let url = '/api/material-categories';
+  let url = API_BASE_URL + '/material-categories';
   let method = 'POST';
 
   if (mode === 'edit') {
-    url = `/api/material-categories/${분류코드}`;
+    url = API_BASE_URL + `/material-categories/${분류코드}`;
     method = 'PUT';
   }
 
@@ -167,7 +337,7 @@ async function saveMaterialCategory() {
 
     alert(data.message);
     closeCategoryModal();
-    loadMaterialCategories();
+    loadMaterialCategories(currentSearchKeyword);
   } catch (err) {
     console.error('자재분류 저장 에러:', err);
     alert('저장 중 오류가 발생했습니다: ' + err.message);
@@ -175,15 +345,58 @@ async function saveMaterialCategory() {
 }
 
 /**
- * 자재분류 삭제
+ * 삭제 확인 모달 열기
  */
-async function deleteMaterialCategory(분류코드) {
-  if (!confirm(`분류코드 '${분류코드}'를 삭제하시겠습니까?`)) {
+async function openCategoryDeleteModal(분류코드) {
+  try {
+    const response = await fetch(API_BASE_URL + `/material-categories/${분류코드}`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) throw new Error('자재분류 조회 실패');
+
+    const data = await response.json();
+    categoryToDelete = data.data;
+
+    // 삭제 확인 정보 표시
+    const deleteInfoHtml = `
+      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; font-size: 14px;">
+        <div style="font-weight: 600; color: #6b7280;">분류코드:</div>
+        <div style="font-weight: 500;">${categoryToDelete.분류코드}</div>
+        <div style="font-weight: 600; color: #6b7280;">분류명:</div>
+        <div style="font-weight: 500;">${categoryToDelete.분류명}</div>
+        <div style="font-weight: 600; color: #6b7280;">적요:</div>
+        <div>${categoryToDelete.적요 || '-'}</div>
+      </div>
+    `;
+
+    $('#categoryDeleteInfo').html(deleteInfoHtml);
+    $('#categoryDeleteModal').show();
+  } catch (err) {
+    console.error('자재분류 조회 에러:', err);
+    alert('자재분류 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+/**
+ * 삭제 확인 모달 닫기
+ */
+function closeCategoryDeleteModal() {
+  $('#categoryDeleteModal').hide();
+  categoryToDelete = null;
+}
+
+/**
+ * 자재분류 삭제 확정
+ */
+async function confirmDeleteCategory() {
+  if (!categoryToDelete) {
+    alert('삭제할 분류 정보가 없습니다.');
     return;
   }
 
   try {
-    const response = await fetch(`/api/material-categories/${분류코드}`, {
+    const response = await fetch(API_BASE_URL + `/material-categories/${categoryToDelete.분류코드}`, {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -195,7 +408,8 @@ async function deleteMaterialCategory(분류코드) {
     }
 
     alert(data.message);
-    loadMaterialCategories();
+    closeCategoryDeleteModal();
+    loadMaterialCategories(currentSearchKeyword);
   } catch (err) {
     console.error('자재분류 삭제 에러:', err);
     alert('삭제 중 오류가 발생했습니다: ' + err.message);
@@ -206,12 +420,115 @@ async function deleteMaterialCategory(분류코드) {
  * 모달 닫기
  */
 function closeCategoryModal() {
-  document.getElementById('categoryModal').classList.add('hidden');
+  document.getElementById('categoryModal').style.display = 'none';
   document.getElementById('categoryForm').reset();
 }
 
-// 페이지 로드 시 초기화
+/**
+ * Google Sheets로 내보내기
+ */
+function exportCategoriesToGoogleSheets() {
+  try {
+    console.log('===== Google Sheets로 내보내기 시작 =====');
+
+    // 1. DataTable에서 현재 표시된 데이터 가져오기
+    const table = $('#materialCategoryTable').DataTable();
+    const dataToExport = table.rows({ search: 'applied' }).data().toArray();
+
+    if (dataToExport.length === 0) {
+      alert('내보낼 데이터가 없습니다.');
+      return;
+    }
+
+    console.log(`✅ 내보낼 데이터 수: ${dataToExport.length}건`);
+
+    // 2. CSV 형식으로 변환
+    const headers = ['순번', '분류코드', '분류명', '적요', '사용구분', '수정일자', '사용자코드'];
+    let csvContent = '\uFEFF'; // UTF-8 BOM 추가 (엑셀에서 한글 깨짐 방지)
+    csvContent += headers.join(',') + '\n';
+
+    dataToExport.forEach((row, index) => {
+      // 사용구분 변환
+      const 사용구분 = row.사용구분 === 0 ? '사용중' : '사용안함';
+
+      // 수정일자 포맷
+      let 수정일자 = '-';
+      if (row.수정일자 && row.수정일자.length === 8) {
+        수정일자 = `${row.수정일자.substring(0, 4)}-${row.수정일자.substring(4, 6)}-${row.수정일자.substring(6, 8)}`;
+      }
+
+      const rowArray = [
+        index + 1, // 순번
+        row.분류코드,
+        row.분류명,
+        row.적요 || '-',
+        사용구분,
+        수정일자,
+        row.사용자코드 || '-',
+      ];
+
+      // CSV 특수문자 처리
+      const csvRow = rowArray.map((field) => {
+        const fieldStr = String(field);
+        if (fieldStr.includes(',') || fieldStr.includes('"') || fieldStr.includes('\n')) {
+          return '"' + fieldStr.replace(/"/g, '""') + '"';
+        }
+        return fieldStr;
+      });
+
+      csvContent += csvRow.join(',') + '\n';
+    });
+
+    // 3. Blob 생성 및 다운로드
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const filename = `자재분류관리_${today}.csv`;
+
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      console.log('✅ CSV 파일 다운로드 완료:', filename);
+      alert(
+        `CSV 파일이 다운로드되었습니다.\n\nGoogle Sheets에서:\n1. 파일 > 가져오기\n2. 업로드 탭 선택\n3. 다운로드된 CSV 파일 선택\n4. 가져오기를 클릭하세요.`,
+      );
+    }
+  } catch (error) {
+    console.error('❌ CSV 내보내기 오류:', error);
+    alert('CSV 파일 생성 중 오류가 발생했습니다: ' + error.message);
+  }
+}
+
+/**
+ * Enter 키로 검색
+ */
 $(document).ready(function () {
-  initMaterialCategoryTable();
-  loadMaterialCategories();
+  $('#categoryListSearchInput').on('keypress', function (e) {
+    if (e.which === 13) {
+      searchMaterialCategories();
+    }
+  });
 });
+
+// 전역 함수로 노출 (페이지 표시될 때 호출됨)
+window.initMaterialCategoryTable = initMaterialCategoryTable;
+window.loadMaterialCategories = loadMaterialCategories;
+window.searchMaterialCategories = searchMaterialCategories;
+window.resetCategorySearch = resetCategorySearch;
+window.viewCategoryDetail = viewCategoryDetail;
+window.closeCategoryDetailModal = closeCategoryDetailModal;
+window.openNewCategoryModal = openNewCategoryModal;
+window.editMaterialCategory = editMaterialCategory;
+window.saveMaterialCategory = saveMaterialCategory;
+window.openCategoryDeleteModal = openCategoryDeleteModal;
+window.closeCategoryDeleteModal = closeCategoryDeleteModal;
+window.confirmDeleteCategory = confirmDeleteCategory;
+window.closeCategoryModal = closeCategoryModal;
+window.exportCategoriesToGoogleSheets = exportCategoriesToGoogleSheets;

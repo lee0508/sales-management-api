@@ -3015,12 +3015,25 @@ app.delete('/api/materials/:code', requireAuth, async (req, res) => {
 // 자재분류 목록 조회
 app.get('/api/material-categories', async (req, res) => {
   try {
-    const result = await pool.request().query(`
-                SELECT 분류코드, 분류명, 적요, 수정일자, 사용자코드
-                FROM 자재분류
-                WHERE 사용구분 = 0
-                ORDER BY 분류코드
-            `);
+    const { search } = req.query;
+
+    let query = `
+      SELECT 분류코드, 분류명, 적요, 사용구분, 수정일자, 사용자코드
+      FROM 자재분류
+      WHERE 사용구분 = 0
+    `;
+
+    const request = pool.request();
+
+    // 검색 조건 추가
+    if (search) {
+      query += ` AND (분류코드 LIKE @search OR 분류명 LIKE @search)`;
+      request.input('search', sql.NVarChar(100), `%${search}%`);
+    }
+
+    query += ` ORDER BY 분류코드`;
+
+    const result = await request.query(query);
 
     res.json({
       success: true,
@@ -3211,7 +3224,360 @@ app.delete('/api/material-categories/:code', requireAuth, async (req, res) => {
   }
 });
 
-// 자재내역조회 (자재 입출고 이력)
+// ===========================================
+// 자재내역관리 API (Material Transaction History Management)
+// 자재입출내역 테이블 CRUD
+// ===========================================
+
+// 자재내역 목록 조회
+app.get('/api/material-history', async (req, res) => {
+  try {
+    const { search } = req.query;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    let query = `
+      SELECT
+        i.사업장코드, i.분류코드, i.세부코드,
+        i.입출고구분, i.입출고일자, i.입출고시간,
+        i.거래일자, i.거래번호,
+        i.입고수량, i.입고단가, i.입고부가,
+        i.출고수량, i.출고단가, i.출고부가,
+        i.매입처코드, i.매출처코드,
+        i.적요, i.사용자코드,
+        m.자재명, m.규격, m.단위,
+        s.매출처명,
+        p.매입처명
+      FROM 자재입출내역 i
+        LEFT JOIN 자재 m
+          ON i.세부코드 = m.세부코드
+          AND i.분류코드 = m.분류코드
+        LEFT JOIN 매출처 s
+          ON i.매출처코드 = s.매출처코드
+          AND i.사업장코드 = s.사업장코드
+        LEFT JOIN 매입처 p
+          ON i.매입처코드 = p.매입처코드
+          AND i.사업장코드 = p.사업장코드
+      WHERE i.사업장코드 = @사업장코드
+        AND i.사용구분 = 0
+    `;
+
+    const request = pool.request();
+    request.input('사업장코드', sql.VarChar(2), 사업장코드);
+
+    // 검색 조건 추가 (세부코드, 자재명으로 검색)
+    if (search) {
+      query += ` AND (i.세부코드 LIKE @search OR m.자재명 LIKE @search)`;
+      request.input('search', sql.NVarChar(100), `%${search}%`);
+    }
+
+    query += ` ORDER BY i.입출고일자 DESC, i.입출고시간 DESC`;
+
+    const result = await request.query(query);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('자재내역 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// 자재내역 단일 조회 (복합키: 사업장코드 + 분류코드 + 세부코드 + 입출고일자 + 입출고시간)
+app.get('/api/material-history/:workplace/:category/:detail/:date/:time', async (req, res) => {
+  try {
+    const { workplace, category, detail, date, time } = req.params;
+
+    const result = await pool.request()
+      .input('사업장코드', sql.VarChar(2), workplace)
+      .input('분류코드', sql.VarChar(2), category)
+      .input('세부코드', sql.VarChar(16), detail)
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고시간', sql.VarChar(9), time)
+      .query(`
+        SELECT
+          i.사업장코드, i.분류코드, i.세부코드,
+          i.입출고구분, i.입출고일자, i.입출고시간,
+          i.거래일자, i.거래번호,
+          i.입고수량, i.입고단가, i.입고부가,
+          i.출고수량, i.출고단가, i.출고부가,
+          i.매입처코드, i.매출처코드,
+          i.적요, i.사용자코드, i.수정일자,
+          m.자재명, m.규격, m.단위,
+          s.매출처명,
+          p.매입처명
+        FROM 자재입출내역 i
+          LEFT JOIN 자재 m
+            ON i.세부코드 = m.세부코드
+            AND i.분류코드 = m.분류코드
+          LEFT JOIN 매출처 s
+            ON i.매출처코드 = s.매출처코드
+            AND i.사업장코드 = s.사업장코드
+          LEFT JOIN 매입처 p
+            ON i.매입처코드 = p.매입처코드
+            AND i.사업장코드 = p.사업장코드
+        WHERE i.사업장코드 = @사업장코드
+          AND i.분류코드 = @분류코드
+          AND i.세부코드 = @세부코드
+          AND i.입출고일자 = @입출고일자
+          AND i.입출고시간 = @입출고시간
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '자재내역을 찾을 수 없습니다.' });
+    }
+
+    res.json({
+      success: true,
+      data: result.recordset[0],
+    });
+  } catch (err) {
+    console.error('자재내역 단일 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// 자재내역 생성
+app.post('/api/material-history', requireAuth, async (req, res) => {
+  try {
+    const {
+      사업장코드,
+      분류코드,
+      세부코드,
+      입출고구분,
+      입출고일자,
+      거래일자,
+      거래번호,
+      입고수량,
+      입고단가,
+      입고부가,
+      출고수량,
+      출고단가,
+      출고부가,
+      매입처코드,
+      매출처코드,
+      적요,
+    } = req.body;
+
+    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const 입출고시간 = new Date().toISOString().replace(/[-:]/g, '').slice(0, 17);
+
+    // 필수 필드 검증
+    if (!사업장코드 || !분류코드 || !세부코드 || !입출고구분) {
+      return res.status(400).json({
+        success: false,
+        message: '사업장코드, 분류코드, 세부코드, 입출고구분은 필수입니다.',
+      });
+    }
+
+    await pool.request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드)
+      .input('입출고구분', sql.TinyInt, 입출고구분)
+      .input('입출고일자', sql.VarChar(8), 입출고일자)
+      .input('입출고시간', sql.VarChar(9), 입출고시간)
+      .input('거래일자', sql.VarChar(8), 거래일자 || '')
+      .input('거래번호', sql.Real, 거래번호 || 0)
+      .input('입고수량', sql.Money, 입고수량 || 0)
+      .input('입고단가', sql.Money, 입고단가 || 0)
+      .input('입고부가', sql.Money, 입고부가 || 0)
+      .input('출고수량', sql.Money, 출고수량 || 0)
+      .input('출고단가', sql.Money, 출고단가 || 0)
+      .input('출고부가', sql.Money, 출고부가 || 0)
+      .input('매입처코드', sql.VarChar(8), 매입처코드 || '')
+      .input('매출처코드', sql.VarChar(8), 매출처코드 || '')
+      .input('적요', sql.VarChar(50), 적요 || '')
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .query(`
+        INSERT INTO 자재입출내역 (
+          사업장코드, 분류코드, 세부코드,
+          입출고구분, 입출고일자, 입출고시간,
+          거래일자, 거래번호,
+          입고수량, 입고단가, 입고부가,
+          출고수량, 출고단가, 출고부가,
+          매입처코드, 매출처코드,
+          적요, 사용구분, 수정일자, 사용자코드
+        ) VALUES (
+          @사업장코드, @분류코드, @세부코드,
+          @입출고구분, @입출고일자, @입출고시간,
+          @거래일자, @거래번호,
+          @입고수량, @입고단가, @입고부가,
+          @출고수량, @출고단가, @출고부가,
+          @매입처코드, @매출처코드,
+          @적요, 0, @수정일자, @사용자코드
+        )
+      `);
+
+    res.json({
+      success: true,
+      message: '자재내역이 등록되었습니다.',
+      data: {
+        사업장코드,
+        분류코드,
+        세부코드,
+        입출고일자,
+        입출고시간,
+      },
+    });
+  } catch (err) {
+    console.error('자재내역 등록 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// 자재내역 수정
+app.put('/api/material-history/:workplace/:category/:detail/:date/:time', requireAuth, async (req, res) => {
+  try {
+    const { workplace, category, detail, date, time } = req.params;
+    const {
+      입출고구분,
+      입출고일자,
+      거래일자,
+      거래번호,
+      입고수량,
+      입고단가,
+      입고부가,
+      출고수량,
+      출고단가,
+      출고부가,
+      매입처코드,
+      매출처코드,
+      적요,
+    } = req.body;
+
+    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    // 존재 여부 확인
+    const checkResult = await pool.request()
+      .input('사업장코드', sql.VarChar(2), workplace)
+      .input('분류코드', sql.VarChar(2), category)
+      .input('세부코드', sql.VarChar(16), detail)
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고시간', sql.VarChar(9), time)
+      .query(`
+        SELECT 사업장코드 FROM 자재입출내역
+        WHERE 사업장코드 = @사업장코드
+          AND 분류코드 = @분류코드
+          AND 세부코드 = @세부코드
+          AND 입출고일자 = @입출고일자
+          AND 입출고시간 = @입출고시간
+      `);
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '자재내역을 찾을 수 없습니다.' });
+    }
+
+    await pool.request()
+      .input('사업장코드', sql.VarChar(2), workplace)
+      .input('분류코드', sql.VarChar(2), category)
+      .input('세부코드', sql.VarChar(16), detail)
+      .input('입출고일자_원본', sql.VarChar(8), date)
+      .input('입출고시간', sql.VarChar(9), time)
+      .input('입출고구분', sql.TinyInt, 입출고구분)
+      .input('입출고일자', sql.VarChar(8), 입출고일자)
+      .input('거래일자', sql.VarChar(8), 거래일자 || '')
+      .input('거래번호', sql.Real, 거래번호 || 0)
+      .input('입고수량', sql.Money, 입고수량 || 0)
+      .input('입고단가', sql.Money, 입고단가 || 0)
+      .input('입고부가', sql.Money, 입고부가 || 0)
+      .input('출고수량', sql.Money, 출고수량 || 0)
+      .input('출고단가', sql.Money, 출고단가 || 0)
+      .input('출고부가', sql.Money, 출고부가 || 0)
+      .input('매입처코드', sql.VarChar(8), 매입처코드 || '')
+      .input('매출처코드', sql.VarChar(8), 매출처코드 || '')
+      .input('적요', sql.VarChar(50), 적요 || '')
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .query(`
+        UPDATE 자재입출내역
+        SET 입출고구분 = @입출고구분,
+            입출고일자 = @입출고일자,
+            거래일자 = @거래일자,
+            거래번호 = @거래번호,
+            입고수량 = @입고수량,
+            입고단가 = @입고단가,
+            입고부가 = @입고부가,
+            출고수량 = @출고수량,
+            출고단가 = @출고단가,
+            출고부가 = @출고부가,
+            매입처코드 = @매입처코드,
+            매출처코드 = @매출처코드,
+            적요 = @적요,
+            수정일자 = @수정일자,
+            사용자코드 = @사용자코드
+        WHERE 사업장코드 = @사업장코드
+          AND 분류코드 = @분류코드
+          AND 세부코드 = @세부코드
+          AND 입출고일자 = @입출고일자_원본
+          AND 입출고시간 = @입출고시간
+      `);
+
+    res.json({
+      success: true,
+      message: '자재내역이 수정되었습니다.',
+    });
+  } catch (err) {
+    console.error('자재내역 수정 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// 자재내역 삭제 (하드 삭제)
+app.delete('/api/material-history/:workplace/:category/:detail/:date/:time', requireAuth, async (req, res) => {
+  try {
+    const { workplace, category, detail, date, time } = req.params;
+
+    // 존재 여부 확인
+    const checkResult = await pool.request()
+      .input('사업장코드', sql.VarChar(2), workplace)
+      .input('분류코드', sql.VarChar(2), category)
+      .input('세부코드', sql.VarChar(16), detail)
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고시간', sql.VarChar(9), time)
+      .query(`
+        SELECT 사업장코드 FROM 자재입출내역
+        WHERE 사업장코드 = @사업장코드
+          AND 분류코드 = @분류코드
+          AND 세부코드 = @세부코드
+          AND 입출고일자 = @입출고일자
+          AND 입출고시간 = @입출고시간
+      `);
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '자재내역을 찾을 수 없습니다.' });
+    }
+
+    // 하드 삭제 (자재입출내역은 사용구분 필드가 있지만 실제 삭제)
+    await pool.request()
+      .input('사업장코드', sql.VarChar(2), workplace)
+      .input('분류코드', sql.VarChar(2), category)
+      .input('세부코드', sql.VarChar(16), detail)
+      .input('입출고일자', sql.VarChar(8), date)
+      .input('입출고시간', sql.VarChar(9), time)
+      .query(`
+        DELETE FROM 자재입출내역
+        WHERE 사업장코드 = @사업장코드
+          AND 분류코드 = @분류코드
+          AND 세부코드 = @세부코드
+          AND 입출고일자 = @입출고일자
+          AND 입출고시간 = @입출고시간
+      `);
+
+    res.json({
+      success: true,
+      message: '자재내역이 삭제되었습니다.',
+    });
+  } catch (err) {
+    console.error('자재내역 삭제 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
 
 // 재고 현황 조회
 app.get('/api/inventory/:workplace', async (req, res) => {
