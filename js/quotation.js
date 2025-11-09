@@ -272,6 +272,7 @@ $(document).ready(function () {
                     ? `<button class="btn-icon btn-approve" style="display: none; background: #28a745;" onclick="approveQuotation('${row.견적일자}', ${row.견적번호})" title="승인">승인</button>`
                     : ''
                 }
+                <button class="btn-icon" style="background: #9333ea;" onclick="printQuotation('${row.견적일자}', ${row.견적번호})" title="인쇄">출력</button>
               </div>
             `;
           },

@@ -160,8 +160,12 @@ $(document).ready(function () {
                 수정
               </button>
               <button class="btn-icon btn-delete" onclick="deleteOrder('${row.발주일자}', ${row.발주번호})" title="삭제"
-                      style="padding: 6px 12px; font-size: 13px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none;">
+                      style="padding: 6px 12px; font-size: 13px; margin-right: 4px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none;">
                 삭제
+              </button>
+              <button class="btn-icon" onclick="printOrder('${row.발주일자}', ${row.발주번호})" title="인쇄"
+                      style="padding: 6px 12px; font-size: 13px; background: #9333ea; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                출력
               </button>
             </div>
           `;

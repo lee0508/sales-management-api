@@ -113,6 +113,7 @@ async function loadTransactions() {
                 <button class="btn-icon btn-edit" style="display: none;" onclick="editTransaction('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon btn-delete" style="display: none;" onclick="deleteTransaction('${row.거래일자}', ${row.거래번호})" title="삭제">삭제</button>
                 <!--<button class="btn-icon btn-approve" style="display: none;" onclick="approveTransaction('${row.거래일자}', ${row.거래번호})" title="확정">확정</button>-->
+                <button class="btn-icon" onclick="printTransaction('${row.거래일자}', ${row.거래번호})" title="인쇄" style="background: #9333ea;">출력</button>
               </div>
             `;
           },

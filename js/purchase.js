@@ -107,6 +107,7 @@ async function loadPurchaseStatements() {
                 <button class="btn-icon btn-view" onclick="openPurchaseStatementDetailModal('${row.전표번호}')" title="보기">보기</button>
                 <button class="btn-icon btn-edit" style="display: none;" onclick="editPurchaseStatement('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon btn-delete" style="display: none;" onclick="openPurchaseStatementDeleteModal('${row.거래일자}', ${row.거래번호}, '${row.전표번호}')" title="삭제">삭제</button>
+                <button class="btn-icon" onclick="printPurchaseStatement('${row.거래일자}', ${row.거래번호})" title="인쇄" style="background: #9333ea;">출력</button>
               </div>
             `;
           },
@@ -349,6 +350,12 @@ function openNewPurchaseStatementDetailAddModal() {
   document.getElementById('purchaseStatementMaterialSearchModal').style.display = 'block';
   document.getElementById('purchaseStatementMaterialSearchInput').value = '';
   console.log('✅ 자재 검색 모달 열기 (매입전표용)');
+
+  // 드래그 기능 활성화 (최초 1회만 실행)
+  if (typeof makeModalDraggable === 'function' && !window.purchaseStatementMaterialSearchModalDraggable) {
+    makeModalDraggable('purchaseStatementMaterialSearchModal', 'purchaseStatementMaterialSearchModalHeader');
+    window.purchaseStatementMaterialSearchModalDraggable = true;
+  }
 }
 
 // ✅ 자재 검색 모달 닫기
@@ -358,77 +365,133 @@ function closePurchaseStatementMaterialSearchModal() {
 
 // ✅ 자재 검색 (매입전표 작성 모달용)
 async function searchPurchaseStatementMaterials() {
-  try {
-    const searchText = document.getElementById('purchaseStatementMaterialSearchInput').value.trim();
+  const searchKeyword = document.getElementById('purchaseStatementMaterialSearchInput').value.trim();
+  if (!searchKeyword) {
+    alert('검색어를 입력해주세요.');
+    return;
+  }
 
-    const response = await fetch(
-      `/api/materials?search=${encodeURIComponent(searchText)}`,
-    );
+  try {
+    const response = await fetch(`/api/materials?search=${encodeURIComponent(searchKeyword)}`);
     const result = await response.json();
 
     if (!result.success) {
       throw new Error(result.message || '자재 조회 실패');
     }
 
+    const materials = result.data;
     const tbody = document.getElementById('purchaseStatementMaterialSearchTableBody');
+    const resultsDiv = document.getElementById('purchaseStatementMaterialSearchResults');
 
-    if (!result.data || result.data.length === 0) {
+    if (!materials || materials.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="5" style="padding: 40px; text-align: center; color: #6b7280;">
+          <td colspan="3" style="padding: 40px; text-align: center; color: #6b7280;">
             검색 결과가 없습니다
           </td>
         </tr>
       `;
+      resultsDiv.style.display = 'block';
       return;
     }
 
-    tbody.innerHTML = result.data
+    tbody.innerHTML = materials
       .map(
         (material) => `
-      <tr style="border-bottom: 1px solid #e5e7eb;">
-        <td style="padding: 12px;">${material.자재코드}</td>
-        <td style="padding: 12px;">${material.자재명}</td>
-        <td style="padding: 12px;">${material.규격 || '-'}</td>
-        <td style="padding: 12px; text-align: right;">${(material.입고단가1 || 0).toLocaleString()}</td>
-        <td style="padding: 12px; text-align: center;">
-          <button onclick='selectPurchaseStatementMaterial(${JSON.stringify(material).replace(/'/g, '&apos;')})' style="
-            padding: 6px 16px;
-            background: #2563eb;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-          " onmouseover="this.style.background='#1d4ed8';"
-             onmouseout="this.style.background='#2563eb';">선택</button>
-        </td>
+      <tr onclick='selectPurchaseStatementMaterial(${JSON.stringify(material).replace(
+        /'/g,
+        '&apos;',
+      )})' style="
+        cursor: pointer;
+        transition: background 0.15s;
+        border-bottom: 1px solid #f3f4f6;
+      " onmouseover="this.style.background='#f0f9ff';" onmouseout="this.style.background='white';">
+        <td style="padding: 10px 12px; font-size: 13px; color: #6b7280;">${
+          material.자재코드 || '-'
+        }</td>
+        <td style="padding: 10px 12px; font-weight: 500; font-size: 13px; color: #1f2937;">${
+          material.자재명 || '-'
+        }</td>
+        <td style="padding: 10px 12px; font-size: 13px; color: #6b7280;">${
+          material.규격 || '-'
+        }</td>
       </tr>
     `,
       )
       .join('');
 
-    console.log('✅ 자재 검색 완료:', result.data.length, '건');
+    resultsDiv.style.display = 'block';
+    console.log('✅ 자재 검색 완료:', materials.length + '건');
   } catch (err) {
     console.error('❌ 자재 검색 오류:', err);
     alert('자재 검색 중 오류가 발생했습니다.');
   }
 }
 
-// ✅ 자재 선택 및 추가 (매입전표용 - 입고)
+// ✅ 자재 선택 (클릭 시)
 function selectPurchaseStatementMaterial(material) {
-  const 수량 = prompt(`${material.자재명}\n수량을 입력하세요:`, '1');
+  window.selectedPurchaseStatementMaterial = material;
 
-  if (!수량 || isNaN(수량) || parseFloat(수량) <= 0) {
-    alert('유효한 수량을 입력해주세요.');
+  document.getElementById('purchaseStatementSelectedMaterialName').textContent =
+    material.자재명 || '-';
+  document.getElementById('purchaseStatementSelectedMaterialCode').textContent =
+    material.자재코드 || '-';
+
+  // 입고단가를 기본값으로 설정
+  document.getElementById('purchaseStatementAddDetailPrice').value = material.입고단가1 || 0;
+  document.getElementById('purchaseStatementAddDetailQuantity').value = 1;
+
+  calculatePurchaseStatementDetailAmount();
+
+  document.getElementById('purchaseStatementMaterialSearchResults').style.display = 'none';
+  document.getElementById('purchaseStatementSelectedMaterialInfo').style.display = 'block';
+
+  console.log('✅ 자재 선택:', material.자재명);
+}
+
+// ✅ 선택된 자재 취소
+function clearSelectedPurchaseStatementMaterial() {
+  window.selectedPurchaseStatementMaterial = null;
+  document.getElementById('purchaseStatementSelectedMaterialInfo').style.display = 'none';
+  document.getElementById('purchaseStatementMaterialSearchResults').style.display = 'none';
+  document.getElementById('purchaseStatementMaterialSearchInput').value = '';
+  document.getElementById('purchaseStatementAddDetailQuantity').value = '1';
+  document.getElementById('purchaseStatementAddDetailPrice').value = '0';
+  document.getElementById('purchaseStatementAddDetailAmount').value = '0';
+
+  console.log('✅ 선택된 자재 취소');
+}
+
+// ✅ 공급가액 자동 계산
+function calculatePurchaseStatementDetailAmount() {
+  const quantity =
+    parseFloat(document.getElementById('purchaseStatementAddDetailQuantity').value) || 0;
+  const price = parseFloat(document.getElementById('purchaseStatementAddDetailPrice').value) || 0;
+  const amount = Math.round(quantity * price);
+
+  document.getElementById('purchaseStatementAddDetailAmount').value = amount.toLocaleString();
+}
+
+// ✅ 자재 추가 확정 (테이블에 추가)
+function confirmPurchaseStatementDetailAdd() {
+  const material = window.selectedPurchaseStatementMaterial;
+
+  if (!material) {
+    alert('자재를 먼저 선택해주세요.');
     return;
   }
 
-  const 단가 = prompt(`${material.자재명}\n입고단가를 입력하세요:`, material.입고단가1 || '0');
+  const quantity =
+    parseFloat(document.getElementById('purchaseStatementAddDetailQuantity').value) || 0;
+  const price = parseFloat(document.getElementById('purchaseStatementAddDetailPrice').value) || 0;
 
-  if (!단가 || isNaN(단가) || parseFloat(단가) < 0) {
-    alert('유효한 단가를 입력해주세요.');
+  if (quantity <= 0) {
+    alert('수량을 올바르게 입력해주세요.');
+    return;
+  }
+
+  if (price < 0) {
+    alert('단가를 올바르게 입력해주세요.');
     return;
   }
 
@@ -437,14 +500,31 @@ function selectPurchaseStatementMaterial(material) {
     자재코드: material.자재코드,
     자재명: material.자재명,
     규격: material.규격,
-    수량: parseFloat(수량),
-    단가: parseFloat(단가),
+    수량: quantity,
+    단가: price,
   });
 
   updateNewPurchaseStatementDetailsTable();
+
+  // 모달 닫기 및 초기화
+  clearSelectedPurchaseStatementMaterial();
   closePurchaseStatementMaterialSearchModal();
 
-  console.log('✅ 자재 추가 (매입):', material);
+  console.log('✅ 자재 추가 (매입):', material.자재명, `수량: ${quantity}, 단가: ${price}`);
+}
+
+// ✅ 이전 단가 보기 (TODO: 구현 예정)
+function showPurchaseStatementPriceHistory() {
+  const material = window.selectedPurchaseStatementMaterial;
+
+  if (!material) {
+    alert('자재를 먼저 선택해주세요.');
+    return;
+  }
+
+  // TODO: 이전 단가 조회 모달 구현
+  alert('이전 단가 조회 기능은 추후 구현 예정입니다.');
+  console.log('🔍 이전 단가 조회:', material.자재명);
 }
 
 // ✅ 신규 매입전표 품목 수정

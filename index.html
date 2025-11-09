@@ -26,6 +26,7 @@
     <script src="js/material-history.js?v=1101" defer></script>
     <script src="js/material-inventory.js?v=1101" defer></script>
     <script src="js/material-category.js?v=1101" defer></script>
+    <script src="js/print.js?v=1109" defer></script>
 
     <link rel="stylesheet" href="css/onstyles.css?v=5" />
     <!-- <link rel="stylesheet" href="css/shadcn-ui.css" /> -->
@@ -7932,7 +7933,7 @@
           </div>
 
           <!-- 매입처 삭제 확인 모달 -->
-          <div id="supplierDeleteModal" style="display: none">
+          <div id="supplierDeleteModal" class="modal" style="display: none">
             <div class="modal-content" style="max-width: 500px">
               <!-- 헤더 -->
               <div
@@ -8026,7 +8027,7 @@
             cursor: move;
           ">
         <h2 id="newOrderModalTitle" style="margin: 0; font-size: 24px; font-weight: 700; color: var(--text-dark);">발주서 작성</h2>
-        <button onclick="closeNewOrderModal()" style="
+        <button onclick="closeOrderModal()" style="
               background: #f0f0f0;
               border: none;
               font-size: 24px;
@@ -10386,8 +10387,9 @@
     <!-- ✅ 매입전표 작성 모달 -->
     <div id="purchaseStatementCreateModal" class="modal" style="display: none">
       <div class="modal-content" style="max-width: 1200px; max-height: 90vh; overflow-y: auto">
-        <!-- 헤더 -->
+        <!-- ✅ 헤더 영역 (드래그 가능) -->
         <div
+          id="purchaseStatementCreateModalHeader"
           style="
             display: flex;
             justify-content: space-between;
@@ -10395,6 +10397,8 @@
             margin-bottom: 24px;
             padding-bottom: 16px;
             border-bottom: 2px solid #e5e7eb;
+            cursor: move;
+            user-select: none;
           "
         >
           <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
@@ -10892,9 +10896,11 @@
     </div>
 
     <!-- ✅ 매입전표 작성 - 자재 추가 모달 -->
-    <div id="newPurchaseStatementDetailAddModal" class="modal" style="display: none">
+    <div id="purchaseStatementMaterialSearchModal" class="modal" style="display: none">
       <div class="modal-content" style="max-width: 600px">
+        <!-- ✅ 헤더 영역 (드래그 가능) -->
         <div
+          id="purchaseStatementMaterialSearchModalHeader"
           style="
             display: flex;
             justify-content: space-between;
@@ -10902,11 +10908,13 @@
             margin-bottom: 24px;
             padding-bottom: 16px;
             border-bottom: 2px solid #e5e7eb;
+            cursor: move;
+            user-select: none;
           "
         >
           <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">품목 추가</h2>
           <button
-            onclick="closeNewPurchaseStatementDetailAddModal()"
+            onclick="closePurchaseStatementMaterialSearchModal()"
             style="
               width: 36px;
               height: 36px;
@@ -10937,7 +10945,7 @@
             <div style="display: flex; gap: 8px">
               <input
                 type="text"
-                id="newPurchaseStatementMaterialSearchInput"
+                id="purchaseStatementMaterialSearchInput"
                 style="
                   flex: 1;
                   padding: 10px 12px;
@@ -10946,10 +10954,10 @@
                   font-size: 14px;
                 "
                 placeholder="자재명 또는 품목코드로 검색"
-                onkeypress="if(event.key === 'Enter') searchNewPurchaseStatementMaterials()"
+                onkeypress="if(event.key === 'Enter') searchPurchaseStatementMaterials()"
               />
               <button
-                onclick="searchNewPurchaseStatementMaterials()"
+                onclick="searchPurchaseStatementMaterials()"
                 style="
                   padding: 10px 20px;
                   background: #3b82f6;
@@ -10971,7 +10979,7 @@
           </div>
 
           <!-- ✅ 검색 결과 테이블 (3컬럼, 클릭 가능) -->
-          <div id="newPurchaseStatementMaterialSearchResults" style="display: none">
+          <div id="purchaseStatementMaterialSearchResults" style="display: none">
             <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
               >검색 결과</label
             >
@@ -10984,7 +10992,7 @@
               "
             >
               <table
-                id="newPurchaseStatementMaterialSearchTable"
+                id="purchaseStatementMaterialSearchTable"
                 style="width: 100%; border-collapse: collapse"
               >
                 <thead style="background: #f9fafb; position: sticky; top: 0">
@@ -11027,14 +11035,14 @@
                     </th>
                   </tr>
                 </thead>
-                <tbody id="newPurchaseStatementMaterialSearchTableBody"></tbody>
+                <tbody id="purchaseStatementMaterialSearchTableBody"></tbody>
               </table>
             </div>
           </div>
 
           <!-- ✅ 선택된 자재 표시 (파란색 카드) -->
           <div
-            id="newPurchaseStatementSelectedMaterialInfo"
+            id="purchaseStatementSelectedMaterialInfo"
             style="
               display: none;
               background: #f0f9ff;
@@ -11054,19 +11062,19 @@
               <div>
                 <div
                   style="font-weight: 600; color: #1e40af; font-size: 15px"
-                  id="newPurchaseStatementSelectedMaterialName"
+                  id="purchaseStatementSelectedMaterialName"
                 >
                   -
                 </div>
                 <div
                   style="font-size: 12px; color: #6b7280; margin-top: 2px"
-                  id="newPurchaseStatementSelectedMaterialCode"
+                  id="purchaseStatementSelectedMaterialCode"
                 >
                   -
                 </div>
               </div>
               <button
-                onclick="clearNewSelectedPurchaseStatementMaterial()"
+                onclick="clearSelectedPurchaseStatementMaterial()"
                 style="
                   padding: 4px 12px;
                   background: white;
@@ -11092,11 +11100,11 @@
             >
             <input
               type="number"
-              id="newPurchaseStatementAddDetailQuantity"
+              id="purchaseStatementAddDetailQuantity"
               value="1"
               min="0"
               step="0.01"
-              oninput="calculateNewPurchaseStatementDetailAmount()"
+              oninput="calculatePurchaseStatementDetailAmount()"
               style="
                 width: 100%;
                 padding: 10px 12px;
@@ -11107,26 +11115,47 @@
             />
           </div>
 
-          <!-- ✅ 단가 입력 -->
+          <!-- ✅ 단가 입력 + 이전단가 버튼 -->
           <div>
             <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
-              >단가 (원) *</label
+              >입고단가 (원) *</label
             >
-            <input
-              type="number"
-              id="newPurchaseStatementAddDetailPrice"
-              value="0"
-              min="0"
-              step="1"
-              oninput="calculateNewPurchaseStatementDetailAmount()"
-              style="
-                width: 100%;
-                padding: 10px 12px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-              "
-            />
+            <div style="display: flex; gap: 8px; align-items: center">
+              <input
+                type="number"
+                id="purchaseStatementAddDetailPrice"
+                value="0"
+                min="0"
+                step="1"
+                oninput="calculatePurchaseStatementDetailAmount()"
+                style="
+                  flex: 1;
+                  padding: 10px 12px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 8px;
+                  font-size: 14px;
+                "
+              />
+              <button
+                onclick="showPurchaseStatementPriceHistory()"
+                style="
+                  padding: 10px 20px;
+                  background: #9333ea;
+                  border: none;
+                  border-radius: 8px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  cursor: pointer;
+                  color: white;
+                  transition: all 0.2s;
+                  white-space: nowrap;
+                "
+                onmouseover="this.style.background='#7e22ce';"
+                onmouseout="this.style.background='#9333ea';"
+              >
+                이전 단가
+              </button>
+            </div>
           </div>
 
           <!-- ✅ 공급가액 표시 (읽기 전용) -->
@@ -11136,7 +11165,7 @@
             >
             <input
               type="text"
-              id="newPurchaseStatementAddDetailAmount"
+              id="purchaseStatementAddDetailAmount"
               readonly
               value="0"
               style="
@@ -11165,7 +11194,7 @@
         >
           <button
             type="button"
-            onclick="closeNewPurchaseStatementDetailAddModal()"
+            onclick="closePurchaseStatementMaterialSearchModal()"
             style="
               flex: 1;
               padding: 12px 20px;
@@ -11185,7 +11214,7 @@
           </button>
           <button
             type="button"
-            onclick="confirmNewPurchaseStatementDetailAdd()"
+            onclick="confirmPurchaseStatementDetailAdd()"
             style="
               flex: 1;
               padding: 12px 20px;
@@ -11389,6 +11418,20 @@
           >
             수정 완료
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ 매입전표 삭제 확인 모달 -->
+    <div id="purchaseStatementDeleteModal" class="modal" style="display: none">
+      <div class="modal-content" style="max-width: 400px">
+        <h3 style="margin-bottom: 16px">매입전표 삭제</h3>
+        <p id="purchaseStatementDeleteInfo" style="margin-bottom: 20px"></p>
+        <div style="display: flex; gap: 8px; justify-content: flex-end">
+          <button onclick="closePurchaseStatementDeleteModal()" class="btn btn-secondary">
+            취소
+          </button>
+          <button onclick="confirmPurchaseStatementDelete()" class="btn btn-danger">삭제</button>
         </div>
       </div>
     </div>
