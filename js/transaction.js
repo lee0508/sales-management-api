@@ -3,12 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
   window.loadTransactions = loadTransactions;
 
-  // 거래명세서 작성 모달 드래그 기능
-  if (typeof makeModalDraggable === 'function') {
-    makeModalDraggable('transactionCreateModalContent', 'transactionCreateModalHeader');
-    makeModalDraggable('transactionEditModalContent', 'transactionEditModalHeader');
-  }
-
   // ✅ 수정 모달 닫기 버튼 이벤트
   $(document).on('click', '#closeTransactionEditModalBtn', () => {
     closeTransactionEditModal();
@@ -48,7 +42,7 @@ async function loadTransactions() {
     if (status) query.append('status', status);
 
     const res = await fetch(`/api/transactions?${query.toString()}`, {
-      credentials: 'include' // 세션 쿠키 포함
+      credentials: 'include', // 세션 쿠키 포함
     });
     const data = await res.json();
 
@@ -78,7 +72,7 @@ async function loadTransactions() {
         {
           data: null,
           render: (data, type, row, meta) => meta.row + 1,
-          defaultContent: '-'
+          defaultContent: '-',
         },
         { data: '명세서번호', defaultContent: '-' },
         {
@@ -118,7 +112,7 @@ async function loadTransactions() {
                 <button class="btn-icon btn-view" onclick="openTransactionDetailModal('${row.명세서번호}')" title="보기">보기</button>
                 <button class="btn-icon btn-edit" style="display: none;" onclick="editTransaction('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon btn-delete" style="display: none;" onclick="deleteTransaction('${row.거래일자}', ${row.거래번호})" title="삭제">삭제</button>
-                <button class="btn-icon btn-approve" style="display: none;" onclick="approveTransaction('${row.거래일자}', ${row.거래번호})" title="확정">확정</button>
+                <!--<button class="btn-icon btn-approve" style="display: none;" onclick="approveTransaction('${row.거래일자}', ${row.거래번호})" title="확정">확정</button>-->
               </div>
             `;
           },
@@ -143,9 +137,9 @@ async function loadTransactions() {
       pageLength: 10,
       responsive: true,
       autoWidth: false,
-      drawCallback: function() {
+      drawCallback: function () {
         // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
-        $('.transactionCheckbox').each(function() {
+        $('.transactionCheckbox').each(function () {
           const $checkbox = $(this);
           const transactionDate = String($checkbox.data('date'));
           const transactionNo = String($checkbox.data('no'));
@@ -164,7 +158,7 @@ async function loadTransactions() {
             actionDiv.find('.btn-approve').hide();
           }
         });
-      }
+      },
     });
 
     // ✅ 개별 체크박스 이벤트 (DataTable 초기화 후 등록)
@@ -183,7 +177,7 @@ async function loadTransactions() {
           actionDiv: actionDiv.length,
           btnView: actionDiv.find('.btn-view').length,
           btnEdit: actionDiv.find('.btn-edit').length,
-          btnDelete: actionDiv.find('.btn-delete').length
+          btnDelete: actionDiv.find('.btn-delete').length,
         });
 
         if (isChecked) {
@@ -247,6 +241,12 @@ async function openTransactionDetailModal(transactionNo) {
   modal.style.display = 'flex';
   modal.classList.remove('hidden');
 
+  // 드래그 기능 활성화 (최초 1회만 실행)
+  if (typeof makeModalDraggable === 'function' && !window.transactionDetailModalDraggable) {
+    makeModalDraggable('transactionDetailModal', 'transactionDetailModalHeader');
+    window.transactionDetailModalDraggable = true;
+  }
+
   try {
     // 명세서번호 형식: "YYYYMMDD-번호" 를 분리
     const [date, no] = transactionNo.split('-');
@@ -281,7 +281,7 @@ async function openTransactionDetailModal(transactionNo) {
           data: null,
           render: (data, type, row, meta) => meta.row + 1,
           className: 'dt-center',
-          width: '50px'
+          width: '50px',
         },
         {
           data: '자재코드',
@@ -290,7 +290,7 @@ async function openTransactionDetailModal(transactionNo) {
             if (!d) return '-';
             // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
             return d.length > 2 ? d.substring(2) : d;
-          }
+          },
         },
         { data: '자재명', defaultContent: '-' },
         { data: '규격', defaultContent: '-' },
@@ -320,7 +320,7 @@ async function openTransactionDetailModal(transactionNo) {
           className: 'dt-right',
         },
       ],
-      order: [],  // 정렬 비활성화 - 입력 순서대로 표시
+      order: [], // 정렬 비활성화 - 입력 순서대로 표시
       pageLength: 10,
       language: {
         lengthMenu: '페이지당 _MENU_ 개씩 보기',
@@ -390,6 +390,12 @@ function openNewTransactionModal() {
   // 모달 표시
   document.getElementById('transactionCreateModal').style.display = 'block';
 
+  // 드래그 기능 활성화 (최초 1회만 실행)
+  if (typeof makeModalDraggable === 'function' && !window.transactionCreateModalDraggable) {
+    makeModalDraggable('transactionCreateModal', 'transactionCreateModalHeader');
+    window.transactionCreateModalDraggable = true;
+  }
+
   console.log('✅ 거래명세서 작성 모달 열기');
 }
 
@@ -426,9 +432,7 @@ async function searchTransactionCustomers() {
   try {
     const searchText = document.getElementById('transactionCustomerSearchInput').value.trim();
 
-    const response = await fetch(
-      `/api/customers?search=${encodeURIComponent(searchText)}`,
-    );
+    const response = await fetch(`/api/customers?search=${encodeURIComponent(searchText)}`);
     const result = await response.json();
 
     if (!result.success) {
@@ -456,7 +460,10 @@ async function searchTransactionCustomers() {
         <td style="padding: 12px;">${customer.매출처명}</td>
         <td style="padding: 12px;">${customer.전화번호 || '-'}</td>
         <td style="padding: 12px; text-align: center;">
-          <button onclick='selectTransactionCustomer(${JSON.stringify(customer).replace(/'/g, '&apos;')})' style="
+          <button onclick='selectTransactionCustomer(${JSON.stringify(customer).replace(
+            /'/g,
+            '&apos;',
+          )})' style="
             padding: 6px 16px;
             background: #2563eb;
             color: white;
@@ -537,9 +544,7 @@ async function searchTransactionMaterials() {
   try {
     const searchText = document.getElementById('transactionCreateMaterialSearchInput').value.trim();
 
-    const response = await fetch(
-      `/api/materials?search=${encodeURIComponent(searchText)}`,
-    );
+    const response = await fetch(`/api/materials?search=${encodeURIComponent(searchText)}`);
     const result = await response.json();
 
     if (!result.success) {
@@ -566,9 +571,14 @@ async function searchTransactionMaterials() {
         <td style="padding: 12px;">${material.자재코드}</td>
         <td style="padding: 12px;">${material.자재명}</td>
         <td style="padding: 12px;">${material.규격 || '-'}</td>
-        <td style="padding: 12px; text-align: right;">${(material.출고단가1 || 0).toLocaleString()}</td>
+        <td style="padding: 12px; text-align: right;">${(
+          material.출고단가1 || 0
+        ).toLocaleString()}</td>
         <td style="padding: 12px; text-align: center;">
-          <button onclick='showTransactionPriceHistory(${JSON.stringify(material).replace(/'/g, '&apos;')})' style="
+          <button onclick='showTransactionPriceHistory(${JSON.stringify(material).replace(
+            /'/g,
+            '&apos;',
+          )})' style="
             padding: 6px 16px;
             background: #f59e0b;
             color: white;
@@ -580,7 +590,10 @@ async function searchTransactionMaterials() {
             margin-right: 4px;
           " onmouseover="this.style.background='#d97706';"
              onmouseout="this.style.background='#f59e0b';">이전단가</button>
-          <button onclick='selectTransactionMaterial(${JSON.stringify(material).replace(/'/g, '&apos;')})' style="
+          <button onclick='selectTransactionMaterial(${JSON.stringify(material).replace(
+            /'/g,
+            '&apos;',
+          )})' style="
             padding: 6px 16px;
             background: #2563eb;
             color: white;
@@ -694,9 +707,12 @@ function renderNewTransactionDetailTable() {
   });
 
   // 합계 업데이트
-  document.getElementById('transactionCreateTotalSupply').textContent = totalSupply.toLocaleString();
+  document.getElementById('transactionCreateTotalSupply').textContent =
+    totalSupply.toLocaleString();
   document.getElementById('transactionCreateTotalVat').textContent = totalVat.toLocaleString();
-  document.getElementById('transactionCreateGrandTotal').textContent = (totalSupply + totalVat).toLocaleString();
+  document.getElementById('transactionCreateGrandTotal').textContent = (
+    totalSupply + totalVat
+  ).toLocaleString();
 }
 
 // ✅ 상세내역 항목 삭제
@@ -907,7 +923,7 @@ async function editTransaction(transactionDate, transactionNo) {
             if (!d) return '-';
             // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
             return d.length > 2 ? d.substring(2) : d;
-          }
+          },
         },
         { data: '자재명', defaultContent: '-' },
         { data: '규격', defaultContent: '-' },
@@ -972,6 +988,12 @@ async function editTransaction(transactionDate, transactionNo) {
     // 모달 열기
     const modal = document.getElementById('transactionEditModal');
     modal.style.display = 'flex';
+
+    // 드래그 기능 활성화 (최초 1회만 실행)
+    if (typeof makeModalDraggable === 'function' && !window.transactionEditModalDraggable) {
+      makeModalDraggable('transactionEditModal', 'transactionEditModalHeader');
+      window.transactionEditModalDraggable = true;
+    }
   } catch (err) {
     console.error('❌ 거래명세서 수정 조회 오류:', err);
     alert('거래명세서 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
@@ -1004,10 +1026,7 @@ async function submitTransactionEdit() {
   const 입출고구분 = document.getElementById('editTransactionStatus').value;
 
   // DataTable에서 현재 데이터 가져오기
-  const rawDetails = window.transactionEditDetailTableInstance
-    .rows()
-    .data()
-    .toArray();
+  const rawDetails = window.transactionEditDetailTableInstance.rows().data().toArray();
 
   if (rawDetails.length === 0) {
     alert('최소 1개 이상의 품목이 필요합니다.');
@@ -1015,7 +1034,7 @@ async function submitTransactionEdit() {
   }
 
   // 서버 API 형식에 맞게 데이터 변환
-  const details = rawDetails.map(detail => {
+  const details = rawDetails.map((detail) => {
     // 기존 데이터에서 필요한 필드만 추출
     const firstDetail = window.currentEditingTransaction.details[0] || {};
 
@@ -1024,7 +1043,7 @@ async function submitTransactionEdit() {
       수량: detail.수량,
       단가: detail.단가,
       매출처코드: detail.매출처코드 || firstDetail.매출처코드 || '', // 기존 매출처코드 유지
-      적요: detail.적요 || ''
+      적요: detail.적요 || '',
     };
   });
 
@@ -1060,10 +1079,7 @@ async function submitTransactionEdit() {
 function updateTransactionEditTotal() {
   if (!window.transactionEditDetailTableInstance) return;
 
-  const data = window.transactionEditDetailTableInstance
-    .rows()
-    .data()
-    .toArray();
+  const data = window.transactionEditDetailTableInstance.rows().data().toArray();
 
   const total = data.reduce((sum, item) => sum + (item.합계금액 || 0), 0);
   document.getElementById('transactionEditDetailTotal').textContent = total.toLocaleString();
@@ -1110,7 +1126,8 @@ async function searchTransactionMaterials() {
     const resultsDiv = document.getElementById('transactionMaterialSearchResults');
 
     if (materials.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #9ca3af;">검색 결과가 없습니다</td></tr>';
+      tbody.innerHTML =
+        '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #9ca3af;">검색 결과가 없습니다</td></tr>';
       resultsDiv.style.display = 'block';
       return;
     }
@@ -1122,9 +1139,14 @@ async function searchTransactionMaterials() {
         <td style="padding: 12px;">${material.자재코드 || '-'}</td>
         <td style="padding: 12px;">${material.자재명 || '-'}</td>
         <td style="padding: 12px;">${material.규격 || '-'}</td>
-        <td style="padding: 12px; text-align: right;">${(material.출고단가1 || 0).toLocaleString()}</td>
+        <td style="padding: 12px; text-align: right;">${(
+          material.출고단가1 || 0
+        ).toLocaleString()}</td>
         <td style="padding: 12px; text-align: center;">
-          <button onclick='selectTransactionMaterial(${JSON.stringify(material).replace(/'/g, '&apos;')})' style="
+          <button onclick='selectTransactionMaterial(${JSON.stringify(material).replace(
+            /'/g,
+            '&apos;',
+          )})' style="
             padding: 6px 16px;
             background: #2563eb;
             color: white;
@@ -1210,7 +1232,7 @@ function confirmTransactionDetailAdd() {
     공급가액: 공급가액,
     부가세: 부가세,
     합계금액: 합계금액,
-    _isNew: true
+    _isNew: true,
   };
 
   window.transactionEditDetailTableInstance.row.add(newRow).draw();
@@ -1266,7 +1288,9 @@ function editTransactionDetailRow(rowIndex) {
     document.getElementById('transactionEditDetailSpec').textContent = rowData.규격 || '-';
     document.getElementById('transactionEditDetailQuantity').value = rowData.수량 || 0;
     document.getElementById('transactionEditDetailPrice').value = rowData.단가 || 0;
-    document.getElementById('transactionEditDetailAmount').value = (rowData.공급가액 || 0).toLocaleString();
+    document.getElementById('transactionEditDetailAmount').value = (
+      rowData.공급가액 || 0
+    ).toLocaleString();
 
     // 모달에 rowIndex 저장
     const modal = document.getElementById('transactionDetailEditModal');
@@ -1356,8 +1380,9 @@ function deleteTransactionDetailRow(rowIndex) {
     }
 
     // 모달에 정보 표시
-    document.getElementById('transactionDeleteDetailInfo').textContent =
-      `[${rowData.자재코드}] ${rowData.자재명}`;
+    document.getElementById(
+      'transactionDeleteDetailInfo',
+    ).textContent = `[${rowData.자재코드}] ${rowData.자재명}`;
 
     // 모달에 rowIndex 저장
     const modal = document.getElementById('transactionDetailDeleteModal');
@@ -1489,7 +1514,9 @@ async function confirmTransactionDelete() {
 
 // ✅ 거래명세서 확정 함수
 async function approveTransaction(transactionDate, transactionNo) {
-  const confirmed = confirm(`거래명세서 ${transactionDate}-${transactionNo}를 확정하시겠습니까?\n\n확정 후에는 수정이 불가능합니다.`);
+  const confirmed = confirm(
+    `거래명세서 ${transactionDate}-${transactionNo}를 확정하시겠습니까?\n\n확정 후에는 수정이 불가능합니다.`,
+  );
 
   if (!confirmed) {
     return;
@@ -1580,14 +1607,23 @@ async function searchNewTransactionMaterials() {
     tbody.innerHTML = materials
       .map(
         (material) => `
-      <tr onclick='selectNewTransactionMaterial(${JSON.stringify(material).replace(/'/g, '&apos;')})' style="
+      <tr onclick='selectNewTransactionMaterial(${JSON.stringify(material).replace(
+        /'/g,
+        '&apos;',
+      )})' style="
         cursor: pointer;
         transition: background 0.15s;
         border-bottom: 1px solid #f3f4f6;
       " onmouseover="this.style.background='#f0f9ff';" onmouseout="this.style.background='white';">
-        <td style="padding: 10px 12px; font-size: 13px; color: #6b7280;">${material.자재코드 || '-'}</td>
-        <td style="padding: 10px 12px; font-weight: 500; font-size: 13px; color: #1f2937;">${material.자재명 || '-'}</td>
-        <td style="padding: 10px 12px; font-size: 13px; color: #6b7280;">${material.규격 || '-'}</td>
+        <td style="padding: 10px 12px; font-size: 13px; color: #6b7280;">${
+          material.자재코드 || '-'
+        }</td>
+        <td style="padding: 10px 12px; font-weight: 500; font-size: 13px; color: #1f2937;">${
+          material.자재명 || '-'
+        }</td>
+        <td style="padding: 10px 12px; font-size: 13px; color: #6b7280;">${
+          material.규격 || '-'
+        }</td>
       </tr>
     `,
       )
@@ -1605,8 +1641,10 @@ async function searchNewTransactionMaterials() {
 function selectNewTransactionMaterial(material) {
   window.newSelectedTransactionMaterial = material;
 
-  document.getElementById('newTransactionSelectedMaterialName').textContent = material.자재명 || '-';
-  document.getElementById('newTransactionSelectedMaterialCode').textContent = material.자재코드 || '-';
+  document.getElementById('newTransactionSelectedMaterialName').textContent =
+    material.자재명 || '-';
+  document.getElementById('newTransactionSelectedMaterialCode').textContent =
+    material.자재코드 || '-';
 
   // 출고단가를 기본값으로 설정
   document.getElementById('newTransactionAddDetailPrice').value = material.출고단가1 || 0;
@@ -1635,7 +1673,8 @@ function clearNewSelectedTransactionMaterial() {
 
 // ✅ 공급가액 자동 계산
 function calculateNewTransactionDetailAmount() {
-  const quantity = parseFloat(document.getElementById('newTransactionAddDetailQuantity').value) || 0;
+  const quantity =
+    parseFloat(document.getElementById('newTransactionAddDetailQuantity').value) || 0;
   const price = parseFloat(document.getElementById('newTransactionAddDetailPrice').value) || 0;
   const amount = Math.round(quantity * price);
 
@@ -1651,7 +1690,8 @@ function confirmNewTransactionDetailAdd() {
     return;
   }
 
-  const quantity = parseFloat(document.getElementById('newTransactionAddDetailQuantity').value) || 0;
+  const quantity =
+    parseFloat(document.getElementById('newTransactionAddDetailQuantity').value) || 0;
   const price = parseFloat(document.getElementById('newTransactionAddDetailPrice').value) || 0;
 
   if (quantity <= 0) {
@@ -1679,10 +1719,13 @@ function confirmNewTransactionDetailAdd() {
   const newRow = tbody.insertRow();
 
   // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
-  const 세부코드 = material.자재코드.length > 2 ? material.자재코드.substring(2) : material.자재코드;
+  const 세부코드 =
+    material.자재코드.length > 2 ? material.자재코드.substring(2) : material.자재코드;
 
   newRow.innerHTML = `
-    <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">${tbody.rows.length}</td>
+    <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">${
+      tbody.rows.length
+    }</td>
     <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${세부코드}</td>
     <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${material.자재명}</td>
     <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${material.규격 || '-'}</td>
@@ -1780,7 +1823,8 @@ function closeNewTransactionDetailEditModal() {
 
 // ✅ 수정 모달 - 공급가액 계산
 function calculateNewTransactionEditAmount() {
-  const quantity = parseFloat(document.getElementById('newTransactionEditDetailQuantity').value) || 0;
+  const quantity =
+    parseFloat(document.getElementById('newTransactionEditDetailQuantity').value) || 0;
   const price = parseFloat(document.getElementById('newTransactionEditDetailPrice').value) || 0;
   const amount = Math.round(quantity * price);
 
@@ -1796,7 +1840,8 @@ function confirmNewTransactionDetailEdit() {
     return;
   }
 
-  const quantity = parseFloat(document.getElementById('newTransactionEditDetailQuantity').value) || 0;
+  const quantity =
+    parseFloat(document.getElementById('newTransactionEditDetailQuantity').value) || 0;
   const price = parseFloat(document.getElementById('newTransactionEditDetailPrice').value) || 0;
 
   if (quantity <= 0) {
@@ -1876,7 +1921,8 @@ function updateNewTransactionTotals() {
 
   const grandTotal = totalSupply + totalVat;
 
-  document.getElementById('transactionCreateTotalSupply').textContent = totalSupply.toLocaleString();
+  document.getElementById('transactionCreateTotalSupply').textContent =
+    totalSupply.toLocaleString();
   document.getElementById('transactionCreateTotalVat').textContent = totalVat.toLocaleString();
   document.getElementById('transactionCreateGrandTotal').textContent = grandTotal.toLocaleString();
 

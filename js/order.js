@@ -177,7 +177,7 @@ $(document).ready(function () {
         $('.orderCheckbox').prop('checked', isChecked);
 
         // 모든 체크박스에 대해 버튼 표시/숨김 처리
-        $('.orderCheckbox').each(function() {
+        $('.orderCheckbox').each(function () {
           const orderDate = $(this).data('date');
           const orderNo = $(this).data('no');
           const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
@@ -202,7 +202,7 @@ $(document).ready(function () {
     });
 
     // DataTable 초기화 완료 후 건수 업데이트
-    table.on('init', function() {
+    table.on('init', function () {
       const info = table.page.info();
       $('#orderCount').text(info.recordsDisplay);
       console.log('✅ 발주 DataTable 초기화 완료, 건수:', info.recordsDisplay);
@@ -210,24 +210,26 @@ $(document).ready(function () {
   }
 
   // 개별 체크박스 이벤트 (전역으로 한 번만 등록)
-  $(document).off('change', '.orderCheckbox').on('change', '.orderCheckbox', function () {
-    const orderDate = $(this).data('date');
-    const orderNo = $(this).data('no');
-    const isChecked = $(this).prop('checked');
-    const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
+  $(document)
+    .off('change', '.orderCheckbox')
+    .on('change', '.orderCheckbox', function () {
+      const orderDate = $(this).data('date');
+      const orderNo = $(this).data('no');
+      const isChecked = $(this).prop('checked');
+      const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
 
-    if (isChecked) {
-      // 체크박스 선택 시: 상세 버튼 숨김, 수정/삭제 버튼 표시
-      actionDiv.find('.btn-view').hide();
-      actionDiv.find('.btn-edit').show();
-      actionDiv.find('.btn-delete').show();
-    } else {
-      // 체크박스 해제 시: 상세 버튼 표시, 수정/삭제 버튼 숨김
-      actionDiv.find('.btn-view').show();
-      actionDiv.find('.btn-edit').hide();
-      actionDiv.find('.btn-delete').hide();
-    }
-  });
+      if (isChecked) {
+        // 체크박스 선택 시: 상세 버튼 숨김, 수정/삭제 버튼 표시
+        actionDiv.find('.btn-view').hide();
+        actionDiv.find('.btn-edit').show();
+        actionDiv.find('.btn-delete').show();
+      } else {
+        // 체크박스 해제 시: 상세 버튼 표시, 수정/삭제 버튼 숨김
+        actionDiv.find('.btn-view').show();
+        actionDiv.find('.btn-edit').hide();
+        actionDiv.find('.btn-delete').hide();
+      }
+    });
 
   // 닫기 버튼 이벤트 핸들러
   $('#closeOrderDetailModal').off('click').on('click', closeOrderDetailModal);
@@ -384,6 +386,12 @@ async function viewOrderDetail(orderDate, orderNo) {
     document.getElementById('orderDetailContent').innerHTML = masterHtml;
     document.getElementById('orderDetailModal').style.display = 'flex';
     document.getElementById('orderDetailModal').classList.remove('hidden');
+
+    // 드래그 기능 활성화 (최초 1회만 실행)
+    if (typeof makeModalDraggable === 'function' && !window.orderDetailModalDraggable) {
+      makeModalDraggable('orderDetailModal', 'orderDetailModalHeader');
+      window.orderDetailModalDraggable = true;
+    }
   } catch (error) {
     console.error('발주 상세 조회 오류:', error);
     alert('발주 정보를 불러오는 중 오류가 발생했습니다.');
@@ -453,6 +461,12 @@ async function openOrderModal() {
     // 모달 표시
     document.getElementById('orderModal').style.display = 'flex';
     document.getElementById('orderModal').classList.remove('hidden');
+
+    // 드래그 기능 활성화 (최초 1회만 실행)
+    if (typeof makeModalDraggable === 'function' && !window.orderModalDraggable) {
+      makeModalDraggable('orderModal', 'orderModalHeader');
+      window.orderModalDraggable = true;
+    }
   } catch (error) {
     console.error('❌ 발주 모달 열기 오류:', error);
     alert('발주 모달을 여는 중 오류가 발생했습니다.');
@@ -1308,9 +1322,7 @@ async function showPriceHistoryForOrder(material) {
 async function loadActualPurchasePriceHistory(자재코드, 매입처코드) {
   try {
     const response = await fetch(
-      `/api/materials/${encodeURIComponent(
-        자재코드,
-      )}/purchase-price-history/${매입처코드}`,
+      `/api/materials/${encodeURIComponent(자재코드)}/purchase-price-history/${매입처코드}`,
     );
     const result = await response.json();
 
@@ -1378,9 +1390,7 @@ async function loadActualPurchasePriceHistory(자재코드, 매입처코드) {
 async function loadOrderPriceHistory(자재코드, 매입처코드) {
   try {
     const response = await fetch(
-      `/api/materials/${encodeURIComponent(
-        자재코드,
-      )}/order-history/${매입처코드}`,
+      `/api/materials/${encodeURIComponent(자재코드)}/order-history/${매입처코드}`,
     );
     const result = await response.json();
 
@@ -1646,9 +1656,7 @@ async function showEditOrderPriceHistory() {
 async function loadActualPurchasePriceHistoryForAddModal(자재코드, 매입처코드) {
   try {
     const response = await fetch(
-      `/api/materials/${encodeURIComponent(
-        자재코드,
-      )}/purchase-price-history/${매입처코드}`,
+      `/api/materials/${encodeURIComponent(자재코드)}/purchase-price-history/${매입처코드}`,
     );
     const result = await response.json();
 
@@ -2041,7 +2049,7 @@ let newOrderDetails = [];
  */
 function openNewOrderModal() {
   // 모달 제목 설정
-  document.getElementById('orderModalTitle').textContent = '발주서 작성';
+  document.getElementById('newOrderModalTitle').textContent = '발주서 작성';
 
   // 폼 초기화
   document.getElementById('orderForm').reset();
@@ -2063,12 +2071,12 @@ function openNewOrderModal() {
   renderNewOrderDetailTable();
 
   // 모달 표시
-  document.getElementById('orderModal').style.display = 'block';
+  document.getElementById('newOrderModal').style.display = 'block';
 
   // 드래그 기능 활성화 (최초 1회만 실행)
-  if (!window.orderModalDraggable) {
-    makeModalDraggable('orderModal', 'orderModalHeader');
-    window.orderModalDraggable = true;
+  if (!window.newOrderModalDraggable) {
+    makeModalDraggable('newOrderModal', 'newOrderModalHeader');
+    window.newOrderModalDraggable = true;
   }
 
   console.log('✅ 발주서 작성 모달 열기');
@@ -2078,7 +2086,7 @@ function openNewOrderModal() {
  * 발주서 작성 모달 닫기
  */
 function closeOrderModal() {
-  document.getElementById('orderModal').style.display = 'none';
+  document.getElementById('newOrderModal').style.display = 'none';
   newOrderDetails = [];
 }
 
@@ -2135,9 +2143,7 @@ async function searchOrderSuppliers() {
   try {
     const searchText = document.getElementById('orderSupplierSearchInput').value.trim();
 
-    const response = await fetch(
-      `/api/suppliers?search=${encodeURIComponent(searchText)}`,
-    );
+    const response = await fetch(`/api/suppliers?search=${encodeURIComponent(searchText)}`);
     const result = await response.json();
 
     if (!result.success) {
@@ -2318,7 +2324,7 @@ async function searchNewOrderMaterials() {
       // 자재 데이터 저장
       window.tempNewOrderMaterialsData[index] = {
         ...m,
-        자재코드
+        자재코드,
       };
 
       const tr = document.createElement('tr');
@@ -2338,9 +2344,9 @@ async function searchNewOrderMaterials() {
         <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${
           m.규격 || '-'
         }</td>
-        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right; font-weight: 600; color: #2563eb;">${
-          (m.입고단가 || 0).toLocaleString()
-        }원</td>
+        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right; font-weight: 600; color: #2563eb;">${(
+          m.입고단가 || 0
+        ).toLocaleString()}원</td>
         <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; text-align: center;">
           <button onclick='selectNewOrderMaterial(window.tempNewOrderMaterialsData[${index}])' style="
             padding: 6px 12px;
@@ -2443,9 +2449,7 @@ async function showNewOrderPriceHistory() {
 async function loadActualPurchasePriceHistoryForNewOrder(자재코드, 매입처코드) {
   try {
     const response = await fetch(
-      `/api/materials/${encodeURIComponent(
-        자재코드,
-      )}/purchase-price-history/${매입처코드}`,
+      `/api/materials/${encodeURIComponent(자재코드)}/purchase-price-history/${매입처코드}`,
     );
     const result = await response.json();
 
@@ -2601,9 +2605,7 @@ async function loadNewOrderActualPriceHistory() {
     if (!매입처코드) return;
 
     const response = await fetch(
-      `/api/materials/${encodeURIComponent(
-        자재코드,
-      )}/price-history/${매입처코드}`,
+      `/api/materials/${encodeURIComponent(자재코드)}/price-history/${매입처코드}`,
     );
     const result = await response.json();
 
@@ -2676,9 +2678,7 @@ async function loadNewOrderPriceHistory() {
     if (!매입처코드) return;
 
     const response = await fetch(
-      `/api/materials/${encodeURIComponent(
-        자재코드,
-      )}/order-history/${매입처코드}`,
+      `/api/materials/${encodeURIComponent(자재코드)}/order-history/${매입처코드}`,
     );
     const result = await response.json();
 
@@ -2898,10 +2898,16 @@ function renderNewOrderDetailTable() {
 
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${index + 1}</td>
+      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${
+        index + 1
+      }</td>
       <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${자재코드표시}</td>
-      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${detail.자재명 || '-'}</td>
-      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${detail.규격 || '-'}</td>
+      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${
+        detail.자재명 || '-'
+      }</td>
+      <td style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border);">${
+        detail.규격 || '-'
+      }</td>
       <td style="padding: 12px; text-align: right; border-bottom: 1px solid var(--border);">${수량.toLocaleString()}</td>
       <td style="padding: 12px; text-align: right; border-bottom: 1px solid var(--border);">${단가.toLocaleString()}</td>
       <td style="padding: 12px; text-align: right; border-bottom: 1px solid var(--border);">${공급가.toLocaleString()}</td>

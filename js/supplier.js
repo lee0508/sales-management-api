@@ -196,6 +196,12 @@ function openSupplierModal() {
     console.error('❌ 매입처 코드 입력 필드를 찾을 수 없습니다!');
   }
 
+  // 드래그 기능 활성화 (최초 1회만 실행)
+  if (typeof makeModalDraggable === 'function' && !window.supplierModalDraggable) {
+    makeModalDraggable('supplierModal', 'supplierModalHeader');
+    window.supplierModalDraggable = true;
+  }
+
   console.log('===== 매입처 신규등록 모달 열기 완료 =====');
 }
 
@@ -399,6 +405,12 @@ async function viewSupplierDetail(supplierCode) {
 
     document.getElementById('supplierDetailContent').innerHTML = detailHtml;
     document.getElementById('supplierDetailModal').style.display = 'flex';
+
+    // 드래그 기능 활성화 (최초 1회만 실행)
+    if (typeof makeModalDraggable === 'function' && !window.supplierDetailModalDraggable) {
+      makeModalDraggable('supplierDetailModal', 'supplierDetailModalHeader');
+      window.supplierDetailModalDraggable = true;
+    }
   } catch (error) {
     console.error('매입처 상세 조회 오류:', error);
     alert('매입처 정보를 불러오는 중 오류가 발생했습니다.');
@@ -467,6 +479,12 @@ async function editSupplier(supplierCode) {
 
     // 6. 모달 표시
     modal.style.display = 'flex';
+
+    // 드래그 기능 활성화 (최초 1회만 실행)
+    if (typeof makeModalDraggable === 'function' && !window.supplierModalDraggable) {
+      makeModalDraggable('supplierModal', 'supplierModalHeader');
+      window.supplierModalDraggable = true;
+    }
 
     console.log('✅ 매입처 수정 모달 열기 완료');
   } catch (error) {

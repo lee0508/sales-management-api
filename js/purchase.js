@@ -251,6 +251,12 @@ async function openPurchaseStatementDetailModal(statementNo) {
     // 모달 표시
     document.getElementById('purchaseStatementDetailModal').classList.remove('hidden');
     document.getElementById('purchaseStatementDetailModal').style.display = 'flex';
+
+    // 드래그 기능 활성화 (최초 1회만 실행)
+    if (typeof makeModalDraggable === 'function' && !window.purchaseStatementDetailModalDraggable) {
+      makeModalDraggable('purchaseStatementDetailModal', 'purchaseStatementDetailModalHeader');
+      window.purchaseStatementDetailModalDraggable = true;
+    }
   } catch (err) {
     console.error('❌ 매입전표 상세 조회 에러:', err);
     alert('매입전표 상세 정보를 불러오는 중 오류가 발생했습니다.');
@@ -282,6 +288,12 @@ function openNewPurchaseStatementModal() {
 
   // 모달 표시
   document.getElementById('purchaseStatementCreateModal').style.display = 'flex';
+
+  // 드래그 기능 활성화 (최초 1회만 실행)
+  if (typeof makeModalDraggable === 'function' && !window.purchaseStatementCreateModalDraggable) {
+    makeModalDraggable('purchaseStatementCreateModal', 'purchaseStatementCreateModalHeader');
+    window.purchaseStatementCreateModalDraggable = true;
+  }
 }
 
 // ✅ 매입전표 작성 모달 닫기

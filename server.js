@@ -98,11 +98,70 @@ connectDB()
       console.log(`✅ Static files served at: http://localhost:${PORT}${BASE_PATH}/index.html`);
       console.log(`✅ API endpoints at: http://localhost:${PORT}/api/*`);
     });
+
+    // 세션 타임아웃 체커 시작 (5분마다 실행)
+    startSessionTimeoutChecker();
   })
   .catch((err) => {
     console.error('❌ 서버 기동 중 DB 연결 실패로 종료:', err);
     process.exit(1);
   });
+
+// ==================== 세션 타임아웃 체커 ====================
+
+/**
+ * 세션 타임아웃 체커
+ * 30분 이상 활동이 없는 로그인 사용자를 자동 로그아웃
+ */
+function startSessionTimeoutChecker() {
+  const TIMEOUT_MINUTES = 30; // 타임아웃 시간 (분)
+  const CHECK_INTERVAL = 5 * 60 * 1000; // 체크 주기: 5분
+
+  console.log(`✅ 세션 타임아웃 체커 시작 (타임아웃: ${TIMEOUT_MINUTES}분, 체크 주기: 5분)`);
+
+  setInterval(async () => {
+    try {
+      // 현재 시간에서 30분 전의 타임스탬프 계산
+      const now = new Date();
+      const cutoffTime = new Date(now.getTime() - TIMEOUT_MINUTES * 60 * 1000);
+      const cutoffTimestamp = cutoffTime.toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
+
+      // 30분 이상 활동이 없는 로그인 사용자 조회
+      const result = await pool.request()
+        .input('cutoffTime', sql.VarChar(17), cutoffTimestamp)
+        .query(`
+          SELECT 사용자코드, 사용자명, 마지막활동시간
+          FROM 사용자
+          WHERE 로그인여부 = 'Y'
+            AND 마지막활동시간 IS NOT NULL
+            AND 마지막활동시간 < @cutoffTime
+        `);
+
+      if (result.recordset.length > 0) {
+        const 종료일시 = now.toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
+
+        // 비활성 사용자 자동 로그아웃
+        await pool.request()
+          .input('cutoffTime', sql.VarChar(17), cutoffTimestamp)
+          .input('종료일시', sql.VarChar(17), 종료일시)
+          .query(`
+            UPDATE 사용자
+            SET 종료일시 = @종료일시, 로그인여부 = 'N'
+            WHERE 로그인여부 = 'Y'
+              AND 마지막활동시간 IS NOT NULL
+              AND 마지막활동시간 < @cutoffTime
+          `);
+
+        console.log(`⏰ 세션 타임아웃: ${result.recordset.length}명의 사용자 자동 로그아웃`);
+        result.recordset.forEach(user => {
+          console.log(`   - ${user.사용자명} (${user.사용자코드}), 마지막 활동: ${user.마지막활동시간}`);
+        });
+      }
+    } catch (err) {
+      console.error('❌ 세션 타임아웃 체크 에러:', err);
+    }
+  }, CHECK_INTERVAL);
+}
 
 // ==================== 인증 미들웨어 ====================
 
@@ -208,7 +267,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // 로그인 시간 업데이트
+    // 로그인 시간 및 마지막 활동 시간 업데이트
     const 시작일시 = new Date().toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
 
     await pool
@@ -216,7 +275,7 @@ app.post('/api/auth/login', async (req, res) => {
       .input('사용자코드', sql.VarChar(4), userId)
       .input('시작일시', sql.VarChar(17), 시작일시).query(`
                 UPDATE 사용자
-                SET 시작일시 = @시작일시, 로그인여부 = 'Y'
+                SET 시작일시 = @시작일시, 로그인여부 = 'Y', 마지막활동시간 = @시작일시
                 WHERE 사용자코드 = @사용자코드
             `);
 
@@ -311,6 +370,103 @@ app.get('/api/auth/me', (req, res) => {
   } catch (err) {
     console.error('사용자 정보 조회 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// Heartbeat - 사용자 활동 상태 업데이트
+app.post('/api/auth/heartbeat', async (req, res) => {
+  try {
+    // 세션에서 사용자 정보 확인
+    if (!req.session.user) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
+
+    const 사용자코드 = req.session.user.사용자코드;
+    const 마지막활동시간 = new Date().toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
+
+    // 마지막 활동 시간 업데이트
+    await pool
+      .request()
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .input('마지막활동시간', sql.VarChar(17), 마지막활동시간)
+      .query(`
+        UPDATE 사용자
+        SET 마지막활동시간 = @마지막활동시간
+        WHERE 사용자코드 = @사용자코드
+      `);
+
+    res.json({
+      success: true,
+      message: 'Heartbeat received',
+    });
+  } catch (err) {
+    console.error('Heartbeat 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 강제 로그아웃 (브라우저 종료 시 사용)
+app.post('/api/auth/force-logout', async (req, res) => {
+  try {
+    // sendBeacon은 FormData나 URLSearchParams로 전송됨
+    let userId = req.body?.사용자코드 || req.body?.userId;
+
+    // FormData로 전송된 경우 키 이름 확인
+    if (!userId && req.body) {
+      const keys = Object.keys(req.body);
+      if (keys.length > 0) {
+        userId = req.body[keys[0]];
+      }
+    }
+
+    // 세션에서 사용자 정보 확인
+    if (!userId && req.session?.user) {
+      userId = req.session.user.사용자코드;
+    }
+
+    if (!userId) {
+      // 사용자 정보가 없어도 성공 처리 (이미 로그아웃 상태일 수 있음)
+      return res.json({
+        success: true,
+        message: '로그아웃 처리되었습니다.',
+      });
+    }
+
+    const 종료일시 = new Date().toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
+
+    // 사용자 테이블 업데이트
+    await pool
+      .request()
+      .input('사용자코드', sql.VarChar(4), userId)
+      .input('종료일시', sql.VarChar(17), 종료일시)
+      .query(`
+        UPDATE 사용자
+        SET 종료일시 = @종료일시, 로그인여부 = 'N'
+        WHERE 사용자코드 = @사용자코드
+      `);
+
+    console.log(`✅ 강제 로그아웃 성공 - 사용자코드: ${userId}`);
+
+    // 세션 삭제
+    if (req.session) {
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('세션 삭제 에러:', err);
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      message: '강제 로그아웃 되었습니다.',
+    });
+  } catch (err) {
+    console.error('강제 로그아웃 에러:', err);
+    // 에러가 발생해도 200 응답 (sendBeacon은 응답을 처리하지 않음)
+    res.json({ success: false, message: '서버 오류' });
   }
 });
 

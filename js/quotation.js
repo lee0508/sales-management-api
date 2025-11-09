@@ -313,6 +313,12 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
       modal.style.display = 'block';
     }
 
+    // 드래그 기능 활성화 (최초 1회만 실행)
+    if (typeof makeModalDraggable === 'function' && !window.quotationDetailModalDraggable) {
+      makeModalDraggable('quotationDetailModal', 'quotationDetailModalHeader');
+      window.quotationDetailModalDraggable = true;
+    }
+
     try {
       // 견적 마스터+상세 조회 (기존 API 사용)
       const masterRes = await fetch(`/api/quotations/${quotationDate}/${quotationNo}`);
@@ -596,6 +602,12 @@ async function editQuotation(quotationDate, quotationNo) {
 
     // 모달 표시
     modal.style.display = 'block';
+
+    // 드래그 기능 활성화 (최초 1회만 실행)
+    if (typeof makeModalDraggable === 'function' && !window.quotationEditModalDraggable) {
+      makeModalDraggable('quotationEditModal', 'quotationEditModalHeader');
+      window.quotationEditModalDraggable = true;
+    }
   } catch (err) {
     console.error('❌ 견적 수정 모달 열기 오류:', err);
     alert('견적 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
