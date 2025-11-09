@@ -2685,20 +2685,23 @@ app.delete('/api/orders/:date/:no', requireAuth, async (req, res) => {
 // 자재 리스트
 app.get('/api/materials', async (req, res) => {
   try {
-    const { search, 분류코드 } = req.query;
+    const { search, 분류코드, includeDeleted } = req.query;
     const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    // includeDeleted=true면 사용구분 0과 9 모두 조회, 아니면 0만 조회
+    const 사용구분조건 = includeDeleted === 'true' ? 'IN (0, 9)' : '= 0';
 
     let query = `
             SELECT
                 (m.분류코드 + m.세부코드) as 자재코드,
                 m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
-                m.바코드, m.과세구분, m.적요,
+                m.바코드, m.과세구분, m.적요, m.사용구분,
                 c.분류명,
                 ml.입고단가1, ml.출고단가1, ml.출고단가2, ml.출고단가3
             FROM 자재 m
             LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
             LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = @사업장코드
-            WHERE m.사용구분 = 0
+            WHERE m.사용구분 ${사용구분조건}
         `;
 
     const request = pool.request()
@@ -2986,18 +2989,26 @@ app.put('/api/materials/:code', requireAuth, async (req, res) => {
   }
 });
 
-// 자재 삭제
+// 자재 삭제 (Soft Delete)
 app.delete('/api/materials/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
     const 분류코드 = code.substring(0, 2);
     const 세부코드 = code.substring(2);
 
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+
     await pool
       .request()
       .input('분류코드', sql.VarChar(2), 분류코드)
-      .input('세부코드', sql.VarChar(18), 세부코드).query(`
-                UPDATE 자재 SET 사용구분 = 1
+      .input('세부코드', sql.VarChar(18), 세부코드)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+                UPDATE 자재 SET
+                  사용구분 = 9,
+                  수정일자 = @수정일자,
+                  사용자코드 = @사용자코드
                 WHERE 분류코드 = @분류코드 AND 세부코드 = @세부코드
             `);
 
@@ -3007,6 +3018,152 @@ app.delete('/api/materials/:code', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('자재 삭제 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// 자재 상세 조회 (매입처, 단가, 입출고 이력 포함)
+app.get('/api/materials/:code/detail', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const 분류코드 = code.substring(0, 2);
+    const 세부코드 = code.substring(2);
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    // 1. 자재 기본 정보
+    const materialResult = await pool
+      .request()
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드)
+      .query(`
+        SELECT
+          m.분류코드, m.세부코드,
+          (m.분류코드 + m.세부코드) AS 자재코드,
+          m.자재명, m.바코드, m.규격, m.단위,
+          m.폐기율, m.과세구분, m.적요,
+          m.사용구분, m.수정일자, m.사용자코드,
+          c.분류명
+        FROM 자재 m
+        LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
+        WHERE m.분류코드 = @분류코드 AND m.세부코드 = @세부코드
+      `);
+
+    if (materialResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '자재를 찾을 수 없습니다.' });
+    }
+
+    const material = materialResult.recordset[0];
+
+    // 2. 자재시세 (매입처별 단가, 마진율)
+    const priceResult = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드)
+      .query(`
+        SELECT
+          s.매입처코드,
+          p.매입처명,
+          s.적용일자,
+          s.입고단가,
+          s.입고부가,
+          s.출고단가,
+          s.출고부가,
+          s.마진율,
+          s.수정일자
+        FROM 자재시세 s
+        LEFT JOIN 매입처 p ON s.매입처코드 = p.매입처코드 AND s.사업장코드 = p.사업장코드
+        WHERE s.사업장코드 = @사업장코드
+          AND s.분류코드 = @분류코드
+          AND s.세부코드 = @세부코드
+          AND s.사용구분 = 0
+        ORDER BY s.적용일자 DESC, s.매입처코드
+      `);
+
+    // 3. 자재원장 (실제 단가, 재고 정보)
+    const ledgerResult = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드)
+      .query(`
+        SELECT
+          l.적정재고,
+          l.최저재고,
+          l.최종입고일자,
+          l.최종출고일자,
+          l.비고란,
+          l.주매입처코드,
+          p.매입처명 AS 주매입처명,
+          l.입고단가1,
+          l.입고단가2,
+          l.입고단가3,
+          l.출고단가1,
+          l.출고단가2,
+          l.출고단가3
+        FROM 자재원장 l
+        LEFT JOIN 매입처 p ON l.주매입처코드 = p.매입처코드 AND l.사업장코드 = p.사업장코드
+        WHERE l.사업장코드 = @사업장코드
+          AND l.분류코드 = @분류코드
+          AND l.세부코드 = @세부코드
+      `);
+
+    const ledger = ledgerResult.recordset[0] || null;
+
+    // 4. 자재입출내역 (최근 20건)
+    const transactionResult = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드)
+      .query(`
+        SELECT TOP 20
+          t.입출고구분,
+          CASE t.입출고구분
+            WHEN 1 THEN '입고'
+            WHEN 2 THEN '출고'
+            ELSE '기타'
+          END AS 입출고구분명,
+          t.입출고일자,
+          t.거래일자,
+          t.거래번호,
+          t.입고수량,
+          t.입고단가,
+          t.입고부가,
+          (t.입고수량 * t.입고단가) AS 입고공급가액,
+          t.출고수량,
+          t.출고단가,
+          t.출고부가,
+          (t.출고수량 * t.출고단가) AS 출고공급가액,
+          t.매입처코드,
+          t.매출처코드,
+          CASE
+            WHEN t.입출고구분 = 1 THEN p.매입처명
+            WHEN t.입출고구분 = 2 THEN c.매출처명
+            ELSE ''
+          END AS 거래처명,
+          t.적요
+        FROM 자재입출내역 t
+        LEFT JOIN 매입처 p ON t.매입처코드 = p.매입처코드 AND t.사업장코드 = p.사업장코드
+        LEFT JOIN 매출처 c ON t.매출처코드 = c.매출처코드 AND t.사업장코드 = c.사업장코드
+        WHERE t.사업장코드 = @사업장코드
+          AND t.분류코드 = @분류코드
+          AND t.세부코드 = @세부코드
+          AND t.사용구분 = 0
+        ORDER BY t.입출고일자 DESC, t.거래일자 DESC, t.거래번호 DESC
+      `);
+
+    res.json({
+      success: true,
+      data: {
+        material,
+        prices: priceResult.recordset,
+        ledger,
+        transactions: transactionResult.recordset,
+      },
+    });
+  } catch (err) {
+    console.error('자재 상세 조회 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
   }
 });

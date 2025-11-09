@@ -1,13 +1,13 @@
 /**
- * 자재내역관리 (Material Transaction History Management)
- * 자재입출내역 테이블 CRUD 기능
+ * 자재내역관리 (Material Management)
+ * 자재 테이블 CRUD 기능
  */
 
 let materialHistoryTableInstance = null;
-let selectedHistoryRecords = [];
+let selectedMaterials = [];
 
 /**
- * 자재내역관리 DataTable 초기화
+ * 자재 목록 DataTable 초기화
  */
 function initMaterialHistoryTable() {
   if (materialHistoryTableInstance) {
@@ -16,155 +16,173 @@ function initMaterialHistoryTable() {
 
   materialHistoryTableInstance = $('#materialHistoryTable').DataTable({
     data: [],
+    order: [], // 입력 순서 유지
     columns: [
       {
         data: null,
         orderable: false,
         className: 'dt-center',
+        width: '40px',
         render: function (data, type, row) {
-          const compositeKey = `${row.사업장코드}_${row.분류코드}_${row.세부코드}_${row.입출고일자}_${row.입출고시간}`;
-          return `<input type="checkbox" class="history-checkbox" data-composite-key="${compositeKey}" />`;
+          return `<input type="checkbox" class="material-checkbox" data-code="${row.자재코드}" />`;
         },
       },
-      { data: null, render: (data, type, row, meta) => meta.row + 1 },
       {
         data: null,
-        render: (data, type, row) => {
-          // 세부코드가 이미 분류코드를 포함하고 있는지 확인
-          let 세부코드 = row.세부코드 || '';
-          // 세부코드 앞 2자리가 분류코드와 같으면 제거
-          if (세부코드.substring(0, 2) === row.분류코드) {
-            세부코드 = 세부코드.substring(2);
+        className: 'dt-center',
+        width: '60px',
+        render: (data, type, row, meta) => meta.row + 1,
+      },
+      {
+        data: '분류명',
+        defaultContent: '-',
+      },
+      {
+        data: '자재코드',
+        render: (data) => {
+          // 자재코드에서 사업장코드 + 분류코드 제거하고 순수 세부코드만 표시
+          if (data && data.length >= 4) {
+            return data.substring(4); // 앞 4자리(사업장코드2 + 분류코드2) 제거
           }
-          const 자재코드 = `${row.분류코드}${세부코드}`;
-          return 자재코드 || '-';
+          return data || '-';
         },
       },
-      { data: '자재명', defaultContent: '-' },
+      {
+        data: '자재명',
+        defaultContent: '-',
+        render: (data, type, row) => {
+          if (row.사용구분 === 9) {
+            return `<span style="color: #dc3545; text-decoration: line-through;">${data || '-'}</span> <span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 8px; font-size: 10px; margin-left: 4px;">삭제됨</span>`;
+          }
+          return data || '-';
+        },
+      },
       { data: '규격', defaultContent: '-' },
       { data: '단위', defaultContent: '-' },
       {
-        data: '입출고일자',
-        render: (data) => {
-          if (!data || data.length !== 8) return '-';
-          return `${data.substring(0, 4)}-${data.substring(4, 6)}-${data.substring(6, 8)}`;
-        },
-      },
-      {
-        data: '거래일자',
-        render: (data) => {
-          if (!data || data.length !== 8) return '-';
-          return `${data.substring(0, 4)}-${data.substring(4, 6)}-${data.substring(6, 8)}`;
-        },
-      },
-      {
-        data: '입출고구분',
+        data: '과세구분',
+        className: 'dt-center',
         render: (data) => {
           if (data === 1) {
-            return '<span style="background: #28a745; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">입고</span>';
-          } else if (data === 2) {
-            return '<span style="background: #007bff; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">출고</span>';
+            return '<span style="background: #007bff; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px;">과세</span>';
+          } else if (data === 0) {
+            return '<span style="background: #6c757d; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px;">면세</span>';
           }
           return '-';
         },
       },
       {
-        data: null,
+        data: '입고단가1',
         className: 'dt-right',
-        render: (data, type, row) => {
-          if (row.입출고구분 === 1) {
-            return formatNumber(row.입고수량 || 0);
-          } else if (row.입출고구분 === 2) {
-            return formatNumber(row.출고수량 || 0);
-          }
-          return '0';
-        },
+        render: (data) => formatCurrency(data || 0),
       },
       {
-        data: null,
+        data: '출고단가1',
         className: 'dt-right',
-        render: (data, type, row) => {
-          if (row.입출고구분 === 1) {
-            return formatCurrency(row.입고단가 || 0);
-          } else if (row.입출고구분 === 2) {
-            return formatCurrency(row.출고단가 || 0);
-          }
-          return '0원';
-        },
+        render: (data) => formatCurrency(data || 0),
       },
       {
         data: null,
-        render: (data, type, row) => {
-          if (row.입출고구분 === 1) {
-            return `${row.매입처코드 || '-'}<br/><small>${row.매입처명 || ''}</small>`;
-          } else if (row.입출고구분 === 2) {
-            return `${row.매출처코드 || '-'}<br/><small>${row.매출처명 || ''}</small>`;
-          }
-          return '-';
-        },
-      },
-      {
-        data: null,
-        orderable: false,
         className: 'dt-center',
+        orderable: false,
+        width: '200px',
         render: function (data, type, row) {
-          const compositeKey = `${row.사업장코드}_${row.분류코드}_${row.세부코드}_${row.입출고일자}_${row.입출고시간}`;
+          // 삭제된 자재는 상세 버튼만 표시
+          if (row.사용구분 === 9) {
+            return `
+              <button class="btn-detail" onclick="viewMaterialDetail('${row.자재코드}')"
+                      style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
+                상세
+              </button>
+              <span style="color: #999; font-size: 12px; margin-left: 8px;">삭제된 자재</span>
+            `;
+          }
+
+          // 정상 자재는 모든 버튼 표시
           return `
-            <div class="action-buttons" id="history-actions-${compositeKey}">
-              <button class="btn-icon btn-view" onclick="viewHistoryDetail('${compositeKey}')">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editMaterialHistory('${compositeKey}')">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="openDeleteConfirmation('${compositeKey}')">삭제</button>
-            </div>
+            <button class="btn-detail" onclick="viewMaterialDetail('${row.자재코드}')"
+                    style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; margin-right: 4px;">
+              상세
+            </button>
+            <button class="btn-edit" onclick="editMaterial('${row.자재코드}')"
+                    style="padding: 6px 12px; background: #ffc107; color: #333; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; margin-right: 4px;">
+              수정
+            </button>
+            <button class="btn-delete" onclick="deleteMaterial('${row.자재코드}')"
+                    style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
+              삭제
+            </button>
           `;
         },
       },
     ],
     language: {
-      emptyTable: '데이터가 없습니다.',
+      emptyTable: '검색 버튼을 눌러 자재를 조회하세요.',
+      info: '전체 _TOTAL_개 중 _START_~_END_번째',
+      infoEmpty: '데이터 없음',
+      infoFiltered: '(전체 _MAX_개 중 검색결과)',
+      lengthMenu: '_MENU_개씩 보기',
       search: '검색:',
-      lengthMenu: '페이지당 _MENU_ 개 보기',
-      info: '_START_ - _END_ / 총 _TOTAL_건',
-      paginate: { previous: '이전', next: '다음' },
+      zeroRecords: '검색 결과가 없습니다.',
+      paginate: {
+        first: '처음',
+        last: '마지막',
+        next: '다음',
+        previous: '이전',
+      },
     },
-    order: [],
-    responsive: true,
-    autoWidth: false,
     pageLength: 25,
+    lengthMenu: [
+      [10, 25, 50, 100, -1],
+      [10, 25, 50, 100, '전체'],
+    ],
+    dom: '<"top"lf>rt<"bottom"ip>',
   });
 
-  setupHistoryCheckboxHandlers();
+  // 체크박스 전체 선택/해제
+  $('#selectAllMaterials').on('change', function () {
+    const isChecked = $(this).prop('checked');
+    $('.material-checkbox').prop('checked', isChecked);
+  });
+
+  console.log('✅ 자재 목록 DataTable 초기화 완료');
 }
 
 /**
- * 자재내역 목록 조회
+ * 자재 목록 조회
  */
-async function loadMaterialHistory(searchKeyword = '') {
+async function loadMaterialList(searchKeyword = '') {
   try {
-    let url = `${API_BASE_URL}/material-history`;
-    if (searchKeyword) {
-      url += `?search=${encodeURIComponent(searchKeyword)}`;
+    console.log('🔍 자재 목록 조회 시작:', searchKeyword);
+
+    // 자재내역관리에서는 삭제된 자재(사용구분=9)도 포함하여 조회
+    const url = searchKeyword
+      ? `/api/materials?search=${encodeURIComponent(searchKeyword)}&includeDeleted=true`
+      : '/api/materials?includeDeleted=true';
+
+    const response = await fetch(url, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error('자재 목록 조회 실패');
     }
 
-    const response = await fetch(url, { credentials: 'include' });
+    const result = await response.json();
 
-    if (!response.ok) throw new Error('자재내역 조회 실패');
+    if (result.success && result.data) {
+      console.log(`✅ 자재 ${result.data.length}건 조회 성공`);
 
-    const data = await response.json();
-    const history = data.data || [];
-
-    if (materialHistoryTableInstance) {
+      // DataTable 데이터 갱신
       materialHistoryTableInstance.clear();
-      materialHistoryTableInstance.rows.add(history);
+      materialHistoryTableInstance.rows.add(result.data);
       materialHistoryTableInstance.draw();
+    } else {
+      alert('자재 목록 조회에 실패했습니다.');
     }
-
-    // 선택 초기화
-    selectedHistoryRecords = [];
-    $('.history-checkbox').prop('checked', false);
-    $('#selectAllHistory').prop('checked', false);
-  } catch (err) {
-    console.error('자재내역 조회 에러:', err);
-    alert('자재내역 조회 중 오류가 발생했습니다: ' + err.message);
+  } catch (error) {
+    console.error('❌ 자재 목록 조회 에러:', error);
+    alert('자재 목록 조회 중 오류가 발생했습니다.');
   }
 }
 
@@ -173,14 +191,7 @@ async function loadMaterialHistory(searchKeyword = '') {
  */
 function searchMaterialHistory() {
   const keyword = document.getElementById('historyListSearchInput').value.trim();
-
-  // 검색어가 없으면 경고 표시하고 빈 테이블 유지
-  if (!keyword) {
-    alert('세부코드 또는 자재명을 입력해주세요.');
-    return;
-  }
-
-  loadMaterialHistory(keyword);
+  loadMaterialList(keyword);
 }
 
 /**
@@ -188,493 +199,468 @@ function searchMaterialHistory() {
  */
 function resetHistorySearch() {
   document.getElementById('historyListSearchInput').value = '';
-  loadMaterialHistory();
+  materialHistoryTableInstance.clear().draw();
+  console.log('🔄 검색 초기화 완료');
 }
 
 /**
- * 신규 등록 모달 열기
+ * 신규 자재 등록 모달 열기
  */
 function openNewHistoryModal() {
+  // 모달 제목 설정
   const titleElement = document.getElementById('historyModalTitle');
   if (titleElement) {
-    titleElement.textContent = '자재입출내역 신규 등록';
+    titleElement.textContent = '자재 신규 등록';
   }
 
-  document.getElementById('historyModalMode').value = 'create';
+  // 폼 초기화
   document.getElementById('historyForm').reset();
 
-  // 현재 날짜 기본값 설정
-  const today = new Date().toISOString().substring(0, 10);
-  const 입출고일자 = document.getElementById('history입출고일자');
-  const 거래일자 = document.getElementById('history거래일자');
-  if (입출고일자) 입출고일자.value = today;
-  if (거래일자) 거래일자.value = today;
+  // 저장 버튼 이벤트 설정
+  const saveBtn = document.getElementById('saveHistoryBtn');
+  if (saveBtn) {
+    saveBtn.onclick = saveMaterial;
+  }
 
+  // 모달 표시
   document.getElementById('historyModal').style.display = 'flex';
 }
 
 /**
- * 모달 닫기
+ * 자재 저장 (신규 등록)
  */
-function closeHistoryModal() {
-  document.getElementById('historyModal').style.display = 'none';
-  document.getElementById('historyForm').reset();
-}
-
-function closeHistoryDetailModal() {
-  document.getElementById('historyDetailModal').style.display = 'none';
-}
-
-function closeHistoryDeleteModal() {
-  document.getElementById('historyDeleteModal').style.display = 'none';
-}
-
-/**
- * 체크박스 핸들러 설정
- */
-function setupHistoryCheckboxHandlers() {
-  // 전체 선택 체크박스
-  $('#selectAllHistory').off('change').on('change', function () {
-    const isChecked = $(this).is(':checked');
-    $('.history-checkbox').prop('checked', isChecked);
-
-    selectedHistoryRecords = [];
-    if (isChecked) {
-      $('.history-checkbox').each(function () {
-        selectedHistoryRecords.push($(this).data('composite-key'));
-      });
-    }
-
-    // 모든 행의 버튼 표시 상태 업데이트
-    $('.history-checkbox').each(function () {
-      const compositeKey = $(this).data('composite-key');
-      const actionDiv = $(`#history-actions-${compositeKey}`);
-
-      if (isChecked) {
-        // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
-        actionDiv.find('.btn-view').hide();
-        actionDiv.find('.btn-edit').show();
-        actionDiv.find('.btn-delete').show();
-      } else {
-        // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
-        actionDiv.find('.btn-view').show();
-        actionDiv.find('.btn-edit').hide();
-        actionDiv.find('.btn-delete').hide();
-      }
-    });
-  });
-
-  // 개별 체크박스
-  $(document).off('change', '.history-checkbox').on('change', '.history-checkbox', function () {
-    const compositeKey = $(this).data('composite-key');
-    const isChecked = $(this).is(':checked');
-    const actionDiv = $(`#history-actions-${compositeKey}`);
-
-    if (isChecked) {
-      if (!selectedHistoryRecords.includes(compositeKey)) {
-        selectedHistoryRecords.push(compositeKey);
-      }
-      // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
-      actionDiv.find('.btn-view').hide();
-      actionDiv.find('.btn-edit').show();
-      actionDiv.find('.btn-delete').show();
-    } else {
-      const index = selectedHistoryRecords.indexOf(compositeKey);
-      if (index > -1) {
-        selectedHistoryRecords.splice(index, 1);
-      }
-      $('#selectAllHistory').prop('checked', false);
-
-      // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
-      actionDiv.find('.btn-view').show();
-      actionDiv.find('.btn-edit').hide();
-      actionDiv.find('.btn-delete').hide();
-    }
-  });
-}
-
-/**
- * 삭제 확인 모달 열기
- */
-async function openDeleteConfirmation(compositeKey) {
+async function saveMaterial() {
   try {
-    const [사업장코드, 분류코드, 세부코드, 입출고일자, 입출고시간] = compositeKey.split('_');
+    const 분류코드 = document.getElementById('history분류코드').value.trim();
+    const 세부코드 = document.getElementById('history세부코드').value.trim();
+    const 자재명 = document.getElementById('history자재명').value.trim();
+    const 바코드 = document.getElementById('history바코드')?.value.trim() || '';
+    const 규격 = document.getElementById('history규격')?.value.trim() || '';
+    const 단위 = document.getElementById('history단위')?.value.trim() || '';
+    const 폐기율 = parseFloat(document.getElementById('history폐기율')?.value || 0);
+    const 과세구분 = parseInt(document.getElementById('history과세구분')?.value || 1);
+    const 적요 = document.getElementById('history적요')?.value.trim() || '';
 
-    const url = `${API_BASE_URL}/material-history/${사업장코드}/${분류코드}/${세부코드}/${입출고일자}/${입출고시간}`;
-    const response = await fetch(url, { credentials: 'include' });
-
-    if (!response.ok) throw new Error('상세 조회 실패');
-
-    const data = await response.json();
-    const record = data.data;
-
-    // 삭제할 내역 정보 표시
-    const 자재코드 = `${record.분류코드}${record.세부코드}`;
-    const 입출고구분명 = record.입출고구분 === 1 ? '입고' : '출고';
-    const 수량 = record.입출고구분 === 1 ? record.입고수량 : record.출고수량;
-
-    const deleteInfo = `
-      <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: 14px;">
-        <strong>자재코드:</strong>
-        <span>${자재코드}</span>
-        <strong>자재명:</strong>
-        <span>${record.자재명 || '-'}</span>
-        <strong>입출고구분:</strong>
-        <span>${입출고구분명}</span>
-        <strong>입출고일자:</strong>
-        <span>${formatDate(record.입출고일자)}</span>
-        <strong>수량:</strong>
-        <span>${formatNumber(수량 || 0)}</span>
-      </div>
-    `;
-
-    document.getElementById('historyDeleteInfo').innerHTML = deleteInfo;
-
-    // compositeKey를 전역 변수에 저장
-    window.currentDeleteCompositeKey = compositeKey;
-
-    // 모달 표시
-    document.getElementById('historyDeleteModal').style.display = 'flex';
-  } catch (err) {
-    console.error('삭제 모달 에러:', err);
-    alert('삭제 준비 중 오류가 발생했습니다: ' + err.message);
-  }
-}
-
-
-/**
- * 상세보기 모달
- */
-async function viewHistoryDetail(compositeKey) {
-  try {
-    const [사업장코드, 분류코드, 세부코드, 입출고일자, 입출고시간] = compositeKey.split('_');
-
-    const url = `${API_BASE_URL}/material-history/${사업장코드}/${분류코드}/${세부코드}/${입출고일자}/${입출고시간}`;
-    const response = await fetch(url, { credentials: 'include' });
-
-    if (!response.ok) throw new Error('상세 조회 실패');
-
-    const data = await response.json();
-    const record = data.data;
-
-    // 자재코드 처리 (세부코드가 이미 분류코드를 포함하고 있는지 확인)
-    let detailCode = record.세부코드 || '';
-    if (detailCode.substring(0, 2) === record.분류코드) {
-      detailCode = detailCode.substring(2);
-    }
-    const 자재코드 = `${record.분류코드}${detailCode}`;
-    const 입출고구분명 = record.입출고구분 === 1 ? '입고 (매입)' : '출고 (매출)';
-    const 수량 = record.입출고구분 === 1 ? record.입고수량 : record.출고수량;
-    const 단가 = record.입출고구분 === 1 ? record.입고단가 : record.출고단가;
-    const 부가 = record.입출고구분 === 1 ? record.입고부가 : record.출고부가;
-    const 거래처코드 = record.입출고구분 === 1 ? record.매입처코드 : record.매출처코드;
-    const 거래처명 = record.입출고구분 === 1 ? record.매입처명 : record.매출처명;
-    const 합계 = (수량 || 0) * (단가 || 0) + (부가 || 0);
-
-    // 상세 정보 HTML 생성
-    const detailHTML = `
-      <div style="grid-column: span 2; background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 8px;">
-        <strong>${입출고구분명}</strong>
-      </div>
-      <div><strong>자재코드:</strong></div>
-      <div>${자재코드}</div>
-      <div><strong>자재명:</strong></div>
-      <div>${record.자재명 || '-'}</div>
-      <div><strong>규격:</strong></div>
-      <div>${record.규격 || '-'}</div>
-      <div><strong>단위:</strong></div>
-      <div>${record.단위 || '-'}</div>
-      <div><strong>입출고일자:</strong></div>
-      <div>${formatDate(record.입출고일자)}</div>
-      <div><strong>거래일자:</strong></div>
-      <div>${formatDate(record.거래일자)}</div>
-      <div><strong>거래번호:</strong></div>
-      <div>${record.거래번호 || '-'}</div>
-      <div><strong>수량:</strong></div>
-      <div style="text-align: right; font-weight: 600;">${formatNumber(수량 || 0)}</div>
-      <div><strong>단가:</strong></div>
-      <div style="text-align: right; font-weight: 600;">${formatCurrency(단가 || 0)}</div>
-      <div><strong>부가세:</strong></div>
-      <div style="text-align: right; font-weight: 600;">${formatCurrency(부가 || 0)}</div>
-      <div><strong>합계:</strong></div>
-      <div style="text-align: right; font-weight: 700; color: #007bff; font-size: 16px;">${formatCurrency(합계)}</div>
-      <div><strong>거래처코드:</strong></div>
-      <div>${거래처코드 || '-'}</div>
-      <div><strong>거래처명:</strong></div>
-      <div>${거래처명 || '-'}</div>
-      <div><strong>적요:</strong></div>
-      <div style="grid-column: span 2; white-space: pre-wrap;">${record.적요 || '-'}</div>
-      <div><strong>사용자코드:</strong></div>
-      <div>${record.사용자코드 || '-'}</div>
-      <div><strong>수정일자:</strong></div>
-      <div>${record.수정일자 || '-'}</div>
-    `;
-
-    document.getElementById('historyDetailContent').innerHTML = detailHTML;
-
-    // 모달 표시
-    document.getElementById('historyDetailModal').style.display = 'flex';
-  } catch (err) {
-    console.error('상세 조회 에러:', err);
-    alert('상세 조회 중 오류가 발생했습니다: ' + err.message);
-  }
-}
-
-// (이 함수는 위에서 이미 정의되어 있으므로 삭제)
-
-/**
- * 수정 모달 열기
- */
-async function editMaterialHistory(compositeKey) {
-  try {
-    const [사업장코드, 분류코드, 세부코드, 입출고일자, 입출고시간] = compositeKey.split('_');
-
-    const url = `${API_BASE_URL}/material-history/${사업장코드}/${분류코드}/${세부코드}/${입출고일자}/${입출고시간}`;
-    const response = await fetch(url, { credentials: 'include' });
-
-    if (!response.ok) throw new Error('상세 조회 실패');
-
-    const data = await response.json();
-    const record = data.data;
-
-    // 폼에 데이터 채우기
-    const titleElement = document.getElementById('historyModalTitle');
-    if (titleElement) {
-      titleElement.textContent = '자재내역 수정';
+    // 필수 항목 검증
+    if (!분류코드 || !세부코드 || !자재명) {
+      alert('분류코드, 세부코드, 자재명은 필수 입력 항목입니다.');
+      return;
     }
 
-    document.getElementById('historyModalMode').value = 'edit';
-    document.getElementById('historyOriginalCompositeKey').value = compositeKey;
+    const requestBody = {
+      분류코드,
+      세부코드,
+      자재명,
+      바코드,
+      규격,
+      단위,
+      폐기율,
+      과세구분,
+      적요,
+    };
 
-    // 사업장코드는 세션에서 가져오므로 필드에 설정하지 않음
-    document.getElementById('history분류코드').value = record.분류코드 || '';
-    document.getElementById('history세부코드').value = record.세부코드 || '';
-    document.getElementById('history입출고구분').value = record.입출고구분 || '1';
-    document.getElementById('history입출고일자').value = formatDateInput(record.입출고일자);
-    document.getElementById('history거래일자').value = formatDateInput(record.거래일자);
-    document.getElementById('history거래번호').value = record.거래번호 || '';
+    console.log('📤 자재 등록 요청:', requestBody);
 
-    if (record.입출고구분 === 1) {
-      document.getElementById('history수량').value = record.입고수량 || 0;
-      document.getElementById('history단가').value = record.입고단가 || 0;
-      document.getElementById('history부가').value = record.입고부가 || 0;
-      document.getElementById('history거래처코드').value = record.매입처코드 || '';
-    } else {
-      document.getElementById('history수량').value = record.출고수량 || 0;
-      document.getElementById('history단가').value = record.출고단가 || 0;
-      document.getElementById('history부가').value = record.출고부가 || 0;
-      document.getElementById('history거래처코드').value = record.매출처코드 || '';
-    }
-
-    document.getElementById('history적요').value = record.적요 || '';
-
-    // 모달 표시
-    document.getElementById('historyModal').style.display = 'flex';
-  } catch (err) {
-    console.error('수정 모달 에러:', err);
-    alert('수정 모달을 열 수 없습니다: ' + err.message);
-  }
-}
-
-/**
- * 저장 (생성/수정)
- */
-async function saveMaterialHistory() {
-  const mode = document.getElementById('historyModalMode').value;
-
-  const formData = {
-    사업장코드: document.getElementById('history사업장코드').value.trim(),
-    분류코드: document.getElementById('history분류코드').value.trim(),
-    세부코드: document.getElementById('history세부코드').value.trim(),
-    입출고구분: parseInt(document.getElementById('history입출고구분').value),
-    입출고일자: document.getElementById('history입출고일자').value.replace(/-/g, ''),
-    거래일자: document.getElementById('history거래일자').value.replace(/-/g, ''),
-    거래번호: parseInt(document.getElementById('history거래번호').value) || 0,
-    적요: document.getElementById('history적요').value.trim(),
-  };
-
-  const 수량 = parseFloat(document.getElementById('history수량').value) || 0;
-  const 단가 = parseFloat(document.getElementById('history단가').value) || 0;
-  const 부가 = parseFloat(document.getElementById('history부가').value) || 0;
-  const 거래처코드 = document.getElementById('history거래처코드').value.trim();
-
-  if (formData.입출고구분 === 1) {
-    formData.입고수량 = 수량;
-    formData.입고단가 = 단가;
-    formData.입고부가 = 부가;
-    formData.매입처코드 = 거래처코드;
-    formData.출고수량 = 0;
-    formData.출고단가 = 0;
-    formData.출고부가 = 0;
-    formData.매출처코드 = '';
-  } else {
-    formData.출고수량 = 수량;
-    formData.출고단가 = 단가;
-    formData.출고부가 = 부가;
-    formData.매출처코드 = 거래처코드;
-    formData.입고수량 = 0;
-    formData.입고단가 = 0;
-    formData.입고부가 = 0;
-    formData.매입처코드 = '';
-  }
-
-  // 필수 항목 검증
-  if (!formData.사업장코드 || !formData.분류코드 || !formData.세부코드) {
-    alert('사업장코드, 분류코드, 세부코드는 필수 입력 항목입니다.');
-    return;
-  }
-
-  try {
-    let url, method;
-
-    if (mode === 'create') {
-      url = `${API_BASE_URL}/material-history`;
-      method = 'POST';
-    } else {
-      const originalKey = document.getElementById('historyOriginalCompositeKey').value;
-      const [사업장코드, 분류코드, 세부코드, 입출고일자, 입출고시간] = originalKey.split('_');
-      url = `${API_BASE_URL}/material-history/${사업장코드}/${분류코드}/${세부코드}/${입출고일자}/${입출고시간}`;
-      method = 'PUT';
-    }
-
-    const response = await fetch(url, {
-      method: method,
+    const response = await fetch('/api/materials', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify(formData),
+      body: JSON.stringify(requestBody),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      alert('자재가 등록되었습니다.');
+      closeHistoryModal();
+      searchMaterialHistory(); // 목록 새로고침
+    } else {
+      alert(result.message || '자재 등록에 실패했습니다.');
+    }
+  } catch (error) {
+    console.error('❌ 자재 등록 에러:', error);
+    alert('자재 등록 중 오류가 발생했습니다.');
+  }
+}
+
+/**
+ * 자재 수정 모달 열기
+ */
+async function editMaterial(자재코드) {
+  try {
+    console.log('✏️ 자재 수정 모달 열기:', 자재코드);
+
+    // 자재 상세 정보 조회
+    const response = await fetch(`/api/materials/${자재코드}/detail`, {
+      credentials: 'include',
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || '저장 실패');
+      throw new Error('자재 정보 조회 실패');
     }
 
-    alert(mode === 'create' ? '등록되었습니다.' : '수정되었습니다.');
-    closeHistoryModal();
-    loadMaterialHistory();
-  } catch (err) {
-    console.error('저장 에러:', err);
-    alert('저장 중 오류가 발생했습니다: ' + err.message);
+    const result = await response.json();
+
+    if (result.success && result.data.material) {
+      const material = result.data.material;
+
+      // 모달 제목 설정
+      const titleElement = document.getElementById('historyModalTitle');
+      if (titleElement) {
+        titleElement.textContent = '자재 수정';
+      }
+
+      // 폼에 데이터 채우기
+      document.getElementById('history분류코드').value = material.분류코드 || '';
+      document.getElementById('history분류코드').readOnly = true; // 수정 불가
+      document.getElementById('history세부코드').value = material.세부코드 || '';
+      document.getElementById('history세부코드').readOnly = true; // 수정 불가
+      document.getElementById('history자재명').value = material.자재명 || '';
+      document.getElementById('history바코드').value = material.바코드 || '';
+      document.getElementById('history규격').value = material.규격 || '';
+      document.getElementById('history단위').value = material.단위 || '';
+      document.getElementById('history폐기율').value = material.폐기율 || 0;
+      document.getElementById('history과세구분').value = material.과세구분 || 1;
+      document.getElementById('history적요').value = material.적요 || '';
+
+      // 저장 버튼 이벤트 설정
+      const saveBtn = document.getElementById('saveHistoryBtn');
+      if (saveBtn) {
+        saveBtn.onclick = () => updateMaterial(자재코드);
+      }
+
+      // 모달 표시
+      document.getElementById('historyModal').style.display = 'flex';
+    } else {
+      alert('자재 정보를 불러올 수 없습니다.');
+    }
+  } catch (error) {
+    console.error('❌ 자재 수정 모달 열기 에러:', error);
+    alert('자재 정보 조회 중 오류가 발생했습니다.');
   }
 }
 
 /**
- * 삭제 확인 모달
+ * 자재 업데이트
  */
-function openHistoryDeleteModal(compositeKey = null) {
-  if (compositeKey) {
-    selectedHistoryRecords = [compositeKey];
-  }
+async function updateMaterial(자재코드) {
+  try {
+    const 자재명 = document.getElementById('history자재명').value.trim();
+    const 바코드 = document.getElementById('history바코드')?.value.trim() || '';
+    const 규격 = document.getElementById('history규격')?.value.trim() || '';
+    const 단위 = document.getElementById('history단위')?.value.trim() || '';
+    const 폐기율 = parseFloat(document.getElementById('history폐기율')?.value || 0);
+    const 과세구분 = parseInt(document.getElementById('history과세구분')?.value || 1);
+    const 적요 = document.getElementById('history적요')?.value.trim() || '';
 
-  if (selectedHistoryRecords.length === 0) {
-    alert('삭제할 항목을 선택해주세요.');
-    return;
-  }
+    // 필수 항목 검증
+    if (!자재명) {
+      alert('자재명은 필수 입력 항목입니다.');
+      return;
+    }
 
-  document.getElementById('historyDeleteCount').textContent = selectedHistoryRecords.length;
+    const requestBody = {
+      자재명,
+      바코드,
+      규격,
+      단위,
+      폐기율,
+      과세구분,
+      적요,
+    };
+
+    console.log('📤 자재 수정 요청:', 자재코드, requestBody);
+
+    const response = await fetch(`/api/materials/${자재코드}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(requestBody),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      alert('자재가 수정되었습니다.');
+      closeHistoryModal();
+      searchMaterialHistory(); // 목록 새로고침
+    } else {
+      alert(result.message || '자재 수정에 실패했습니다.');
+    }
+  } catch (error) {
+    console.error('❌ 자재 수정 에러:', error);
+    alert('자재 수정 중 오류가 발생했습니다.');
+  }
+}
+
+/**
+ * 자재 삭제
+ */
+async function deleteMaterial(자재코드) {
+  // 삭제할 자재 정보 표시
+  const deleteInfo = document.getElementById('historyDeleteInfo');
+  deleteInfo.innerHTML = `
+    <div style="font-size: 14px; color: #333;">
+      <strong>자재코드:</strong> ${자재코드.substring(4)}<br>
+      <p style="margin-top: 8px; color: #666; font-size: 13px;">
+        이 작업은 자재의 사용구분을 9로 변경합니다.
+      </p>
+    </div>
+  `;
+
+  // 삭제할 자재코드 저장
+  window.materialToDelete = 자재코드;
+
+  // 모달창 표시
   document.getElementById('historyDeleteModal').style.display = 'flex';
 }
 
 /**
- * 삭제 확인
+ * 삭제 모달 닫기
+ */
+function closeHistoryDeleteModal() {
+  document.getElementById('historyDeleteModal').style.display = 'none';
+  window.materialToDelete = null;
+}
+
+/**
+ * 삭제 확인 처리
  */
 async function confirmDeleteHistory() {
-  const compositeKey = window.currentDeleteCompositeKey;
-  if (!compositeKey) return;
+  if (!window.materialToDelete) {
+    return;
+  }
 
   try {
-    const [사업장코드, 분류코드, 세부코드, 입출고일자, 입출고시간] = compositeKey.split('_');
+    console.log('🗑️ 자재 삭제 요청:', window.materialToDelete);
 
-    const url = `${API_BASE_URL}/material-history/${사업장코드}/${분류코드}/${세부코드}/${입출고일자}/${입출고시간}`;
-    const response = await fetch(url, {
+    const response = await fetch(`/api/materials/${window.materialToDelete}`, {
       method: 'DELETE',
       credentials: 'include',
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || '삭제 실패');
-    }
+    const result = await response.json();
 
-    alert('자재내역이 삭제되었습니다.');
-    closeHistoryDeleteModal();
-
-    // 선택 초기화
-    selectedHistoryRecords = [];
-    $('.history-checkbox').prop('checked', false);
-    $('#selectAllHistory').prop('checked', false);
-
-    // 검색어가 있으면 다시 검색, 없으면 빈 테이블
-    const keyword = document.getElementById('historyListSearchInput').value.trim();
-    if (keyword) {
-      loadMaterialHistory(keyword);
+    if (result.success) {
+      alert('자재가 삭제되었습니다.');
+      closeHistoryDeleteModal();
+      searchMaterialHistory(); // 목록 새로고침
     } else {
-      if (window.materialHistoryTableInstance) {
-        window.materialHistoryTableInstance.clear().draw();
-      }
+      alert(result.message || '자재 삭제에 실패했습니다.');
     }
-  } catch (err) {
-    console.error('삭제 에러:', err);
-    alert('삭제 중 오류가 발생했습니다: ' + err.message);
+  } catch (error) {
+    console.error('❌ 자재 삭제 에러:', error);
+    alert('자재 삭제 중 오류가 발생했습니다.');
   }
 }
 
 /**
- * 모달 닫기
+ * 자재 상세보기 모달 열기
  */
-function closeHistoryModal() {
-  document.getElementById('historyModal').style.display = 'none';
-  document.getElementById('historyForm').reset();
+async function viewMaterialDetail(자재코드) {
+  try {
+    console.log('🔍 자재 상세보기:', 자재코드);
+
+    const response = await fetch(`/api/materials/${자재코드}/detail`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error('자재 상세 정보 조회 실패');
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      displayMaterialDetailModal(result.data);
+    } else {
+      alert('자재 상세 정보를 불러올 수 없습니다.');
+    }
+  } catch (error) {
+    console.error('❌ 자재 상세보기 에러:', error);
+    alert('자재 상세 정보 조회 중 오류가 발생했습니다.');
+  }
 }
 
+/**
+ * 자재 상세 정보 모달 표시
+ */
+function displayMaterialDetailModal(data) {
+  const { material, prices, ledger, transactions } = data;
+
+  // 기본 정보 HTML 생성
+  const basicInfoHtml = `
+    <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+      <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #333;">📦 자재 기본 정보</h3>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+        <div><strong>자재코드:</strong> ${material.자재코드 || '-'}</div>
+        <div><strong>분류명:</strong> ${material.분류명 || '-'}</div>
+        <div><strong>자재명:</strong> ${material.자재명 || '-'}</div>
+        <div><strong>규격:</strong> ${material.규격 || '-'}</div>
+        <div><strong>단위:</strong> ${material.단위 || '-'}</div>
+        <div><strong>바코드:</strong> ${material.바코드 || '-'}</div>
+        <div><strong>폐기율:</strong> ${material.폐기율 || 0}%</div>
+        <div><strong>과세구분:</strong> ${material.과세구분 === 1 ? '과세' : '면세'}</div>
+        <div style="grid-column: 1 / -1;"><strong>적요:</strong> ${material.적요 || '-'}</div>
+      </div>
+    </div>
+  `;
+
+  // 자재시세 정보 HTML 생성
+  let pricesHtml = `
+    <div style="background: #fff3cd; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+      <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #333;">💰 자재시세 (매입처별 단가)</h3>
+  `;
+
+  if (prices && prices.length > 0) {
+    pricesHtml += `<table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="background: #f1f1f1;">
+          <th style="padding: 8px; border: 1px solid #ddd;">매입처</th>
+          <th style="padding: 8px; border: 1px solid #ddd;">적용일자</th>
+          <th style="padding: 8px; border: 1px solid #ddd;">입고단가</th>
+          <th style="padding: 8px; border: 1px solid #ddd;">출고단가</th>
+          <th style="padding: 8px; border: 1px solid #ddd;">마진율</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    prices.forEach((price) => {
+      pricesHtml += `
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">${price.매입처명 || price.매입처코드 || '-'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${formatDate(price.적용일자)}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(price.입고단가 || 0)}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(price.출고단가 || 0)}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatNumber(price.마진율 || 0)}%</td>
+        </tr>
+      `;
+    });
+
+    pricesHtml += `</tbody></table>`;
+  } else {
+    pricesHtml += `<p style="color: #999;">등록된 자재시세 정보가 없습니다.</p>`;
+  }
+
+  pricesHtml += `</div>`;
+
+  // 자재원장 정보 HTML 생성
+  let ledgerHtml = `
+    <div style="background: #d1ecf1; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+      <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #333;">📊 자재원장 (실제 단가 및 재고)</h3>
+  `;
+
+  if (ledger) {
+    ledgerHtml += `
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+        <div><strong>주매입처:</strong> ${ledger.주매입처명 || ledger.주매입처코드 || '-'}</div>
+        <div><strong>적정재고:</strong> ${formatNumber(ledger.적정재고 || 0)}</div>
+        <div><strong>최저재고:</strong> ${formatNumber(ledger.최저재고 || 0)}</div>
+        <div><strong>입고단가1:</strong> ${formatCurrency(ledger.입고단가1 || 0)}</div>
+        <div><strong>입고단가2:</strong> ${formatCurrency(ledger.입고단가2 || 0)}</div>
+        <div><strong>입고단가3:</strong> ${formatCurrency(ledger.입고단가3 || 0)}</div>
+        <div><strong>출고단가1:</strong> ${formatCurrency(ledger.출고단가1 || 0)}</div>
+        <div><strong>출고단가2:</strong> ${formatCurrency(ledger.출고단가2 || 0)}</div>
+        <div><strong>출고단가3:</strong> ${formatCurrency(ledger.출고단가3 || 0)}</div>
+        <div><strong>최종입고일:</strong> ${formatDate(ledger.최종입고일자)}</div>
+        <div><strong>최종출고일:</strong> ${formatDate(ledger.최종출고일자)}</div>
+        <div style="grid-column: 1 / -1;"><strong>비고:</strong> ${ledger.비고란 || '-'}</div>
+      </div>
+    `;
+  } else {
+    ledgerHtml += `<p style="color: #999;">등록된 자재원장 정보가 없습니다.</p>`;
+  }
+
+  ledgerHtml += `</div>`;
+
+  // 입출고 이력 HTML 생성
+  let transactionsHtml = `
+    <div style="background: #d4edda; padding: 16px; border-radius: 8px;">
+      <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #333;">📋 입출고 이력 (최근 20건)</h3>
+  `;
+
+  if (transactions && transactions.length > 0) {
+    transactionsHtml += `<div style="max-height: 400px; overflow-y: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead style="position: sticky; top: 0; background: #fff;">
+          <tr style="background: #f1f1f1;">
+            <th style="padding: 6px; border: 1px solid #ddd;">구분</th>
+            <th style="padding: 6px; border: 1px solid #ddd;">입출고일자</th>
+            <th style="padding: 6px; border: 1px solid #ddd;">거래처</th>
+            <th style="padding: 6px; border: 1px solid #ddd;">수량</th>
+            <th style="padding: 6px; border: 1px solid #ddd;">단가</th>
+            <th style="padding: 6px; border: 1px solid #ddd;">공급가액</th>
+            <th style="padding: 6px; border: 1px solid #ddd;">적요</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    transactions.forEach((tx) => {
+      const 구분Badge =
+        tx.입출고구분 === 1
+          ? '<span style="background: #28a745; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">입고</span>'
+          : '<span style="background: #007bff; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">출고</span>';
+
+      const 수량 = tx.입출고구분 === 1 ? tx.입고수량 : tx.출고수량;
+      const 단가 = tx.입출고구분 === 1 ? tx.입고단가 : tx.출고단가;
+      const 공급가액 = tx.입출고구분 === 1 ? tx.입고공급가액 : tx.출고공급가액;
+
+      transactionsHtml += `
+        <tr>
+          <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${구분Badge}</td>
+          <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${formatDate(tx.입출고일자)}</td>
+          <td style="padding: 6px; border: 1px solid #ddd;">${tx.거래처명 || '-'}</td>
+          <td style="padding: 6px; border: 1px solid #ddd; text-align: right;">${formatNumber(수량 || 0)}</td>
+          <td style="padding: 6px; border: 1px solid #ddd; text-align: right;">${formatCurrency(단가 || 0)}</td>
+          <td style="padding: 6px; border: 1px solid #ddd; text-align: right;">${formatCurrency(공급가액 || 0)}</td>
+          <td style="padding: 6px; border: 1px solid #ddd;">${tx.적요 || '-'}</td>
+        </tr>
+      `;
+    });
+
+    transactionsHtml += `</tbody></table></div>`;
+  } else {
+    transactionsHtml += `<p style="color: #999;">입출고 이력이 없습니다.</p>`;
+  }
+
+  transactionsHtml += `</div>`;
+
+  // 모달에 HTML 삽입
+  const detailContent = document.getElementById('historyDetailContent');
+  if (detailContent) {
+    detailContent.innerHTML = basicInfoHtml + pricesHtml + ledgerHtml + transactionsHtml;
+  }
+
+  // 모달 표시
+  document.getElementById('historyDetailModal').style.display = 'flex';
+}
+
+/**
+ * 상세보기 모달 닫기
+ */
 function closeHistoryDetailModal() {
   document.getElementById('historyDetailModal').style.display = 'none';
 }
 
-function closeHistoryDeleteModal() {
-  document.getElementById('historyDeleteModal').style.display = 'none';
-}
-
 /**
- * 날짜 포맷 변환 (YYYYMMDD → YYYY-MM-DD)
+ * 등록/수정 모달 닫기
  */
-function formatDate(dateStr) {
-  if (!dateStr || dateStr.length !== 8) return '-';
-  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+function closeHistoryModal() {
+  document.getElementById('historyModal').style.display = 'none';
+  document.getElementById('historyForm').reset();
+
+  // readOnly 속성 제거
+  document.getElementById('history분류코드').readOnly = false;
+  document.getElementById('history세부코드').readOnly = false;
 }
 
 /**
- * 날짜 포맷 변환 (YYYYMMDD → YYYY-MM-DD for input field)
- */
-function formatDateInput(dateStr) {
-  if (!dateStr || dateStr.length !== 8) return '';
-  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
-}
-
-/**
- * 숫자 포맷 (천단위 콤마)
- */
-function formatNumber(num) {
-  if (num === null || num === undefined) return '0';
-  return Number(num).toLocaleString('ko-KR');
-}
-
-/**
- * 통화 포맷 (원화)
- */
-function formatCurrency(num) {
-  if (num === null || num === undefined) return '0원';
-  return Number(num).toLocaleString('ko-KR') + '원';
-}
-
-/**
- * Google Sheets로 내보내기
+ * Google Sheets 내보내기
  */
 function exportHistoryToGoogleSheets() {
   try {
     console.log('===== Google Sheets로 내보내기 시작 =====');
 
-    // 1. DataTable에서 현재 표시된 데이터 가져오기
     const table = $('#materialHistoryTable').DataTable();
     const dataToExport = table.rows({ search: 'applied' }).data().toArray();
 
@@ -683,107 +669,86 @@ function exportHistoryToGoogleSheets() {
       return;
     }
 
-    console.log(`✅ 내보낼 데이터 수: ${dataToExport.length}건`);
-
-    // 2. CSV 형식으로 변환
+    // CSV 헤더
     const headers = [
       '순번',
+      '분류명',
       '자재코드',
       '자재명',
       '규격',
       '단위',
-      '입출고일자',
-      '거래일자',
-      '입출고구분',
-      '수량',
-      '단가',
-      '거래처',
+      '과세구분',
+      '입고단가1',
+      '출고단가1',
     ];
-    let csvContent = '\uFEFF'; // UTF-8 BOM 추가 (엑셀에서 한글 깨짐 방지)
-    csvContent += headers.join(',') + '\n';
+
+    // CSV 데이터 생성
+    let csvContent = headers.join(',') + '\n';
 
     dataToExport.forEach((row, index) => {
-      // 자재코드 처리 (세부코드가 이미 분류코드를 포함하고 있는지 확인)
-      let 세부코드 = row.세부코드 || '';
-      if (세부코드.substring(0, 2) === row.분류코드) {
-        세부코드 = 세부코드.substring(2);
-      }
-      const 자재코드 = `${row.분류코드}${세부코드}`;
-
-      // 입출고구분
-      const 입출고구분명 = row.입출고구분 === 1 ? '입고' : row.입출고구분 === 2 ? '출고' : '-';
-
-      // 수량 및 단가
-      const 수량 = row.입출고구분 === 1 ? row.입고수량 || 0 : row.출고수량 || 0;
-      const 단가 = row.입출고구분 === 1 ? row.입고단가 || 0 : row.출고단가 || 0;
-
-      // 거래처
-      let 거래처 = '-';
-      if (row.입출고구분 === 1 && row.매입처명) {
-        거래처 = `${row.매입처코드 || ''} ${row.매입처명}`;
-      } else if (row.입출고구분 === 2 && row.매출처명) {
-        거래처 = `${row.매출처코드 || ''} ${row.매출처명}`;
-      }
-
-      // 날짜 포맷
-      const 입출고일자 = row.입출고일자 ? formatDate(row.입출고일자) : '-';
-      const 거래일자 = row.거래일자 ? formatDate(row.거래일자) : '-';
-
-      const rowArray = [
-        index + 1, // 순번
-        자재코드,
-        row.자재명 || '-',
-        row.규격 || '-',
-        row.단위 || '-',
-        입출고일자,
-        거래일자,
-        입출고구분명,
-        수량,
-        단가,
-        거래처,
+      const rowData = [
+        index + 1,
+        `"${row.분류명 || ''}"`,
+        `"${row.자재코드?.substring(4) || ''}"`,
+        `"${row.자재명 || ''}"`,
+        `"${row.규격 || ''}"`,
+        `"${row.단위 || ''}"`,
+        row.과세구분 === 1 ? '과세' : '면세',
+        row.입고단가1 || 0,
+        row.출고단가1 || 0,
       ];
-
-      // CSV 특수문자 처리
-      const csvRow = rowArray.map((field) => {
-        const fieldStr = String(field);
-        if (fieldStr.includes(',') || fieldStr.includes('"') || fieldStr.includes('\n')) {
-          return '"' + fieldStr.replace(/"/g, '""') + '"';
-        }
-        return fieldStr;
-      });
-
-      csvContent += csvRow.join(',') + '\n';
+      csvContent += rowData.join(',') + '\n';
     });
 
-    // 3. Blob 생성 및 다운로드
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Blob 생성 및 다운로드
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
 
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const filename = `자재내역관리_${today}.csv`;
+    link.setAttribute('href', url);
+    link.setAttribute('download', `자재목록_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
 
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
-      console.log('✅ CSV 파일 다운로드 완료:', filename);
-      alert(
-        `CSV 파일이 다운로드되었습니다.\n\nGoogle Sheets에서:\n1. 파일 > 가져오기\n2. 업로드 탭 선택\n3. 다운로드된 CSV 파일 선택\n4. 가져오기를 클릭하세요.`,
-      );
-    }
+    console.log('✅ CSV 파일 다운로드 완료');
+    alert('CSV 파일이 다운로드되었습니다. Google Sheets에서 열어보세요.');
   } catch (error) {
-    console.error('❌ CSV 내보내기 오류:', error);
-    alert('CSV 파일 생성 중 오류가 발생했습니다: ' + error.message);
+    console.error('❌ CSV 내보내기 에러:', error);
+    alert('CSV 내보내기 중 오류가 발생했습니다.');
   }
 }
 
-// 페이지 로드 시 초기화 (데이터는 페이지 표시 시 로드)
+/**
+ * 유틸리티 함수: 날짜 포맷
+ */
+function formatDate(dateStr) {
+  if (!dateStr || dateStr.length !== 8) return '-';
+  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+}
+
+/**
+ * 유틸리티 함수: 숫자 포맷
+ */
+function formatNumber(num) {
+  if (num === null || num === undefined) return '0';
+  return Number(num).toLocaleString('ko-KR');
+}
+
+/**
+ * 유틸리티 함수: 통화 포맷
+ */
+function formatCurrency(num) {
+  if (num === null || num === undefined) return '0원';
+  return Number(num).toLocaleString('ko-KR') + '원';
+}
+
+// 페이지 로드 시 DataTable 초기화
 $(document).ready(function () {
-  initMaterialHistoryTable();
-  // loadMaterialHistory()를 여기서 호출하지 않음 - pageMap의 loadFunc에서 호출됨
+  if ($('#materialHistoryTable').length > 0) {
+    initMaterialHistoryTable();
+    console.log('✅ 자재내역관리 페이지 로드 완료');
+  }
 });

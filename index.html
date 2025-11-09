@@ -6681,7 +6681,12 @@
             // 로그인 날짜 자동 설정 함수
             function setLoginDateToToday() {
               const today = new Date();
-              const formatted = today.toISOString().slice(0, 10); // YYYY-MM-DD 형식
+
+              // 한국 시간 기준으로 날짜 계산 (UTC+9)
+              const year = today.getFullYear();
+              const month = String(today.getMonth() + 1).padStart(2, '0');
+              const day = String(today.getDate()).padStart(2, '0');
+              const formatted = `${year}-${month}-${day}`; // YYYY-MM-DD 형식
 
               const loginDateText = document.getElementById('loginDateText');
               const loginDatePicker = document.getElementById('loginDatePicker');
@@ -6690,7 +6695,7 @@
               if (loginDateText) loginDateText.value = formatted;
               if (loginDatePicker) loginDatePicker.value = formatted;
 
-              console.log(`✅ 로그인 날짜 자동 설정 완료: ${formatted}`);
+              console.log(`✅ 로그인 날짜 자동 설정 완료 (로컬 시간 기준): ${formatted}`);
             }
 
             // 로그아웃
@@ -7388,7 +7393,7 @@
               </div>
             </div>
 
-            <!-- 자재내역 목록 DataTable -->
+            <!-- 자재 목록 DataTable -->
             <div style="overflow-x: auto">
               <table id="materialHistoryTable" class="display" style="width: 100%">
                 <thead>
@@ -7396,23 +7401,21 @@
                     <th style="width: 40px">
                       <input
                         type="checkbox"
-                        id="selectAllHistory"
+                        id="selectAllMaterials"
                         title="전체 선택"
                         aria-label="전체 선택"
                       />
                     </th>
                     <th>순번</th>
+                    <th>분류명</th>
                     <th>자재코드</th>
                     <th>자재명</th>
                     <th>규격</th>
                     <th>단위</th>
-                    <th>입출고일자</th>
-                    <th>거래일자</th>
-                    <th>입출고구분</th>
-                    <th>수량</th>
-                    <th>단가</th>
-                    <th>거래처</th>
-                    <th style="width: 150px">관리</th>
+                    <th>과세구분</th>
+                    <th>입고단가1</th>
+                    <th>출고단가1</th>
+                    <th style="width: 200px">관리</th>
                   </tr>
                 </thead>
               </table>
@@ -7748,7 +7751,7 @@
             margin-bottom: 24px;
           "
         >
-          <h2 style="margin: 0; font-size: 24px; font-weight: 700">자재입출내역 상세정보</h2>
+          <h2 style="margin: 0; font-size: 24px; font-weight: 700">자재 상세정보</h2>
           <button
             onclick="closeHistoryDetailModal()"
             style="background: none; border: none; font-size: 28px; cursor: pointer; color: #999"
@@ -7757,11 +7760,8 @@
           </button>
         </div>
 
-        <div
-          id="historyDetailContent"
-          style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px"
-        >
-          <!-- 상세 정보가 여기에 동적으로 로드됩니다 -->
+        <div id="historyDetailContent" style="padding: 0">
+          <!-- 자재 상세 정보가 여기에 동적으로 로드됩니다 (기본정보, 자재시세, 자재원장, 입출고이력) -->
         </div>
 
         <div style="margin-top: 24px; display: flex; justify-content: flex-end">
@@ -7772,7 +7772,16 @@
 
     <!-- 자재내역 삭제 확인 모달 -->
     <div id="historyDeleteModal" class="modal" style="display: none">
-      <div class="modal-content" style="max-width: 500px">
+      <div class="modal-content" style="
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      ">
         <!-- 헤더 -->
         <div
           style="
@@ -7785,7 +7794,7 @@
           "
         >
           <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #dc3545">
-            ⚠ 자재입출내역 삭제 확인
+            ⚠ 자재 삭제 확인
           </h2>
           <button
             onclick="closeHistoryDeleteModal()"
@@ -7822,7 +7831,8 @@
             "
           >
             <p style="margin: 0; font-size: 14px; color: #991b1b; line-height: 1.5">
-              다음 자재입출내역을 삭제하시겠습니까?
+              다음 자재를 삭제하시겠습니까?<br>
+              (사용구분이 9로 변경됩니다)
             </p>
           </div>
 
@@ -7877,9 +7887,18 @@
       </div>
     </div>
 
-    <!-- 자재내역 등록/수정 모달 -->
+    <!-- 자재 등록/수정 모달 -->
     <div id="historyModal" class="modal" style="display: none">
-      <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto">
+      <div class="modal-content" style="
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      ">
         <div
           style="
             display: flex;
@@ -7894,7 +7913,7 @@
             id="historyModalTitle"
             style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937"
           >
-            자재입출내역 등록
+            자재 등록
           </h2>
           <button
             onclick="closeHistoryModal()"
@@ -7919,20 +7938,144 @@
           </button>
         </div>
 
-        <form id="historyForm" onsubmit="event.preventDefault(); saveMaterialHistory();">
-          <input type="hidden" id="historyModalMode" value="create" />
-          <input type="hidden" id="historyOriginalCompositeKey" />
-          <input type="hidden" id="historyOriginal입출고일자" />
-
-          <!-- 입출고구분 -->
+        <form id="historyForm" onsubmit="event.preventDefault();">
+          <!-- 분류코드 -->
           <div style="margin-bottom: 16px">
             <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
-              입출고구분 <span style="color: #dc3545">*</span>
+              분류코드 <span style="color: #dc3545">*</span>
+            </label>
+            <input
+              type="text"
+              id="history분류코드"
+              class="form-control"
+              placeholder="분류코드 (2자리)"
+              maxlength="2"
+              required
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 세부코드 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              세부코드 <span style="color: #dc3545">*</span>
+            </label>
+            <input
+              type="text"
+              id="history세부코드"
+              class="form-control"
+              placeholder="세부코드 (16자리)"
+              maxlength="16"
+              required
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 자재명 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              자재명 <span style="color: #dc3545">*</span>
+            </label>
+            <input
+              type="text"
+              id="history자재명"
+              class="form-control"
+              placeholder="자재명 입력"
+              maxlength="30"
+              required
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 규격 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              규격
+            </label>
+            <input
+              type="text"
+              id="history규격"
+              class="form-control"
+              placeholder="규격 입력"
+              maxlength="30"
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 단위 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              단위
+            </label>
+            <input
+              type="text"
+              id="history단위"
+              class="form-control"
+              placeholder="단위 입력 (예: EA, 대, 개)"
+              maxlength="20"
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 바코드 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              바코드
+            </label>
+            <input
+              type="text"
+              id="history바코드"
+              class="form-control"
+              placeholder="바코드 입력 (선택)"
+              maxlength="13"
+              style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+              "
+            />
+          </div>
+
+          <!-- 과세구분 -->
+          <div style="margin-bottom: 16px">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+              과세구분
             </label>
             <select
-              id="history입출고구분"
+              id="history과세구분"
               class="form-control"
-              required
               style="
                 width: 100%;
                 padding: 12px 16px;
@@ -7941,186 +8084,24 @@
                 font-size: 14px;
               "
             >
-              <option value="">선택하세요</option>
-              <option value="1">입고 (매입)</option>
-              <option value="2">출고 (매출)</option>
+              <option value="1">과세</option>
+              <option value="0">면세</option>
             </select>
           </div>
 
-          <!-- 입출고일자 -->
+          <!-- 폐기율 -->
           <div style="margin-bottom: 16px">
             <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
-              입출고일자 <span style="color: #dc3545">*</span>
-            </label>
-            <input
-              type="date"
-              id="history입출고일자"
-              class="form-control"
-              required
-              style="
-                width: 100%;
-                padding: 12px 16px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-              "
-            />
-          </div>
-
-          <!-- 거래일자 -->
-          <div style="margin-bottom: 16px">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
-              거래일자 <span style="color: #dc3545">*</span>
-            </label>
-            <input
-              type="date"
-              id="history거래일자"
-              class="form-control"
-              required
-              style="
-                width: 100%;
-                padding: 12px 16px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-              "
-            />
-          </div>
-
-          <!-- 거래번호 -->
-          <div style="margin-bottom: 16px">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
-              거래번호 <span style="color: #dc3545">*</span>
+              폐기율 (%)
             </label>
             <input
               type="number"
-              id="history거래번호"
+              id="history폐기율"
               class="form-control"
-              placeholder="거래번호 입력"
-              required
-              style="
-                width: 100%;
-                padding: 12px 16px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-              "
-            />
-          </div>
-
-          <!-- 자재코드 (분류코드 + 세부코드) -->
-          <div style="margin-bottom: 16px">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
-              자재 정보 <span style="color: #dc3545">*</span>
-            </label>
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px">
-              <input
-                type="text"
-                id="history분류코드"
-                class="form-control"
-                placeholder="분류코드 (2자리)"
-                maxlength="2"
-                required
-                style="
-                  padding: 12px 16px;
-                  border: 2px solid #e5e7eb;
-                  border-radius: 8px;
-                  font-size: 14px;
-                "
-              />
-              <input
-                type="text"
-                id="history세부코드"
-                class="form-control"
-                placeholder="세부코드 (16자리)"
-                maxlength="16"
-                required
-                style="
-                  padding: 12px 16px;
-                  border: 2px solid #e5e7eb;
-                  border-radius: 8px;
-                  font-size: 14px;
-                "
-              />
-            </div>
-          </div>
-
-          <!-- 수량 -->
-          <div style="margin-bottom: 16px">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
-              수량 <span style="color: #dc3545">*</span>
-            </label>
-            <input
-              type="number"
-              id="history수량"
-              class="form-control"
-              placeholder="수량 입력"
+              placeholder="폐기율 입력 (선택)"
               step="0.01"
-              required
-              style="
-                width: 100%;
-                padding: 12px 16px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-              "
-            />
-          </div>
-
-          <!-- 단가 -->
-          <div style="margin-bottom: 16px">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
-              단가 <span style="color: #dc3545">*</span>
-            </label>
-            <input
-              type="number"
-              id="history단가"
-              class="form-control"
-              placeholder="단가 입력"
-              step="0.01"
-              required
-              style="
-                width: 100%;
-                padding: 12px 16px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-              "
-            />
-          </div>
-
-          <!-- 부가세 -->
-          <div style="margin-bottom: 16px">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
-              부가세
-            </label>
-            <input
-              type="number"
-              id="history부가"
-              class="form-control"
-              placeholder="부가세 입력 (선택)"
-              step="0.01"
-              style="
-                width: 100%;
-                padding: 12px 16px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-              "
-            />
-          </div>
-
-          <!-- 거래처코드 -->
-          <div style="margin-bottom: 16px">
-            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
-              거래처코드
-            </label>
-            <input
-              type="text"
-              id="history거래처코드"
-              class="form-control"
-              placeholder="매입처코드 또는 매출처코드"
-              maxlength="8"
+              min="0"
+              max="100"
               style="
                 width: 100%;
                 padding: 12px 16px;
@@ -8141,6 +8122,7 @@
               class="form-control"
               placeholder="비고 입력 (선택사항)"
               rows="3"
+              maxlength="60"
               style="
                 width: 100%;
                 padding: 12px 16px;
@@ -8173,6 +8155,7 @@
             </button>
             <button
               type="submit"
+              id="saveHistoryBtn"
               style="
                 padding: 10px 20px;
                 background: #2563eb;
