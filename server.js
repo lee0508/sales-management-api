@@ -934,7 +934,7 @@ app.delete('/api/customers/:code', requireAuth, async (req, res) => {
       .input('수정일자', sql.VarChar(8), 수정일자)
       .query(`
         UPDATE 매출처 SET
-          사용구분 = 1,
+          사용구분 = 9,
           사용자코드 = @사용자코드,
           수정일자 = @수정일자
         WHERE 매출처코드 = @매출처코드
@@ -1581,10 +1581,29 @@ app.delete('/api/suppliers/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
 
+    // 세션에서 사용자코드 가져오기
+    const 사용자코드 = req.session?.user?.사용자코드;
+    if (!사용자코드) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
+
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
     await pool
       .request()
       .input('매입처코드', sql.VarChar(8), code)
-      .query('DELETE FROM 매입처 WHERE 매입처코드 = @매입처코드');
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .query(`
+        UPDATE 매입처 SET
+          사용구분 = 9,
+          사용자코드 = @사용자코드,
+          수정일자 = @수정일자
+        WHERE 매입처코드 = @매입처코드
+      `);
 
     res.json({
       success: true,
@@ -1601,10 +1620,29 @@ app.delete('/api/suppliers_delete/:code', requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
 
+    // 세션에서 사용자코드 가져오기
+    const 사용자코드 = req.session?.user?.사용자코드;
+    if (!사용자코드) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
+
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
     await pool
       .request()
       .input('매입처코드', sql.VarChar(8), code)
-      .query('DELETE FROM 매입처 WHERE 매입처코드 = @매입처코드');
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .query(`
+        UPDATE 매입처 SET
+          사용구분 = 9,
+          사용자코드 = @사용자코드,
+          수정일자 = @수정일자
+        WHERE 매입처코드 = @매입처코드
+      `);
 
     res.json({
       success: true,
