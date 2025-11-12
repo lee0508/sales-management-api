@@ -113,7 +113,7 @@ async function loadTransactions() {
                 <button class="btn-icon btn-edit" style="display: none;" onclick="editTransaction('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon btn-delete" style="display: none;" onclick="deleteTransaction('${row.거래일자}', ${row.거래번호})" title="삭제">삭제</button>
                 <!--<button class="btn-icon btn-approve" style="display: none;" onclick="approveTransaction('${row.거래일자}', ${row.거래번호})" title="확정">확정</button>-->
-                <button class="btn-icon" onclick="printTransaction('${row.거래일자}', ${row.거래번호})" title="인쇄" style="background: #9333ea;">출력</button>
+                <button class="btn-icon btn-print" onclick="printTransaction('${row.거래일자}', ${row.거래번호})" title="인쇄" style="background: #9333ea;">출력</button>
               </div>
             `;
           },
@@ -152,11 +152,13 @@ async function loadTransactions() {
             actionDiv.find('.btn-edit').show();
             actionDiv.find('.btn-delete').show();
             actionDiv.find('.btn-approve').show();
+            actionDiv.find('.btn-print').hide();  // ✅ 출력 버튼 숨김
           } else {
             actionDiv.find('.btn-view').show();
             actionDiv.find('.btn-edit').hide();
             actionDiv.find('.btn-delete').hide();
             actionDiv.find('.btn-approve').hide();
+            actionDiv.find('.btn-print').show();  // ✅ 출력 버튼 표시
           }
         });
       },
@@ -187,6 +189,7 @@ async function loadTransactions() {
           actionDiv.find('.btn-edit').show();
           actionDiv.find('.btn-delete').show();
           actionDiv.find('.btn-approve').show();
+          actionDiv.find('.btn-print').hide();  // ✅ 출력 버튼 숨김
           console.log('✅ 버튼 표시 완료 - 수정/삭제/확정 버튼 visible');
         } else {
           // 체크 해제: 수정/삭제/확정 버튼 숨기고 보기 버튼 표시
@@ -194,6 +197,7 @@ async function loadTransactions() {
           actionDiv.find('.btn-edit').hide();
           actionDiv.find('.btn-delete').hide();
           actionDiv.find('.btn-approve').hide();
+          actionDiv.find('.btn-print').show();  // ✅ 출력 버튼 표시
           console.log('✅ 버튼 표시 완료 - 보기 버튼 visible');
         }
       });

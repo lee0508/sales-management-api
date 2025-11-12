@@ -26,6 +26,7 @@
     <script src="js/material-history.js?v=1101" defer></script>
     <script src="js/material-inventory.js?v=1101" defer></script>
     <script src="js/material-category.js?v=1101" defer></script>
+    <script src="js/taxinvoice.js?v=1111" defer></script>
     <script src="js/print.js?v=1109" defer></script>
 
     <link rel="stylesheet" href="css/onstyles.css?v=5" />
@@ -189,7 +190,7 @@
               <a class="submenu-link" onclick="showPage('item-stock')">미수금관리</a>
               <a class="submenu-link" onclick="showPage('item-stock')">미지급금관리</a>
               <a class="submenu-link" onclick="showPage('item-stock')">현금출납관리</a>
-              <a class="submenu-link" onclick="showPage('item-stock')">세금계산서관리</a>
+              <a class="submenu-link" onclick="showPage('taxInvoice')">세금계산서관리</a>
             </div>
           </div>
 
@@ -6527,6 +6528,16 @@
                   }
                 },
               },
+              taxInvoice: {
+                element: 'taxInvoicePage',
+                title: '세금계산서관리',
+                menu: 'jangbu',
+                loadFunc: () => {
+                  if (typeof window.loadTaxInvoices === 'function') {
+                    window.loadTaxInvoices();
+                  }
+                },
+              },
               receivable: {
                 element: 'receivablePage',
                 title: '미수금관리',
@@ -6624,6 +6635,16 @@
                 title: '시스템설정',
                 menu: 'settings',
                 loadFunc: null,
+              },
+              'paper-setting': {
+                element: 'paperSettingPage',
+                title: '용지설정관리',
+                menu: 'settings',
+                loadFunc: () => {
+                  if (typeof loadPaperMargins === 'function') {
+                    loadPaperMargins();
+                  }
+                },
               },
             };
 
@@ -7046,6 +7067,9 @@
               // 로그인 날짜 초기 설정
               setLoginDateToToday();
 
+              // 프린트 마진 초기화
+              initPrintMargins();
+
               const isLoggedIn = await checkAuth();
               if (isLoggedIn) {
                 showPage('dashboard');
@@ -7133,6 +7157,607 @@
               </thead>
               <tbody id="orderTableBody"></tbody>
             </table>
+          </div>
+
+          <!-- 세금계산서관리 페이지 -->
+          <div class="page-content hidden" id="taxInvoicePage">
+            <h2 style="display: none">세금계산서관리</h2>
+
+            <!-- 🔹 상단 툴바 -->
+            <div class="toolbar" style="justify-content: space-between">
+              <div class="toolbar-left" style="display: flex; gap: 12px; align-items: center">
+                <select
+                  id="taxInvoiceStatusFilter"
+                  class="form-control"
+                  style="width: 150px"
+                  onchange="filterTaxInvoices()"
+                >
+                  <option value="">전체 상태</option>
+                  <option value="0">작성중</option>
+                  <option value="1">발행완료</option>
+                </select>
+                <input
+                  type="date"
+                  id="taxInvoiceStartDate"
+                  class="form-control"
+                  style="width: 150px"
+                  onchange="filterTaxInvoices()"
+                />
+                <span>~</span>
+                <input
+                  type="date"
+                  id="taxInvoiceEndDate"
+                  class="form-control"
+                  style="width: 150px"
+                  onchange="filterTaxInvoices()"
+                />
+                <button class="btn btn-secondary" onclick="filterTaxInvoices()">조회</button>
+              </div>
+
+              <div class="toolbar-right">
+                <button
+                  class="btn btn-success"
+                  onclick="openNewTaxInvoiceModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #28a745;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  <span style="font-size: 18px; margin-right: 4px">+</span> 세금계산서 발행
+                </button>
+                <button
+                  class="btn btn-secondary"
+                  onclick="exportTaxInvoicesToCSV()"
+                  style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                  "
+                >
+                  📊 Google Sheets로 내보내기
+                </button>
+              </div>
+            </div>
+
+            <!-- ✅ 세금계산서 요약 정보 -->
+            <div class="summary-bar" style="margin: 10px 0; font-size: 14px">
+              총 세금계산서 수: <span id="taxInvoiceCount" style="font-weight: bold">0</span> 건 |
+              총 공급가액: <span id="taxInvoiceTotalSupply" style="font-weight: bold">0</span> 원 |
+              총 세액: <span id="taxInvoiceTotalTax" style="font-weight: bold">0</span> 원
+            </div>
+
+            <!-- ✅ 세금계산서 목록 DataTable -->
+            <table id="taxInvoiceTable" class="display" style="width: 100%">
+              <thead>
+                <tr>
+                  <th style="width: 40px"><input type="checkbox" id="selectAllTaxInvoices" /></th>
+                  <th>순번</th>
+                  <th>작성년도</th>
+                  <th>책번호</th>
+                  <th>일련번호</th>
+                  <th>작성일자</th>
+                  <th>매출처명</th>
+                  <th>품목및규격</th>
+                  <th>수량</th>
+                  <th>공급가액</th>
+                  <th>세액</th>
+                  <th>합계</th>
+                  <th>발행여부</th>
+                  <th>관리</th>
+                </tr>
+              </thead>
+              <tbody id="taxInvoiceTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- ✅ 세금계산서 상세보기 모달 -->
+          <div id="taxInvoiceDetailModal" class="modal hidden">
+            <div
+              class="modal-content large"
+              style="max-width: 900px; max-height: 90vh; overflow-y: auto"
+            >
+              <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) -->
+              <div
+                id="taxInvoiceDetailModalHeader"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                  cursor: move;
+                  user-select: none;
+                "
+              >
+                <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
+                  세금계산서 상세 보기
+                </h2>
+                <button
+                  onclick="closeTaxInvoiceDetailModal()"
+                  style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                  onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <!-- ✅ 세금계산서 기본 정보 (카드 스타일) -->
+              <div
+                style="
+                  background: #f9fafb;
+                  padding: 20px;
+                  border-radius: 12px;
+                  margin-bottom: 24px;
+                  border: 1px solid #e5e7eb;
+                "
+              >
+                <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
+                  기본 정보
+                </h3>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280"
+                      >작성년도-책번호</span
+                    >
+                    <span id="detailTaxInvoiceNo" style="color: #1f2937; font-weight: 600">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">작성일자</span>
+                    <span id="detailTaxInvoiceDate" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">매출처명</span>
+                    <span id="detailTaxCustomerName" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">사업자번호</span>
+                    <span id="detailTaxBusinessNo" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">대표자명</span>
+                    <span id="detailTaxCeoName" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">업태/업종</span>
+                    <span id="detailTaxBusinessType" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center; grid-column: span 2">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">주소</span>
+                    <span id="detailTaxAddress" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">품목및규격</span>
+                    <span id="detailTaxItemSpec" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">수량</span>
+                    <span id="detailTaxQuantity" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">공급가액</span>
+                    <span id="detailTaxSupplyAmount" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">세액</span>
+                    <span id="detailTaxAmount" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">합계</span>
+                    <span id="detailTaxTotal" style="color: #2563eb; font-weight: 600">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">발행여부</span>
+                    <span id="detailTaxIssued" style="color: #1f2937">-</span>
+                  </div>
+                  <div style="display: flex; align-items: center; grid-column: span 2">
+                    <span style="min-width: 120px; font-weight: 500; color: #6b7280">적요</span>
+                    <span id="detailTaxRemark" style="color: #1f2937">-</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ✅ 자재입출내역 (세부 품목) -->
+              <div
+                style="
+                  background: #ffffff;
+                  padding: 20px;
+                  border-radius: 12px;
+                  margin-bottom: 24px;
+                  border: 1px solid #e5e7eb;
+                "
+              >
+                <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
+                  품목 내역
+                </h3>
+                <div style="overflow-x: auto">
+                  <table
+                    id="taxInvoiceDetailItemsTable"
+                    class="display"
+                    style="width: 100%; font-size: 14px"
+                  >
+                    <thead>
+                      <tr>
+                        <th>순번</th>
+                        <th>자재명</th>
+                        <th>규격</th>
+                        <th>단위</th>
+                        <th>수량</th>
+                        <th>단가</th>
+                        <th>공급가액</th>
+                        <th>부가세</th>
+                        <th>합계금액</th>
+                        <th>적요</th>
+                      </tr>
+                    </thead>
+                    <tbody id="taxInvoiceDetailItemsTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- ✅ 버튼 영역 -->
+              <div style="display: flex; gap: 12px; justify-content: flex-end">
+                <button
+                  onclick="closeTaxInvoiceDetailModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                  "
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ✅ 세금계산서 수정 모달 -->
+          <div id="taxInvoiceEditModal" class="modal" style="display: none">
+            <div
+              id="taxInvoiceEditModalContent"
+              class="modal-content large"
+              style="
+                max-width: 900px;
+                max-height: 90vh;
+                overflow-y: auto;
+                padding: 32px;
+              "
+            >
+              <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) -->
+              <div
+                id="taxInvoiceEditModalHeader"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                  cursor: move;
+                  user-select: none;
+                "
+              >
+                <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
+                  세금계산서 수정
+                </h2>
+                <button
+                  id="closeTaxInvoiceEditModalBtn"
+                  style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                  onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <!-- ✅ 세금계산서 기본 정보 폼 -->
+              <form id="taxInvoiceEditForm">
+                <div
+                  style="
+                    background: #f9fafb;
+                    padding: 20px;
+                    border-radius: 12px;
+                    margin-bottom: 24px;
+                    border: 1px solid #e5e7eb;
+                  "
+                >
+                  <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
+                    기본 정보
+                  </h3>
+                  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
+                    <div>
+                      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                        작성년도-책번호
+                      </label>
+                      <input
+                        type="text"
+                        id="editTaxInvoiceNo"
+                        class="form-control"
+                        readonly
+                        style="background: #e5e7eb"
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                        작성일자
+                      </label>
+                      <input
+                        type="date"
+                        id="editTaxInvoiceDate"
+                        class="form-control"
+                        required
+                      />
+                    </div>
+                    <div style="grid-column: span 2">
+                      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                        품목및규격
+                      </label>
+                      <input
+                        type="text"
+                        id="editTaxItemSpec"
+                        class="form-control"
+                        placeholder="예: LED전구 1건외 3건"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                        수량
+                      </label>
+                      <input
+                        type="number"
+                        id="editTaxQuantity"
+                        class="form-control"
+                        step="0.01"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                        공급가액
+                      </label>
+                      <input
+                        type="number"
+                        id="editTaxSupplyAmount"
+                        class="form-control"
+                        step="1"
+                        required
+                        onchange="calculateTaxInvoiceTotal()"
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                        세액 (10%)
+                      </label>
+                      <input
+                        type="number"
+                        id="editTaxAmount"
+                        class="form-control"
+                        step="1"
+                        required
+                        readonly
+                        style="background: #e5e7eb"
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                        합계
+                      </label>
+                      <input
+                        type="number"
+                        id="editTaxTotal"
+                        class="form-control"
+                        readonly
+                        style="background: #e5e7eb; font-weight: bold; color: #2563eb"
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                        발행여부
+                      </label>
+                      <select id="editTaxIssued" class="form-control" required>
+                        <option value="0">미발행</option>
+                        <option value="1">발행완료</option>
+                      </select>
+                    </div>
+                    <div style="grid-column: span 2">
+                      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                        적요
+                      </label>
+                      <input
+                        type="text"
+                        id="editTaxRemark"
+                        class="form-control"
+                        placeholder="적요를 입력하세요"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ✅ 버튼 영역 -->
+                <div style="display: flex; gap: 12px; justify-content: flex-end">
+                  <button
+                    type="button"
+                    id="cancelTaxInvoiceEditBtn"
+                    style="
+                      padding: 10px 20px;
+                      background: #6c757d;
+                      color: white;
+                      border: none;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    "
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    style="
+                      padding: 10px 20px;
+                      background: #007bff;
+                      color: white;
+                      border: none;
+                      border-radius: 8px;
+                      cursor: pointer;
+                    "
+                  >
+                    저장
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- ✅ 세금계산서 삭제 확인 모달 -->
+          <div
+            id="taxInvoiceDeleteModal"
+            style="
+              display: none;
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 1000;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <div
+              style="
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                width: 90%;
+                max-width: 400px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              "
+            >
+              <!-- 아이콘 -->
+              <div style="text-align: center; margin-bottom: 20px">
+                <div
+                  style="
+                    width: 64px;
+                    height: 64px;
+                    background: #fee2e2;
+                    border-radius: 50%;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 16px;
+                  "
+                >
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#dc2626"
+                    stroke-width="2"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"
+                    />
+                  </svg>
+                </div>
+                <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #1f2937">
+                  세금계산서 삭제
+                </h2>
+                <p
+                  id="deleteTaxInvoiceInfo"
+                  style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px"
+                >
+                  세금계산서 번호: -
+                </p>
+                <p style="margin: 0; color: #dc2626; font-size: 14px; font-weight: 500">
+                  정말로 이 세금계산서를 삭제하시겠습니까?
+                </p>
+                <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 12px">
+                  삭제된 세금계산서는 복구할 수 없습니다.
+                </p>
+              </div>
+
+              <!-- 버튼 -->
+              <div style="display: flex; gap: 12px">
+                <button
+                  onclick="closeTaxInvoiceDeleteModal()"
+                  style="
+                    flex: 1;
+                    padding: 12px 24px;
+                    background: #f3f4f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: #374151;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#e5e7eb';"
+                  onmouseout="this.style.background='#f3f4f6';"
+                >
+                  취소
+                </button>
+                <button
+                  onclick="confirmTaxInvoiceDelete()"
+                  style="
+                    flex: 1;
+                    padding: 12px 24px;
+                    background: #dc2626;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#b91c1c';"
+                  onmouseout="this.style.background='#dc2626';"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- 매입전표관리 페이지 -->
@@ -8711,71 +9336,110 @@
   </div>
 
   <!-- 발주 삭제 확인 모달 -->
-  <div id="orderDeleteModal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 500px;">
-      <!-- 헤더 -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
-        <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">발주 삭제</h2>
-        <button onclick="closeOrderDeleteModal()" style="
-              background: #f0f0f0;
-              border: none;
-              cursor: pointer;
-              color: #666;
-              width: 36px;
-              height: 36px;
-              border-radius: 50%;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              transition: all 0.2s ease;
-            " onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';" onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';">
-          ×
-        </button>
-      </div>
-
-      <!-- 삭제할 발주 정보 표시 -->
-      <div id="orderDeleteContent" style="margin-bottom: 24px;">
-        <!-- 발주 정보가 여기에 동적으로 로드됩니다 -->
-      </div>
-
-      <!-- 경고 메시지 -->
-      <div style="
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 24px;
-          ">
-        <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.6;">
-          <strong>⚠️ 경고:</strong> 이 작업은 되돌릴 수 없습니다.<br>
-          삭제된 데이터는 복구할 수 없습니다.
+  <div
+    id="orderDeleteModal"
+    style="
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    "
+  >
+    <div
+      style="
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      "
+    >
+      <!-- 아이콘 -->
+      <div style="text-align: center; margin-bottom: 20px">
+        <div
+          style="
+            width: 64px;
+            height: 64px;
+            background: #fee2e2;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+          "
+        >
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#dc2626"
+            stroke-width="2"
+          >
+            <path
+              d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"
+            />
+          </svg>
+        </div>
+        <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #1f2937">
+          발주 삭제
+        </h2>
+        <div id="orderDeleteContent" style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px">
+          발주번호: -
+        </div>
+        <p style="margin: 0; color: #dc2626; font-size: 14px; font-weight: 500">
+          정말로 이 발주를 삭제하시겠습니까?
+        </p>
+        <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 12px">
+          삭제된 발주는 복구할 수 없습니다.
         </p>
       </div>
 
-      <!-- 버튼 영역 -->
-      <div style="display: flex; gap: 12px; justify-content: flex-end">
-        <button type="button" onclick="closeOrderDeleteModal()" style="
-              padding: 10px 24px;
-              background: var(--bg-light);
-              border: 1px solid var(--border);
-              border-radius: 8px;
-              font-size: 14px;
-              font-weight: 500;
-              cursor: pointer;
-              color: var(--text-dark);
-            ">
+      <!-- 버튼 -->
+      <div style="display: flex; gap: 12px">
+        <button
+          onclick="closeOrderDeleteModal()"
+          style="
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            color: #374151;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+          "
+          onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db';"
+          onmouseout="this.style.background='white'; this.style.borderColor='#e5e7eb';"
+        >
           취소
         </button>
-        <button type="button" onclick="confirmDeleteOrder()" style="
-              padding: 10px 24px;
-              background: #dc3545;
-              border: none;
-              border-radius: 8px;
-              font-size: 14px;
-              font-weight: 500;
-              cursor: pointer;
-              color: white;
-            ">
+        <button
+          onclick="confirmDeleteOrder()"
+          style="
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: #dc2626;
+            color: white;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+          "
+          onmouseover="this.style.background='#b91c1c';"
+          onmouseout="this.style.background='#dc2626';"
+        >
           삭제
         </button>
       </div>
@@ -9515,6 +10179,222 @@
               </table>
             </div>
           </div>
+
+          <!-- 용지설정관리 페이지 -->
+          <div class="page-content hidden" id="paperSettingPage">
+            <h2 style="display: none">용지설정관리</h2>
+
+            <div style="max-width: 800px; margin: 0 auto; padding: 24px">
+              <!-- 페이지 헤더 -->
+              <div style="margin-bottom: 32px">
+                <h3 style="font-size: 24px; font-weight: 700; color: #1f2937; margin-bottom: 8px">
+                  프린트 용지 마진 설정
+                </h3>
+                <p style="color: #6b7280; font-size: 14px">
+                  A4 용지 출력 시 적용될 여백(마진)을 설정합니다.
+                </p>
+              </div>
+
+              <!-- 마진 설정 카드 -->
+              <div
+                style="
+                  background: white;
+                  border: 1px solid #e5e7eb;
+                  border-radius: 12px;
+                  padding: 32px;
+                  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                "
+              >
+                <!-- 마진 설정 그리드 -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px">
+                  <!-- 상단 마진 -->
+                  <div>
+                    <label
+                      style="
+                        display: block;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 8px;
+                      "
+                    >
+                      상단 마진 (TOP)
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 12px">
+                      <input
+                        type="number"
+                        id="marginTop"
+                        min="0"
+                        max="50"
+                        value="10"
+                        style="
+                          flex: 1;
+                          padding: 10px 16px;
+                          border: 1px solid #d1d5db;
+                          border-radius: 8px;
+                          font-size: 14px;
+                          outline: none;
+                        "
+                      />
+                      <span style="font-size: 14px; color: #6b7280; min-width: 30px">mm</span>
+                    </div>
+                  </div>
+
+                  <!-- 하단 마진 -->
+                  <div>
+                    <label
+                      style="
+                        display: block;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 8px;
+                      "
+                    >
+                      하단 마진 (BOTTOM)
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 12px">
+                      <input
+                        type="number"
+                        id="marginBottom"
+                        min="0"
+                        max="50"
+                        value="10"
+                        style="
+                          flex: 1;
+                          padding: 10px 16px;
+                          border: 1px solid #d1d5db;
+                          border-radius: 8px;
+                          font-size: 14px;
+                          outline: none;
+                        "
+                      />
+                      <span style="font-size: 14px; color: #6b7280; min-width: 30px">mm</span>
+                    </div>
+                  </div>
+
+                  <!-- 좌측 마진 -->
+                  <div>
+                    <label
+                      style="
+                        display: block;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 8px;
+                      "
+                    >
+                      좌측 마진 (LEFT)
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 12px">
+                      <input
+                        type="number"
+                        id="marginLeft"
+                        min="0"
+                        max="50"
+                        value="10"
+                        style="
+                          flex: 1;
+                          padding: 10px 16px;
+                          border: 1px solid #d1d5db;
+                          border-radius: 8px;
+                          font-size: 14px;
+                          outline: none;
+                        "
+                      />
+                      <span style="font-size: 14px; color: #6b7280; min-width: 30px">mm</span>
+                    </div>
+                  </div>
+
+                  <!-- 우측 마진 -->
+                  <div>
+                    <label
+                      style="
+                        display: block;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 8px;
+                      "
+                    >
+                      우측 마진 (RIGHT)
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 12px">
+                      <input
+                        type="number"
+                        id="marginRight"
+                        min="0"
+                        max="50"
+                        value="10"
+                        style="
+                          flex: 1;
+                          padding: 10px 16px;
+                          border: 1px solid #d1d5db;
+                          border-radius: 8px;
+                          font-size: 14px;
+                          outline: none;
+                        "
+                      />
+                      <span style="font-size: 14px; color: #6b7280; min-width: 30px">mm</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 버튼 영역 -->
+                <div style="display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid #e5e7eb; padding-top: 24px">
+                  <button
+                    onclick="resetPaperMargins()"
+                    style="
+                      padding: 10px 24px;
+                      background: #f3f4f6;
+                      color: #374151;
+                      border: none;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      cursor: pointer;
+                    "
+                  >
+                    기본값 복원
+                  </button>
+                  <button
+                    onclick="savePaperMargins()"
+                    style="
+                      padding: 10px 24px;
+                      background: #3b82f6;
+                      color: white;
+                      border: none;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      cursor: pointer;
+                    "
+                  >
+                    저장
+                  </button>
+                </div>
+              </div>
+
+              <!-- 안내 메시지 -->
+              <div
+                style="
+                  margin-top: 24px;
+                  padding: 16px;
+                  background: #eff6ff;
+                  border-left: 4px solid #3b82f6;
+                  border-radius: 8px;
+                "
+              >
+                <p style="margin: 0; font-size: 14px; color: #1e40af; line-height: 1.6">
+                  <strong>💡 사용 안내:</strong><br />
+                  • 마진 값은 0mm ~ 50mm 범위 내에서 설정할 수 있습니다.<br />
+                  • 설정한 마진은 견적서, 발주서, 거래명세서 등 모든 프린트 출력에 적용됩니다.<br />
+                  • 기본값은 상하좌우 모두 10mm입니다.
+                </p>
+              </div>
+            </div>
+          </div>
+
         </div>
         <!-- content-area End -->
       </main>
@@ -11423,15 +12303,115 @@
     </div>
 
     <!-- ✅ 매입전표 삭제 확인 모달 -->
-    <div id="purchaseStatementDeleteModal" class="modal" style="display: none">
-      <div class="modal-content" style="max-width: 400px">
-        <h3 style="margin-bottom: 16px">매입전표 삭제</h3>
-        <p id="purchaseStatementDeleteInfo" style="margin-bottom: 20px"></p>
-        <div style="display: flex; gap: 8px; justify-content: flex-end">
-          <button onclick="closePurchaseStatementDeleteModal()" class="btn btn-secondary">
+    <div
+      id="purchaseStatementDeleteModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        style="
+          background: white;
+          border-radius: 12px;
+          padding: 32px;
+          width: 90%;
+          max-width: 400px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        "
+      >
+        <!-- 아이콘 -->
+        <div style="text-align: center; margin-bottom: 20px">
+          <div
+            style="
+              width: 64px;
+              height: 64px;
+              background: #fee2e2;
+              border-radius: 50%;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              margin-bottom: 16px;
+            "
+          >
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#dc2626"
+              stroke-width="2"
+            >
+              <path
+                d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"
+              />
+            </svg>
+          </div>
+          <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #1f2937">
+            매입전표 삭제
+          </h2>
+          <p
+            id="purchaseStatementDeleteInfo"
+            style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px"
+          >
+            전표번호: -
+          </p>
+          <p style="margin: 0; color: #dc2626; font-size: 14px; font-weight: 500">
+            정말로 이 매입전표를 삭제하시겠습니까?
+          </p>
+          <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 12px">
+            삭제된 전표는 복구할 수 없습니다.
+          </p>
+        </div>
+
+        <!-- 버튼 -->
+        <div style="display: flex; gap: 12px">
+          <button
+            onclick="closePurchaseStatementDeleteModal()"
+            style="
+              flex: 1;
+              padding: 12px;
+              border: 2px solid #e5e7eb;
+              background: white;
+              color: #374151;
+              border-radius: 8px;
+              font-size: 15px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#d1d5db';"
+            onmouseout="this.style.background='white'; this.style.borderColor='#e5e7eb';"
+          >
             취소
           </button>
-          <button onclick="confirmPurchaseStatementDelete()" class="btn btn-danger">삭제</button>
+          <button
+            onclick="confirmPurchaseStatementDelete()"
+            style="
+              flex: 1;
+              padding: 12px;
+              border: none;
+              background: #dc2626;
+              color: white;
+              border-radius: 8px;
+              font-size: 15px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background='#b91c1c';"
+            onmouseout="this.style.background='#dc2626';"
+          >
+            삭제
+          </button>
         </div>
       </div>
     </div>
@@ -12373,6 +13353,109 @@
       // 작업일자 가져오기
       function getWorkingDate() {
         return localStorage.getItem('workingDate') || new Date().toISOString().slice(0, 10);
+      }
+
+      // ==================== 용지설정관리 함수 ====================
+
+      // 페이지 로드 시 저장된 마진 설정 불러오기
+      function loadPaperMargins() {
+        const savedMargins = localStorage.getItem('printMargins');
+
+        if (savedMargins) {
+          const margins = JSON.parse(savedMargins);
+          document.getElementById('marginTop').value = margins.top || 10;
+          document.getElementById('marginBottom').value = margins.bottom || 10;
+          document.getElementById('marginLeft').value = margins.left || 10;
+          document.getElementById('marginRight').value = margins.right || 10;
+        } else {
+          // 기본값 설정
+          document.getElementById('marginTop').value = 10;
+          document.getElementById('marginBottom').value = 10;
+          document.getElementById('marginLeft').value = 10;
+          document.getElementById('marginRight').value = 10;
+        }
+      }
+
+      // 마진 설정 저장
+      function savePaperMargins() {
+        const margins = {
+          top: parseInt(document.getElementById('marginTop').value) || 10,
+          bottom: parseInt(document.getElementById('marginBottom').value) || 10,
+          left: parseInt(document.getElementById('marginLeft').value) || 10,
+          right: parseInt(document.getElementById('marginRight').value) || 10
+        };
+
+        // 유효성 검사
+        if (margins.top < 0 || margins.top > 50 ||
+            margins.bottom < 0 || margins.bottom > 50 ||
+            margins.left < 0 || margins.left > 50 ||
+            margins.right < 0 || margins.right > 50) {
+          alert('마진 값은 0mm ~ 50mm 사이여야 합니다.');
+          return;
+        }
+
+        // localStorage에 저장
+        localStorage.setItem('printMargins', JSON.stringify(margins));
+
+        // CSS 변수 업데이트
+        updatePrintMargins(margins);
+
+        alert('마진 설정이 저장되었습니다.');
+        console.log('✅ 용지 마진 저장:', margins);
+      }
+
+      // 마진 기본값 복원
+      function resetPaperMargins() {
+        if (confirm('마진 설정을 기본값(10mm)으로 복원하시겠습니까?')) {
+          document.getElementById('marginTop').value = 10;
+          document.getElementById('marginBottom').value = 10;
+          document.getElementById('marginLeft').value = 10;
+          document.getElementById('marginRight').value = 10;
+
+          const defaultMargins = { top: 10, bottom: 10, left: 10, right: 10 };
+          localStorage.setItem('printMargins', JSON.stringify(defaultMargins));
+          updatePrintMargins(defaultMargins);
+
+          alert('기본값으로 복원되었습니다.');
+        }
+      }
+
+      // CSS @page 마진 업데이트
+      function updatePrintMargins(margins) {
+        // 기존 스타일 제거
+        const existingStyle = document.getElementById('dynamicPrintMargins');
+        if (existingStyle) {
+          existingStyle.remove();
+        }
+
+        // 새 스타일 추가
+        const style = document.createElement('style');
+        style.id = 'dynamicPrintMargins';
+        style.textContent = `
+          @media print {
+            @page {
+              size: A4;
+              margin: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm;
+            }
+          }
+        `;
+        document.head.appendChild(style);
+
+        console.log('✅ 프린트 마진 CSS 업데이트:', margins);
+      }
+
+      // 페이지 로드 시 마진 적용
+      function initPrintMargins() {
+        const savedMargins = localStorage.getItem('printMargins');
+
+        if (savedMargins) {
+          const margins = JSON.parse(savedMargins);
+          updatePrintMargins(margins);
+        } else {
+          // 기본값 적용
+          const defaultMargins = { top: 10, bottom: 10, left: 10, right: 10 };
+          updatePrintMargins(defaultMargins);
+        }
       }
 
       // 작업일자 변경 모달 열기

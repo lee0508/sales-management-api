@@ -94,7 +94,7 @@ async function printQuotation(견적일자, 견적번호) {
  */
 function generateQuotationPrintHTML(data) {
   const master = data.master;
-  const details = data.details || [];
+  const details = data.detail || [];  // ✅ API 응답의 "detail" (단수형) 사용
 
   // 합계 계산
   let 공급가액합계 = 0;
@@ -322,7 +322,7 @@ async function printOrder(발주일자, 발주번호) {
  */
 function generateOrderPrintHTML(data) {
   const master = data.master;
-  const details = data.details || [];
+  const details = data.detail || [];  // ✅ Fixed: API returns 'detail' not 'details'
 
   // 합계 계산
   let 공급가액합계 = 0;

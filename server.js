@@ -4636,6 +4636,369 @@ app.put('/api/transactions/:date/:no/approve', requireAuth, async (req, res) => 
 });
 
 // ================================
+// 세금계산서관리 API (Tax Invoices)
+// ================================
+
+// ✅ 세금계산서 목록 조회
+app.get('/api/tax-invoices', async (req, res) => {
+  try {
+    const { 사업장코드, startDate, endDate, 발행여부 } = req.query;
+
+    let query = `
+      SELECT
+        t.사업장코드,
+        t.작성년도,
+        t.책번호,
+        t.일련번호,
+        t.매출처코드,
+        c.매출처명,
+        c.사업자번호,
+        t.작성일자,
+        t.품목및규격,
+        t.수량,
+        t.공급가액,
+        t.세액,
+        t.금액구분,
+        t.영청구분,
+        t.발행여부,
+        t.작성구분,
+        t.미수구분,
+        t.적요,
+        t.사용구분,
+        t.수정일자,
+        t.사용자코드
+      FROM 세금계산서 t
+        LEFT JOIN 매출처 c ON t.매출처코드 = c.매출처코드 AND t.사업장코드 = c.사업장코드
+      WHERE t.사업장코드 = @사업장코드
+    `;
+
+    const request = pool.request();
+    request.input('사업장코드', sql.VarChar(2), 사업장코드 || '01');
+
+    // 날짜 필터
+    if (startDate) {
+      query += ` AND t.작성일자 >= @startDate`;
+      request.input('startDate', sql.VarChar(8), startDate);
+    }
+    if (endDate) {
+      query += ` AND t.작성일자 <= @endDate`;
+      request.input('endDate', sql.VarChar(8), endDate);
+    }
+
+    // 발행여부 필터
+    if (발행여부 !== undefined && 발행여부 !== '') {
+      query += ` AND t.발행여부 = @발행여부`;
+      request.input('발행여부', sql.TinyInt, parseInt(발행여부));
+    }
+
+    query += ` ORDER BY t.작성일자 DESC, t.책번호 DESC, t.일련번호 DESC`;
+
+    const result = await request.query(query);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+
+  } catch (error) {
+    console.error('세금계산서 목록 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      message: '세금계산서 목록 조회에 실패했습니다.',
+      error: error.message,
+    });
+  }
+});
+
+// ✅ 세금계산서 상세 조회 (매출처 정보 + 자재입출내역 포함)
+app.get('/api/tax-invoices/:사업장코드/:작성년도/:책번호/:일련번호', async (req, res) => {
+  try {
+    const { 사업장코드, 작성년도, 책번호, 일련번호 } = req.params;
+
+    console.log('='.repeat(80));
+    console.log(`🔍 [API 호출] 세금계산서 상세 조회`);
+    console.log(`📋 요청 파라미터: 사업장코드=${사업장코드}, 작성년도=${작성년도}, 책번호=${책번호}, 일련번호=${일련번호}`);
+    console.log('='.repeat(80));
+
+    // 1. 세금계산서 기본 정보 조회
+    const masterQuery = `
+      SELECT
+        t.사업장코드,
+        t.작성년도,
+        t.책번호,
+        t.일련번호,
+        t.매출처코드,
+        c.매출처명,
+        c.사업자번호,
+        c.대표자명,
+        c.업태,
+        c.업종,
+        c.주소,
+        c.번지,
+        c.전화번호,
+        c.팩스번호,
+        t.작성일자,
+        t.품목및규격,
+        t.수량,
+        t.공급가액,
+        t.세액,
+        t.금액구분,
+        t.영청구분,
+        t.발행여부,
+        t.작성구분,
+        t.미수구분,
+        t.적요,
+        t.사용구분,
+        t.수정일자,
+        t.사용자코드,
+        u.사용자명
+      FROM 세금계산서 t
+        LEFT JOIN 매출처 c ON t.매출처코드 = c.매출처코드 AND t.사업장코드 = c.사업장코드
+        LEFT JOIN 사용자 u ON t.사용자코드 = u.사용자코드
+      WHERE t.사업장코드 = @사업장코드
+        AND t.작성년도 = @작성년도
+        AND t.책번호 = @책번호
+        AND t.일련번호 = @일련번호
+    `;
+
+    console.log('📊 [Step 1] 세금계산서 마스터 정보 조회 시작...');
+    const masterResult = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성년도', sql.VarChar(4), 작성년도)
+      .input('책번호', sql.Real, parseFloat(책번호))
+      .input('일련번호', sql.Real, parseFloat(일련번호))
+      .query(masterQuery);
+
+    console.log(`✅ [Step 1] 세금계산서 마스터 조회 완료: ${masterResult.recordset.length}건`);
+
+    if (masterResult.recordset.length === 0) {
+      console.log('❌ 세금계산서를 찾을 수 없습니다.');
+      return res.status(404).json({
+        success: false,
+        message: '세금계산서를 찾을 수 없습니다.',
+      });
+    }
+
+    const taxInvoice = masterResult.recordset[0];
+    console.log('📄 세금계산서 정보:', taxInvoice);
+
+    // 2. 관련 자재입출내역 조회 (세금계산서 작성년도, 책번호, 일련번호 기준)
+    const detailQuery = `
+      SELECT
+        i.거래일자,
+        i.거래번호,
+        i.분류코드,
+        i.세부코드,
+        (i.분류코드 + i.세부코드) AS 자재코드,
+        m.자재명,
+        m.규격,
+        m.단위,
+        ISNULL(i.출고수량, 0) AS 수량,
+        ISNULL(i.출고단가, 0) AS 단가,
+        ISNULL(i.출고수량, 0) * ISNULL(i.출고단가, 0) AS 공급가액,
+        ISNULL(i.출고부가, 0) AS 부가세,
+        (ISNULL(i.출고수량, 0) * ISNULL(i.출고단가, 0)) + ISNULL(i.출고부가, 0) AS 합계금액,
+        i.계산서발행여부,
+        i.적요
+      FROM 자재입출내역 i
+        LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
+      WHERE i.사업장코드 = @사업장코드
+        AND i.작성년도 = @작성년도
+        AND i.책번호 = @책번호
+        AND i.일련번호 = @일련번호
+        AND i.입출고구분 = 2
+      ORDER BY i.거래번호, m.자재명
+    `;
+
+    console.log('📊 [Step 2] 자재입출내역 조회 시작...');
+    console.log(`🔍 검색 조건: 사업장코드=${사업장코드}, 작성년도=${작성년도}, 책번호=${책번호}, 일련번호=${일련번호}`);
+
+    const detailResult = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성년도', sql.VarChar(4), 작성년도)
+      .input('책번호', sql.Real, parseFloat(책번호))
+      .input('일련번호', sql.Real, parseFloat(일련번호))
+      .query(detailQuery);
+
+    console.log(`✅ [Step 2] 자재입출내역 조회 완료: ${detailResult.recordset.length}건`);
+
+    if (detailResult.recordset.length > 0) {
+      console.log('📦 첫 번째 품목 정보:');
+      console.log('  - 자재코드:', detailResult.recordset[0].자재코드);
+      console.log('  - 자재명:', detailResult.recordset[0].자재명);
+      console.log('  - 규격:', detailResult.recordset[0].규격);
+      console.log('  - 수량:', detailResult.recordset[0].수량);
+      console.log('  - 단가:', detailResult.recordset[0].단가);
+    } else {
+      console.log('⚠️ 자재입출내역이 없습니다!');
+      console.log('💡 다음을 확인해주세요:');
+      console.log('   1. 자재입출내역 테이블에 작성년도, 책번호, 일련번호 필드가 정확한지');
+      console.log('   2. 세금계산서 생성 시 자재입출내역 레코드가 생성되었는지');
+      console.log('   3. 입출고구분이 2(출고)로 설정되어 있는지');
+    }
+    console.log('='.repeat(80));
+
+    res.json({
+      success: true,
+      data: {
+        master: taxInvoice,
+        details: detailResult.recordset,
+      },
+    });
+
+  } catch (error) {
+    console.error('세금계산서 상세 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      message: '세금계산서 상세 조회에 실패했습니다.',
+      error: error.message,
+    });
+  }
+});
+
+// ✅ 세금계산서 수정
+app.put('/api/tax-invoices/:사업장코드/:작성년도/:책번호/:일련번호', async (req, res) => {
+  try {
+    const { 사업장코드, 작성년도, 책번호, 일련번호 } = req.params;
+    const { 작성일자, 품목및규격, 수량, 공급가액, 세액, 발행여부, 적요 } = req.body;
+
+    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    const query = `
+      UPDATE 세금계산서
+      SET
+        작성일자 = @작성일자,
+        품목및규격 = @품목및규격,
+        수량 = @수량,
+        공급가액 = @공급가액,
+        세액 = @세액,
+        발행여부 = @발행여부,
+        적요 = @적요,
+        수정일자 = @수정일자,
+        사용자코드 = @사용자코드
+      WHERE 사업장코드 = @사업장코드
+        AND 작성년도 = @작성년도
+        AND 책번호 = @책번호
+        AND 일련번호 = @일련번호
+    `;
+
+    await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성년도', sql.VarChar(4), 작성년도)
+      .input('책번호', sql.Real, parseFloat(책번호))
+      .input('일련번호', sql.Real, parseFloat(일련번호))
+      .input('작성일자', sql.VarChar(8), 작성일자)
+      .input('품목및규격', sql.VarChar(50), 품목및규격)
+      .input('수량', sql.Real, parseFloat(수량))
+      .input('공급가액', sql.Money, parseFloat(공급가액))
+      .input('세액', sql.Money, parseFloat(세액))
+      .input('발행여부', sql.TinyInt, parseInt(발행여부))
+      .input('적요', sql.VarChar(50), 적요 || '')
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .query(query);
+
+    res.json({
+      success: true,
+      message: '세금계산서가 수정되었습니다.',
+    });
+
+  } catch (error) {
+    console.error('세금계산서 수정 실패:', error);
+    res.status(500).json({
+      success: false,
+      message: '세금계산서 수정에 실패했습니다.',
+      error: error.message,
+    });
+  }
+});
+
+// ✅ 세금계산서 삭제 (소프트 삭제 - 사용구분 9)
+app.delete('/api/tax-invoices/:사업장코드/:작성년도/:책번호/:일련번호', async (req, res) => {
+  try {
+    const { 사업장코드, 작성년도, 책번호, 일련번호 } = req.params;
+
+    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    console.log('='.repeat(80));
+    console.log(`🗑️ [세금계산서 삭제] 사업장코드=${사업장코드}, 작성년도=${작성년도}, 책번호=${책번호}, 일련번호=${일련번호}`);
+    console.log(`👤 삭제 사용자: ${사용자코드}, 수정일자: ${수정일자}`);
+    console.log('='.repeat(80));
+
+    // Step 1: 세금계산서 테이블 사용구분 = 9 업데이트
+    const taxInvoiceQuery = `
+      UPDATE 세금계산서
+      SET
+        사용구분 = 9,
+        수정일자 = @수정일자,
+        사용자코드 = @사용자코드
+      WHERE 사업장코드 = @사업장코드
+        AND 작성년도 = @작성년도
+        AND 책번호 = @책번호
+        AND 일련번호 = @일련번호
+    `;
+
+    await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성년도', sql.VarChar(4), 작성년도)
+      .input('책번호', sql.Real, parseFloat(책번호))
+      .input('일련번호', sql.Real, parseFloat(일련번호))
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .query(taxInvoiceQuery);
+
+    console.log('✅ [Step 1] 세금계산서 테이블 사용구분 = 9 업데이트 완료');
+
+    // Step 2: 자재입출내역 테이블 사용구분 = 9 업데이트
+    const inventoryQuery = `
+      UPDATE 자재입출내역
+      SET
+        사용구분 = 9,
+        수정일자 = @수정일자,
+        사용자코드 = @사용자코드
+      WHERE 사업장코드 = @사업장코드
+        AND 작성년도 = @작성년도
+        AND 책번호 = @책번호
+        AND 일련번호 = @일련번호
+        AND 입출고구분 = 2
+    `;
+
+    const inventoryResult = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성년도', sql.VarChar(4), 작성년도)
+      .input('책번호', sql.Real, parseFloat(책번호))
+      .input('일련번호', sql.Real, parseFloat(일련번호))
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .query(inventoryQuery);
+
+    console.log(`✅ [Step 2] 자재입출내역 테이블 사용구분 = 9 업데이트 완료 (${inventoryResult.rowsAffected[0]}건)`);
+    console.log('='.repeat(80));
+
+    res.json({
+      success: true,
+      message: '세금계산서가 삭제되었습니다.',
+    });
+
+  } catch (error) {
+    console.error('❌ 세금계산서 삭제 실패:', error);
+    res.status(500).json({
+      success: false,
+      message: '세금계산서 삭제에 실패했습니다.',
+      error: error.message,
+    });
+  }
+});
+
+// ================================
 // 매입전표관리 API (Purchase Statements)
 // ================================
 

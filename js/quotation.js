@@ -33,11 +33,13 @@ $(document).ready(function () {
       actionDiv.find('.btn-edit').show();
       actionDiv.find('.btn-delete').show();
       actionDiv.find('.btn-approve').show();
+      actionDiv.find('.btn-print').hide();  // ✅ 출력 버튼 숨김
     } else {
       actionDiv.find('.btn-view').show();
       actionDiv.find('.btn-edit').hide();
       actionDiv.find('.btn-delete').hide();
       actionDiv.find('.btn-approve').hide();
+      actionDiv.find('.btn-print').show();  // ✅ 출력 버튼 표시
     }
   });
 
@@ -272,7 +274,7 @@ $(document).ready(function () {
                     ? `<button class="btn-icon btn-approve" style="display: none; background: #28a745;" onclick="approveQuotation('${row.견적일자}', ${row.견적번호})" title="승인">승인</button>`
                     : ''
                 }
-                <button class="btn-icon" style="background: #9333ea;" onclick="printQuotation('${row.견적일자}', ${row.견적번호})" title="인쇄">출력</button>
+                <button class="btn-icon btn-print" onclick="printQuotation('${row.견적일자}', ${row.견적번호})" title="인쇄">출력</button>
               </div>
             `;
           },
@@ -2846,8 +2848,21 @@ function makeModalDraggable(modalContentId, dragHandleId) {
 
 console.log('✅ quotation.js 로드 완료');
 
+// ==================== 필터링 함수 ====================
+
+// 견적 필터링 함수 (상태, 시작일, 종료일 기준으로 데이터 재조회)
+function filterQuotations() {
+  if (quotationTable) {
+    console.log('✅ 견적 필터 적용 - DataTable 재로드');
+    quotationTable.ajax.reload();
+  } else {
+    console.warn('⚠️ quotationTable이 초기화되지 않았습니다.');
+  }
+}
+
 // 전역 함수 노출
 window.editQuotation = editQuotation;
 window.deleteQuotation = deleteQuotation;
 window.approveQuotation = approveQuotation;
 window.makeModalDraggable = makeModalDraggable;
+window.filterQuotations = filterQuotations;

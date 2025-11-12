@@ -1,492 +1,1069 @@
-# 소스 코드 모듈화 제안서
+# 판매관리 시스템 리팩토링 제안서
 
-## 현재 문제점
-
-### 1. 파일 크기
-- **index.html**: 약 9,200+ 줄 (모든 페이지 HTML + JavaScript)
-- **quotation.js**: 2,787 줄
-- **order.js**: 2,798 줄
-- **server.js**: 약 4,000+ 줄 (모든 API 엔드포인트)
-
-### 2. 유지보수 어려움
-- 한 파일에서 특정 메뉴 수정 시 전체 파일 로딩 필요
-- 코드 검색 및 네비게이션 어려움
-- 여러 개발자 협업 시 충돌 가능성 높음
-- 특정 기능만 테스트하기 어려움
+**작성일**: 2025-11-11 (업데이트)
+**상태**: 제안 - 실제 운영 테스트 후 검토 예정
+**검토 시기**: 제이씨엠전기 1개월 병행 테스트 완료 후
 
 ---
 
-## 제안 1: HTML 뷰 분리 (우선순위: 높음)
+## 📊 현재 상황 분석 (2025-11-11 업데이트)
 
-### 현재 구조
-```
-index.html (9,200+ 줄)
-├── 대시보드 HTML
-├── 견적관리 HTML
-├── 발주관리 HTML
-├── 거래명세서관리 HTML
-├── 매입전표관리 HTML
-├── 매출처관리 HTML
-├── 매입처관리 HTML
-└── 모든 JavaScript 로직
-```
+### 코드 라인 수
+- **index.html**: 13,049줄 (이전: 9,200+줄)
+- **server.js**: 5,421줄 (이전: 4,000+줄)
+- **js/quotation.js**: 2,868줄 (이전: 2,787줄)
+- **js/order.js**: 3,005줄 (이전: 2,798줄)
+- **js/transaction.js**: 1,935줄 (이전: 1,500+줄)
+- **js/purchase.js**: 741줄
+- **js/supplier.js**: 634줄
+- **js/customer.js**: 158줄
 
-### 제안 구조
-```
-index.html (메인 레이아웃만 - 약 200줄)
-├── includes/
-│   ├── dashboard.html        (대시보드 뷰)
-│   ├── quotation.html         (견적관리 뷰)
-│   ├── order.html             (발주관리 뷰)
-│   ├── transaction.html       (거래명세서관리 뷰)
-│   ├── purchase-statement.html (매입전표관리 뷰)
-│   ├── customer.html          (매출처관리 뷰)
-│   └── supplier.html          (매입처관리 뷰)
-```
+**총계**: 약 **28,000+ 줄**의 코드가 소수의 파일에 집중
 
-### 구현 방법 (3가지 옵션)
+### 문제점
 
-#### 옵션 A: JavaScript Fetch API (권장)
-**장점**:
-- 추가 라이브러리 불필요
-- 비동기 로딩으로 초기 로딩 속도 개선
-- 필요한 뷰만 로드하여 메모리 절약
+1. **index.html 비대화** (13,049줄)
+   - 모든 페이지 HTML이 하나의 파일에 집중
+   - 기능 추가 및 수정 시 파일 탐색 어려움
+   - 로딩 시간 증가 (불필요한 HTML까지 모두 로드)
+   - Git diff 확인 어려움
 
-**구현 예시**:
-```javascript
-// 기존 showPage() 함수 수정
-async function showPage(pageName) {
-  const container = document.getElementById('page-container');
+2. **JavaScript 파일 비대화**
+   - quotation.js (2,868줄), order.js (3,005줄)
+   - 단일 파일에 모든 로직 집중 (리스트, 폼, API, 유틸리티)
+   - 코드 재사용성 낮음
+   - 동일한 패턴 반복 (DataTable 초기화, 모달 관리 등)
 
-  // 뷰가 이미 로드되어 있으면 표시만
-  const existingPage = document.getElementById(`${pageName}Page`);
-  if (existingPage) {
-    // 기존 로직 (페이지 전환)
-    hideAllPages();
-    existingPage.classList.add('active');
-  } else {
-    // 처음 접근 시 HTML 로드
-    try {
-      const response = await fetch(`/sales-management-api/views/${pageName}.html`);
-      const html = await response.text();
-      container.insertAdjacentHTML('beforeend', html);
+3. **server.js 비대화** (5,421줄)
+   - 모든 라우트, 컨트롤러, 비즈니스 로직이 한 파일에
+   - 유지보수 및 디버깅 어려움
+   - 협업 시 Git 충돌 가능성 높음
+   - 특정 기능 테스트 어려움
 
-      // 페이지별 초기화 함수 호출
-      if (window[`init${capitalize(pageName)}`]) {
-        window[`init${capitalize(pageName)}`]();
-      }
-
-      hideAllPages();
-      document.getElementById(`${pageName}Page`).classList.add('active');
-    } catch (error) {
-      console.error(`페이지 로드 실패: ${pageName}`, error);
-    }
-  }
-}
-```
-
-#### 옵션 B: jQuery load() 메서드
-**장점**:
-- jQuery 이미 사용 중이므로 추가 설정 불필요
-- 간단한 구문
-
-**구현 예시**:
-```javascript
-async function showPage(pageName) {
-  const existingPage = document.getElementById(`${pageName}Page`);
-  if (!existingPage) {
-    await new Promise((resolve) => {
-      $('#page-container').append(
-        $('<div>').load(`/sales-management-api/views/${pageName}.html`, resolve)
-      );
-    });
-
-    if (window[`init${capitalize(pageName)}`]) {
-      window[`init${capitalize(pageName)}`]();
-    }
-  }
-
-  hideAllPages();
-  $(`#${pageName}Page`).addClass('active');
-}
-```
-
-#### 옵션 C: 서버사이드 템플릿 엔진 (향후 고려)
-- EJS, Handlebars, Pug 등 사용
-- 서버에서 HTML 조합 후 전송
-- 더 큰 리팩토링 필요
+4. **코드 중복**
+   - DataTable 초기화 로직 반복
+   - 모달 열기/닫기 패턴 반복
+   - API 호출 에러 처리 중복
+   - 날짜 포맷팅 로직 중복 (YYYYMMDD ↔ YYYY-MM-DD)
+   - 금액 계산 로직 중복 (공급가액, 부가세, 합계)
 
 ---
 
-## 제안 2: JavaScript 모듈 분리 (우선순위: 중간)
+## 🎯 개선 방안 제안
 
-### 현재 구조
+### 전략: **점진적 리팩토링 (Progressive Refactoring)**
+
+한 번에 모든 것을 바꾸는 것이 아니라, 단계별로 개선해 나가는 방식
+
+---
+
+## 1단계: 프론트엔드 모듈화 (우선순위: 높음)
+
+### 1-1. HTML 분리 - Component 기반 구조
+
+**현재 구조**:
+```
+index.html (13,049줄 - 모든 페이지 포함)
+```
+
+**개선 후 구조**:
+```
+pages/
+├── dashboard.html              (대시보드 화면)
+├── customer-management.html    (매출처 관리)
+├── supplier-management.html    (매입처 관리)
+├── quotation.html              (견적 관리)
+├── order.html                  (발주 관리)
+├── transaction.html            (거래명세서)
+├── purchase.html               (매입전표)
+└── material-management.html    (자재 관리)
+
+components/
+├── modals/
+│   ├── customer-modal.html
+│   ├── quotation-modal.html
+│   └── material-search-modal.html
+└── common/
+    ├── sidebar.html
+    ├── header.html
+    └── footer.html
+```
+
+**구현 방법**:
+- JavaScript의 `fetch()` API로 HTML 동적 로딩
+- 간단한 템플릿 엔진 사용 (예: Handlebars, Mustache)
+- 또는 Web Components 사용
+
+**예시 코드**:
+```javascript
+// js/core/router.js
+class Router {
+  async loadPage(pageName) {
+    const response = await fetch(`/pages/${pageName}.html`);
+    const html = await response.text();
+    document.getElementById('main-content').innerHTML = html;
+  }
+}
+
+// 사용 예
+router.loadPage('quotation'); // quotation.html 로드
+```
+
+**장점**:
+- 각 페이지를 독립적으로 관리 가능
+- 초기 로딩 속도 개선 (필요한 페이지만 로드)
+- 페이지별 수정 시 영향 범위 최소화
+- Git 충돌 감소
+
+---
+
+### 1-2. JavaScript 모듈 분리
+
+**현재 구조**:
 ```
 js/
-├── jquery-3.7.1.min.js
-├── dataTableInit.js
-├── customer.js       (2,000+ 줄)
-├── supplier.js       (2,000+ 줄)
-├── quotation.js      (2,787 줄)
-├── order.js          (2,798 줄)
-├── transaction.js    (1,500+ 줄)
-└── postoffice.js
+├── quotation.js (2,868줄 - 모든 로직 포함)
+├── order.js (3,005줄 - 모든 로직 포함)
+└── transaction.js (1,935줄 - 모든 로직 포함)
 ```
 
-### 제안 구조 (기능별 세분화)
+**개선 후 구조**:
 ```
 js/
-├── lib/
-│   ├── jquery-3.7.1.min.js
-│   └── dataTableInit.js
-├── utils/
-│   ├── api.js              (API 호출 헬퍼)
-│   ├── formatters.js       (날짜, 금액 포맷)
-│   ├── validators.js       (입력 검증)
-│   └── modal.js            (모달 공통 로직)
+├── core/                       (핵심 기능)
+│   ├── api.js                  (공통 API 호출 함수)
+│   ├── router.js               (페이지 라우팅)
+│   ├── session.js              (세션 관리)
+│   ├── datatable-helper.js     (DataTable 공통 설정)
+│   ├── modal-helper.js         (모달 공통 함수)
+│   └── utils.js                (공통 유틸리티)
 ├── modules/
-│   ├── dashboard/
-│   │   ├── dashboard.js
-│   │   └── dashboard-tables.js
+│   ├── customer/
+│   │   ├── customer-list.js    (고객 목록 관리)
+│   │   ├── customer-form.js    (고객 등록/수정 폼)
+│   │   └── customer-api.js     (고객 API 호출)
 │   ├── quotation/
-│   │   ├── quotation-list.js      (목록 관리)
-│   │   ├── quotation-form.js      (작성/수정 폼)
-│   │   ├── quotation-modal.js     (모달 관리)
-│   │   └── quotation-api.js       (API 호출)
+│   │   ├── quotation-list.js   (견적 목록)
+│   │   ├── quotation-form.js   (견적 작성/수정)
+│   │   ├── quotation-detail.js (견적 상세)
+│   │   └── quotation-api.js    (견적 API)
 │   ├── order/
 │   │   ├── order-list.js
 │   │   ├── order-form.js
-│   │   ├── order-modal.js
+│   │   ├── order-detail.js
 │   │   └── order-api.js
-│   ├── transaction/
-│   │   ├── transaction-list.js
-│   │   ├── transaction-form.js
-│   │   ├── transaction-modal.js
-│   │   └── transaction-api.js
-│   ├── purchase-statement/
-│   │   ├── purchase-list.js
-│   │   ├── purchase-form.js
-│   │   └── purchase-api.js
-│   ├── customer/
-│   │   ├── customer-list.js
-│   │   ├── customer-form.js
-│   │   └── customer-api.js
-│   └── supplier/
-│       ├── supplier-list.js
-│       ├── supplier-form.js
-│       └── supplier-api.js
-└── postoffice.js
+│   └── material/
+│       ├── material-search.js  (자재 검색 모달)
+│       └── material-api.js     (자재 API)
+└── app.js                      (메인 진입점)
 ```
 
-### 구현 방법: ES6 Modules
+**예시 코드**:
 
-**index.html에서 로딩**:
-```html
-<script type="module">
-  // 공통 유틸리티
-  import * as API from './js/utils/api.js';
-  import * as Formatters from './js/utils/formatters.js';
+```javascript
+// js/core/api.js
+export class API {
+  static async get(endpoint, params = {}) {
+    const url = `/api${endpoint}?${new URLSearchParams(params)}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.statusText}`);
+    }
+    return response.json();
+  }
 
-  // 전역으로 노출 (레거시 호환)
-  window.API = API;
-  window.Formatters = Formatters;
+  static async post(endpoint, data) {
+    const response = await fetch(`/api${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.statusText}`);
+    }
+    return response.json();
+  }
 
-  // 페이지별 모듈은 동적 로딩
-  async function loadPageModule(pageName) {
-    switch(pageName) {
-      case 'quotation':
-        await import('./js/modules/quotation/quotation-list.js');
-        await import('./js/modules/quotation/quotation-form.js');
-        break;
-      case 'order':
-        await import('./js/modules/order/order-list.js');
-        await import('./js/modules/order/order-form.js');
-        break;
-      // ... 기타 페이지
+  static async put(endpoint, data) {
+    const response = await fetch(`/api${endpoint}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  static async delete(endpoint) {
+    const response = await fetch(`/api${endpoint}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.statusText}`);
+    }
+    return response.json();
+  }
+}
+
+// js/modules/quotation/quotation-api.js
+import { API } from '../../core/api.js';
+
+export class QuotationAPI {
+  static async getList(filters = {}) {
+    return API.get('/quotations', filters);
+  }
+
+  static async getDetail(date, no) {
+    return API.get(`/quotations/${date}/${no}`);
+  }
+
+  static async create(data) {
+    return API.post('/quotations', data);
+  }
+
+  static async update(date, no, data) {
+    return API.put(`/quotations/${date}/${no}`, data);
+  }
+
+  static async delete(date, no) {
+    return API.delete(`/quotations/${date}/${no}`);
+  }
+}
+
+// js/core/datatable-helper.js
+export class DataTableHelper {
+  static init(selector, columns, options = {}) {
+    return $(selector).DataTable({
+      ...this.getDefaultConfig(),
+      columns,
+      ...options
+    });
+  }
+
+  static getDefaultConfig() {
+    return {
+      language: {
+        url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/ko.json'
+      },
+      pageLength: 25,
+      responsive: true,
+      autoWidth: false,
+      processing: true
+    };
+  }
+
+  static destroy(selector) {
+    const table = $(selector).DataTable();
+    if (table) {
+      table.destroy();
     }
   }
-</script>
-```
-
-**모듈 예시 (quotation-list.js)**:
-```javascript
-import { apiCall } from '../../utils/api.js';
-import { formatCurrency, formatDate } from '../../utils/formatters.js';
-
-let quotationTable = null;
-
-export async function initQuotationList() {
-  console.log('✅ 견적관리 목록 초기화');
-
-  // 날짜 초기화
-  initializeDateInputs();
-
-  // DataTable 초기화
-  await loadQuotations();
-
-  // 이벤트 핸들러 등록
-  registerEventHandlers();
 }
 
-async function loadQuotations() {
-  if (quotationTable) {
-    quotationTable.destroy();
-    quotationTable = null;
+// js/core/modal-helper.js
+export class ModalHelper {
+  static open(modalId) {
+    $(`#${modalId}`).modal('show');
   }
 
-  quotationTable = $('#quotationTable').DataTable({
-    // ... DataTable 설정
-  });
+  static close(modalId) {
+    $(`#${modalId}`).modal('hide');
+  }
+
+  static resetForm(formId) {
+    $(`#${formId}`)[0].reset();
+  }
+
+  static setTitle(modalId, title) {
+    $(`#${modalId} .modal-title`).text(title);
+  }
 }
 
-function registerEventHandlers() {
-  $('#quotationSearchBtn').on('click', () => {
-    quotationTable.ajax.reload();
-  });
+// js/core/utils.js
+export class Utils {
+  // 날짜 포맷팅 (YYYYMMDD)
+  static formatDate(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+  }
 
-  $('#quotationNewBtn').on('click', () => {
-    window.openQuotationModal();
-  });
+  // 날짜 파싱 (YYYYMMDD → YYYY-MM-DD)
+  static parseDate(dateStr) {
+    if (!dateStr || dateStr.length !== 8) return '';
+    return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+  }
+
+  // 숫자 포맷팅 (천단위 콤마)
+  static formatNumber(num) {
+    if (num === null || num === undefined) return '0';
+    return Number(num).toLocaleString('ko-KR');
+  }
+
+  // 금액 계산
+  static calculateAmount(quantity, price) {
+    return Math.round(quantity * price);
+  }
+
+  // 부가세 계산 (10%)
+  static calculateVAT(amount) {
+    return Math.round(amount * 0.1);
+  }
 }
-
-// 전역 노출 (기존 HTML 인라인 이벤트 호환)
-window.initQuotationList = initQuotationList;
 ```
+
+**사용 예시**:
+```javascript
+// js/modules/quotation/quotation-list.js
+import { QuotationAPI } from './quotation-api.js';
+import { DataTableHelper } from '../../core/datatable-helper.js';
+import { Utils } from '../../core/utils.js';
+
+export class QuotationList {
+  constructor() {
+    this.table = null;
+  }
+
+  async init() {
+    await this.loadList();
+    this.bindEvents();
+  }
+
+  async loadList() {
+    try {
+      const response = await QuotationAPI.getList({
+        사업장코드: sessionStorage.getItem('사업장코드')
+      });
+
+      this.table = DataTableHelper.init('#quotationTable', [
+        { data: '견적일자', render: (data) => Utils.parseDate(data) },
+        { data: '견적번호' },
+        { data: '매출처명' },
+        { data: '합계금액', render: (data) => Utils.formatNumber(data) }
+      ], {
+        data: response.data
+      });
+    } catch (error) {
+      alert('견적 목록을 불러오는데 실패했습니다: ' + error.message);
+    }
+  }
+
+  bindEvents() {
+    $('#newQuotationBtn').on('click', () => {
+      // 새 견적 작성 모달 열기
+    });
+  }
+}
+```
+
+**장점**:
+- 코드 재사용성 향상
+- 각 모듈의 역할이 명확
+- 테스트 용이
+- 유지보수 편리
 
 ---
 
-## 제안 3: 백엔드 API 모듈화 (우선순위: 낮음)
+## 2단계: 백엔드 모듈화 (우선순위: 중간)
 
-### 현재 구조
+### 2-1. MVC 패턴 적용
+
+**현재 구조**:
 ```
-server.js (4,000+ 줄)
-├── Database connection
-├── Session configuration
-├── Middleware
-├── Authentication routes
-├── Customer routes
-├── Supplier routes
-├── Quotation routes
-├── Order routes
-├── Transaction routes
-├── Material routes
-└── ... 기타 모든 엔드포인트
+server.js (5,421줄 - 모든 로직 포함)
 ```
 
-### 제안 구조 (Express Router 활용)
+**개선 후 구조**:
 ```
-server.js (메인 앱 설정만 - 약 200줄)
+server/
+├── app.js                      (Express 앱 설정 및 시작)
 ├── config/
-│   ├── database.js        (DB 설정)
-│   └── session.js         (세션 설정)
-├── middleware/
-│   ├── auth.js            (requireAuth, requireRole)
-│   └── errorHandler.js    (에러 처리)
+│   ├── database.js             (DB 연결 설정)
+│   └── session.js              (세션 설정)
 ├── routes/
-│   ├── auth.routes.js
-│   ├── customer.routes.js
-│   ├── supplier.routes.js
-│   ├── quotation.routes.js
-│   ├── order.routes.js
-│   ├── transaction.routes.js
-│   ├── purchase-statement.routes.js
-│   ├── material.routes.js
-│   └── dashboard.routes.js
+│   ├── index.js                (라우트 통합)
+│   ├── auth.routes.js          (인증 라우트)
+│   ├── customer.routes.js      (매출처 라우트)
+│   ├── supplier.routes.js      (매입처 라우트)
+│   ├── quotation.routes.js     (견적 라우트)
+│   ├── order.routes.js         (발주 라우트)
+│   ├── transaction.routes.js   (거래명세서 라우트)
+│   └── material.routes.js      (자재 라우트)
 ├── controllers/
 │   ├── auth.controller.js
 │   ├── customer.controller.js
-│   ├── supplier.controller.js
 │   ├── quotation.controller.js
 │   ├── order.controller.js
-│   ├── transaction.controller.js
-│   ├── purchase-statement.controller.js
-│   ├── material.controller.js
-│   └── dashboard.controller.js
-└── models/
-    ├── customer.model.js
-    ├── supplier.model.js
-    ├── quotation.model.js
-    └── ... (SQL 쿼리 로직)
+│   └── material.controller.js
+├── models/
+│   ├── customer.model.js
+│   ├── quotation.model.js
+│   ├── order.model.js
+│   └── material.model.js
+├── middleware/
+│   ├── auth.middleware.js      (인증 미들웨어)
+│   ├── validation.middleware.js (입력 검증)
+│   └── error.middleware.js     (에러 핸들링)
+└── utils/
+    ├── db.js                   (DB 유틸리티)
+    └── helpers.js              (헬퍼 함수)
 ```
 
-**구현 예시 (server.js)**:
+**예시 코드**:
+
 ```javascript
+// routes/quotation.routes.js
+const express = require('express');
+const router = express.Router();
+const quotationController = require('../controllers/quotation.controller');
+const { requireAuth } = require('../middleware/auth.middleware');
+
+// 견적 목록 조회
+router.get('/', requireAuth, quotationController.list);
+
+// 견적 상세 조회
+router.get('/:date/:no', requireAuth, quotationController.getDetail);
+
+// 견적 생성
+router.post('/', requireAuth, quotationController.create);
+
+// 견적 수정
+router.put('/:date/:no', requireAuth, quotationController.update);
+
+// 견적 삭제
+router.delete('/:date/:no', requireAuth, quotationController.delete);
+
+module.exports = router;
+
+// controllers/quotation.controller.js
+const QuotationModel = require('../models/quotation.model');
+const LogModel = require('../models/log.model');
+
+class QuotationController {
+  async list(req, res) {
+    try {
+      const { 사업장코드 } = req.session.user;
+      const filters = req.query;
+
+      const quotations = await QuotationModel.findAll(사업장코드, filters);
+
+      res.json({
+        success: true,
+        data: quotations,
+        total: quotations.length
+      });
+    } catch (error) {
+      console.error('견적 목록 조회 실패:', error);
+      res.status(500).json({
+        success: false,
+        message: '견적 목록을 불러오는데 실패했습니다.'
+      });
+    }
+  }
+
+  async getDetail(req, res) {
+    try {
+      const { date, no } = req.params;
+      const { 사업장코드 } = req.session.user;
+
+      const quotation = await QuotationModel.findByDateAndNo(
+        사업장코드,
+        date,
+        no
+      );
+
+      if (!quotation) {
+        return res.status(404).json({
+          success: false,
+          message: '견적을 찾을 수 없습니다.'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: quotation
+      });
+    } catch (error) {
+      console.error('견적 상세 조회 실패:', error);
+      res.status(500).json({
+        success: false,
+        message: '견적 정보를 불러오는데 실패했습니다.'
+      });
+    }
+  }
+
+  async create(req, res) {
+    const transaction = await pool.transaction();
+
+    try {
+      const { 사업장코드, 사용자코드 } = req.session.user;
+      const { master, details } = req.body;
+
+      // 견적번호 생성
+      const 견적번호 = await LogModel.getNextNumber(
+        '견적',
+        사업장코드 + master.견적일자,
+        transaction
+      );
+
+      // 견적 마스터 생성
+      await QuotationModel.createMaster(
+        { ...master, 사업장코드, 견적번호, 사용자코드 },
+        transaction
+      );
+
+      // 견적 상세 생성
+      await QuotationModel.createDetails(
+        master.견적일자,
+        견적번호,
+        details,
+        transaction
+      );
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: '견적이 저장되었습니다.',
+        data: { 견적일자: master.견적일자, 견적번호 }
+      });
+    } catch (error) {
+      await transaction.rollback();
+      console.error('견적 생성 실패:', error);
+      res.status(500).json({
+        success: false,
+        message: '견적 저장에 실패했습니다.'
+      });
+    }
+  }
+}
+
+module.exports = new QuotationController();
+
+// models/quotation.model.js
+const { pool } = require('../utils/db');
+const sql = require('mssql');
+
+class QuotationModel {
+  async findAll(사업장코드, filters = {}) {
+    const request = pool.request();
+    request.input('사업장코드', sql.VarChar(2), 사업장코드);
+
+    let query = `
+      SELECT
+        q.견적일자, q.견적번호, q.매출처코드,
+        c.매출처명, q.합계금액, q.상태코드
+      FROM 견적 q
+        LEFT JOIN 매출처 c ON q.매출처코드 = c.매출처코드
+      WHERE q.사업장코드 = @사업장코드
+        AND q.사용구분 = 0
+    `;
+
+    // 필터 적용
+    if (filters.상태코드) {
+      request.input('상태코드', sql.VarChar(2), filters.상태코드);
+      query += ` AND q.상태코드 = @상태코드`;
+    }
+
+    query += ` ORDER BY q.견적일자 DESC, q.견적번호 DESC`;
+
+    const result = await request.query(query);
+    return result.recordset;
+  }
+
+  async findByDateAndNo(사업장코드, 견적일자, 견적번호) {
+    const request = pool.request();
+    request.input('사업장코드', sql.VarChar(2), 사업장코드);
+    request.input('견적일자', sql.VarChar(8), 견적일자);
+    request.input('견적번호', sql.Int, 견적번호);
+
+    // 마스터 조회
+    const masterResult = await request.query(`
+      SELECT * FROM 견적
+      WHERE 사업장코드 = @사업장코드
+        AND 견적일자 = @견적일자
+        AND 견적번호 = @견적번호
+        AND 사용구분 = 0
+    `);
+
+    if (masterResult.recordset.length === 0) {
+      return null;
+    }
+
+    // 상세 조회
+    const detailResult = await request.query(`
+      SELECT * FROM 견적내역
+      WHERE 사업장코드 = @사업장코드
+        AND 견적일자 = @견적일자
+        AND 견적번호 = @견적번호
+      ORDER BY 일련번호
+    `);
+
+    return {
+      master: masterResult.recordset[0],
+      details: detailResult.recordset
+    };
+  }
+
+  async createMaster(data, transaction) {
+    const request = transaction.request();
+
+    request.input('사업장코드', sql.VarChar(2), data.사업장코드);
+    request.input('견적일자', sql.VarChar(8), data.견적일자);
+    request.input('견적번호', sql.Int, data.견적번호);
+    request.input('매출처코드', sql.VarChar(8), data.매출처코드);
+    request.input('합계금액', sql.Money, data.합계금액);
+    request.input('사용자코드', sql.VarChar(4), data.사용자코드);
+
+    await request.query(`
+      INSERT INTO 견적 (
+        사업장코드, 견적일자, 견적번호, 매출처코드,
+        합계금액, 상태코드, 사용구분, 사용자코드
+      ) VALUES (
+        @사업장코드, @견적일자, @견적번호, @매출처코드,
+        @합계금액, '01', 0, @사용자코드
+      )
+    `);
+  }
+
+  async createDetails(견적일자, 견적번호, details, transaction) {
+    for (let i = 0; i < details.length; i++) {
+      const detail = details[i];
+      const request = transaction.request();
+
+      request.input('견적일자', sql.VarChar(8), 견적일자);
+      request.input('견적번호', sql.Int, 견적번호);
+      request.input('일련번호', sql.Int, i + 1);
+      request.input('자재코드', sql.VarChar(20), detail.자재코드);
+      request.input('수량', sql.Money, detail.수량);
+      request.input('단가', sql.Money, detail.단가);
+
+      await request.query(`
+        INSERT INTO 견적내역 (
+          견적일자, 견적번호, 일련번호,
+          자재코드, 수량, 단가
+        ) VALUES (
+          @견적일자, @견적번호, @일련번호,
+          @자재코드, @수량, @단가
+        )
+      `);
+    }
+  }
+}
+
+module.exports = new QuotationModel();
+
+// models/log.model.js
+const { pool } = require('../utils/db');
+const sql = require('mssql');
+
+class LogModel {
+  async getNextNumber(테이블명, 베이스코드, transaction) {
+    const request = transaction.request();
+    request.input('테이블명', sql.VarChar(50), 테이블명);
+    request.input('베이스코드', sql.VarChar(50), 베이스코드);
+
+    const result = await request.query(`
+      SELECT 최종로그 FROM 로그
+      WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
+    `);
+
+    let 새번호 = 1;
+
+    if (result.recordset.length > 0) {
+      새번호 = result.recordset[0].최종로그 + 1;
+
+      request.input('새번호', sql.Real, 새번호);
+      await request.query(`
+        UPDATE 로그 SET 최종로그 = @새번호
+        WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
+      `);
+    } else {
+      request.input('새번호', sql.Real, 새번호);
+      await request.query(`
+        INSERT INTO 로그 (테이블명, 베이스코드, 최종로그)
+        VALUES (@테이블명, @베이스코드, @새번호)
+      `);
+    }
+
+    return 새번호;
+  }
+}
+
+module.exports = new LogModel();
+
+// app.js (메인 진입점)
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
-
-// 설정 모듈
-const { initializeDatabase } = require('./config/database');
-const sessionConfig = require('./config/session');
-
-// 라우트 모듈
-const authRoutes = require('./routes/auth.routes');
-const customerRoutes = require('./routes/customer.routes');
-const supplierRoutes = require('./routes/supplier.routes');
-const quotationRoutes = require('./routes/quotation.routes');
-// ... 기타 라우트
+require('dotenv').config();
 
 const app = express();
 
 // 미들웨어
 app.use(cors());
 app.use(express.json());
-app.use(session(sessionConfig));
+app.use(session(require('./config/session')));
 
-// 데이터베이스 초기화
-initializeDatabase();
+// 정적 파일
+app.use(express.static('.'));
 
-// 라우트 등록
-app.use('/api/auth', authRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/suppliers', supplierRoutes);
-app.use('/api/quotations', quotationRoutes);
-// ... 기타 라우트
+// 라우트
+const routes = require('./routes');
+app.use('/api', routes);
 
-// 에러 핸들러
-app.use(require('./middleware/errorHandler'));
+// 에러 핸들링
+app.use(require('./middleware/error.middleware'));
 
-app.listen(3000, () => {
-  console.log('서버 시작: http://localhost:3000');
+// 서버 시작
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
 ```
 
-**구현 예시 (routes/quotation.routes.js)**:
-```javascript
-const express = require('express');
-const router = express.Router();
-const quotationController = require('../controllers/quotation.controller');
-const { requireAuth } = require('../middleware/auth');
+**장점**:
+- 각 레이어의 책임이 명확
+- 코드 재사용성 향상
+- 테스트 작성 용이
+- 협업 시 충돌 최소화
 
-// 견적 목록 조회
-router.get('/', requireAuth, quotationController.getQuotations);
+---
 
-// 견적 상세 조회
-router.get('/:date/:no', requireAuth, quotationController.getQuotationDetail);
+## 3단계: 공통 코드 제거 (DRY 원칙 적용)
 
-// 견적 작성
-router.post('/', requireAuth, quotationController.createQuotation);
+### 중복 패턴 식별
 
-// 견적 수정
-router.put('/:date/:no', requireAuth, quotationController.updateQuotation);
+**현재 중복되는 코드**:
 
-// 견적 삭제
-router.delete('/:date/:no', requireAuth, quotationController.deleteQuotation);
+1. **DataTable 초기화** - quotation.js, order.js, transaction.js 등에서 반복
+2. **모달 열기/닫기** - 모든 모듈에서 동일한 패턴
+3. **API 호출 에러 처리** - 매번 try-catch로 동일한 처리
+4. **날짜 포맷팅** - YYYYMMDD ↔ YYYY-MM-DD 변환 로직 중복
+5. **금액 계산** - 공급가액, 부가세, 합계 계산 로직 반복
 
-module.exports = router;
+### 해결 방안
+
+위의 "1-2. JavaScript 모듈 분리" 섹션에서 제시한 Helper 클래스들 사용
+
+---
+
+## 4단계: 빌드 도구 도입 (선택사항)
+
+### 옵션 A: Vite (추천 - 가장 간단)
+
+**설치**:
+```bash
+npm install -D vite
 ```
 
----
-
-## 단계별 마이그레이션 계획
-
-### Phase 1: HTML 뷰 분리 (추천: 가장 먼저 시작)
-**예상 작업 시간**: 2-3일
-**위험도**: 낮음
-**효과**: 즉각적인 파일 크기 감소 및 가독성 향상
-
-1. `views/` 디렉토리 생성
-2. index.html에서 각 페이지 HTML 추출
-3. showPage() 함수를 동적 로딩으로 수정
-4. 페이지별 초기화 함수 정리
-5. 철저한 테스트
-
-### Phase 2: JavaScript 모듈 세분화
-**예상 작업 시간**: 3-5일
-**위험도**: 중간
-**효과**: 코드 재사용성 향상, 유지보수 용이
-
-1. `utils/` 공통 유틸리티 추출
-2. 큰 파일부터 분리 시작 (quotation.js, order.js)
-3. ES6 모듈로 변환
-4. 동적 import 적용
-5. 기능별 테스트
-
-### Phase 3: 백엔드 API 모듈화
-**예상 작업 시간**: 5-7일
-**위험도**: 중간-높음
-**효과**: 서버 코드 관리 용이, 팀 협업 개선
-
-1. 라우트 분리 (가장 안전)
-2. 컨트롤러 분리
-3. 모델 레이어 추가 (선택사항)
-4. API 테스트
-5. 성능 검증
-
----
-
-## 즉시 적용 가능한 임시 해결책
-
-모듈화 작업 전까지 다음 방법으로 작업 효율 개선 가능:
-
-### 1. VSCode 코드 폴딩 활용
+**설정** (vite.config.js):
 ```javascript
-//#region 견적관리
-// 견적관리 관련 코드...
-//#endregion
+import { defineConfig } from 'vite';
 
-//#region 발주관리
-// 발주관리 관련 코드...
-//#endregion
+export default defineConfig({
+  root: '.',
+  publicDir: 'public',
+  server: {
+    port: 3001,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      }
+    }
+  },
+  build: {
+    outDir: 'dist',
+    rollupOptions: {
+      input: {
+        main: './index.html'
+      }
+    }
+  }
+});
 ```
 
-### 2. 함수 인덱스 주석 추가
-```javascript
-/**
- * 견적관리 모듈
- *
- * Functions:
- * - loadQuotations()           : 견적 목록 로드
- * - openQuotationModal()       : 견적 작성 모달 열기
- * - openQuotationEditModal()   : 견적 수정 모달 열기
- * - deleteQuotation()          : 견적 삭제
- * - approveQuotation()         : 견적 승인
- */
+**장점**:
+- 설정이 매우 간단
+- 빠른 HMR (Hot Module Replacement)
+- ES6 모듈 네이티브 지원
+- 개발 서버 내장
+
+### 옵션 B: Webpack (전통적)
+
+**설치**:
+```bash
+npm install -D webpack webpack-cli webpack-dev-server
+npm install -D html-webpack-plugin css-loader style-loader
 ```
 
-### 3. 파일 내 네비게이션 주석
+**설정** (webpack.config.js):
 ```javascript
-// =============================================================================
-// 견적관리 시작
-// =============================================================================
+const path = require('path');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
-// ... 코드 ...
-
-// =============================================================================
-// 견적관리 끝
-// =============================================================================
+module.exports = {
+  mode: 'development',
+  entry: './js/app.js',
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'bundle.js'
+  },
+  module: {
+    rules: [
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader']
+      }
+    ]
+  },
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: './index.html'
+    })
+  ],
+  devServer: {
+    port: 3001,
+    proxy: {
+      '/api': 'http://localhost:3000'
+    }
+  }
+};
 ```
 
----
+**장점**:
+- 성숙한 생태계
+- 다양한 플러그인
+- 프로덕션 최적화 강력
 
-## 권장 사항
+### 빌드 도구의 공통 장점
 
-**최우선 추천**: **Phase 1 (HTML 뷰 분리)** 부터 시작하는 것을 강력히 권장합니다.
-
-**이유**:
-1. 가장 적은 리스크
-2. 즉각적인 효과 (파일 크기 90% 감소)
-3. 기존 로직 변경 최소화
-4. 롤백 용이
-5. 다른 단계의 기반 작업
-
-**다음 세션 작업 순서**:
-1. 매입관리 메뉴 수정 완료
-2. HTML 뷰 분리 작업 시작 (dashboard.html, quotation.html 등)
-3. 동적 로딩 테스트
-4. 점진적으로 다른 모듈화 진행
+- ES6 모듈 번들링
+- 코드 압축/난독화
+- 소스맵 생성 (디버깅 용이)
+- Tree shaking (사용하지 않는 코드 제거)
+- 개발 서버 HMR
 
 ---
 
-## 참고 자료
+## 📋 실행 계획
 
-- [Express.js Router 공식 문서](https://expressjs.com/en/guide/routing.html)
-- [ES6 Modules 가이드](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules)
-- [Dynamic Import](https://javascript.info/modules-dynamic-imports)
-- [Code Splitting Best Practices](https://web.dev/code-splitting-suspense/)
+### Phase 1 (1-2주): 프론트엔드 기초 작업
+**목표**: HTML과 기본 라우팅 분리
+
+- [ ] HTML을 페이지별로 분리 (pages/ 디렉토리)
+- [ ] 공통 컴포넌트 추출 (sidebar, header, footer)
+- [ ] 간단한 라우터 시스템 구축 (fetch 기반)
+- [ ] 기존 기능 동작 확인
+
+**예상 산출물**:
+- `pages/` 디렉토리 (8개 페이지)
+- `components/` 디렉토리 (공통 컴포넌트)
+- `js/core/router.js`
 
 ---
 
-**작성일**: 2025-11-03
-**작성자**: Claude Code Assistant
-**검토 필요**: HTML 뷰 분리 방식 결정 (Fetch API vs jQuery load)
+### Phase 2 (2-3주): JavaScript 모듈화
+**목표**: 공통 로직 분리 및 재사용성 향상
+
+- [ ] 공통 유틸리티 분리 (api.js, utils.js, datatable-helper.js)
+- [ ] 기능별 모듈 분리 (customer, quotation, order 등)
+- [ ] ES6 모듈 적용 (import/export)
+- [ ] 중복 코드 제거
+
+**예상 산출물**:
+- `js/core/` 디렉토리 (6개 핵심 모듈)
+- `js/modules/` 디렉토리 (기능별 모듈)
+- 코드 라인 수 30% 감소 예상
+
+---
+
+### Phase 3 (2-3주): 백엔드 리팩토링
+**목표**: server.js 분리 및 MVC 패턴 적용
+
+- [ ] Routes 분리 (8개 라우트 파일)
+- [ ] Controllers 추출 (비즈니스 로직 분리)
+- [ ] Models 분리 (DB 로직 캡슐화)
+- [ ] Middleware 구성 (인증, 검증, 에러 처리)
+
+**예상 산출물**:
+- `server/routes/` 디렉토리
+- `server/controllers/` 디렉토리
+- `server/models/` 디렉토리
+- `server/middleware/` 디렉토리
+- server.js → app.js로 축소 (200줄 이하)
+
+---
+
+### Phase 4 (1주): 테스트 및 최적화
+**목표**: 안정성 확보 및 성능 개선
+
+- [ ] 각 기능별 통합 테스트
+- [ ] 성능 측정 및 병목 지점 개선
+- [ ] 코드 리뷰 및 정리
+- [ ] 문서화 (API 문서, 개발자 가이드)
+
+**예상 산출물**:
+- 테스트 체크리스트
+- 성능 개선 보고서
+- 리팩토링 완료 문서
+
+---
+
+## 🤔 제안 선택지
+
+### A안: 점진적 리팩토링 (추천) ⭐
+
+**특징**:
+- 현재 시스템을 유지하면서 조금씩 개선
+- 기존 코드와 새 코드가 공존
+- 각 단계마다 기능 테스트 후 다음 단계 진행
+
+**장점**:
+- ✅ 리스크 낮음 (언제든 롤백 가능)
+- ✅ 점진적 학습 가능
+- ✅ 운영 중단 없음
+- ✅ 팀원들의 적응 시간 확보
+
+**단점**:
+- ❌ 시간이 오래 걸림 (6-8주)
+- ❌ 임시 코드 증가 (과도기)
+- ❌ 일관성 유지 노력 필요
+
+**추천 대상**: 안정성을 중시하는 운영 중인 시스템
+
+---
+
+### B안: 새 프레임워크 도입 (장기)
+
+**특징**:
+- React/Vue.js 같은 현대적 프레임워크 사용
+- 시스템을 완전히 새로 작성
+- 최신 기술 스택 적용
+
+**장점**:
+- ✅ 최신 개발 패턴 적용
+- ✅ 풍부한 생태계 활용 (UI 컴포넌트 라이브러리 등)
+- ✅ 장기적으로 유지보수 용이
+- ✅ 성능 최적화 가능
+
+**단점**:
+- ❌ 리스크 높음 (전체 재작성)
+- ❌ 학습 곡선 가파름
+- ❌ 개발 기간 길음 (3-6개월)
+- ❌ 운영 중단 가능성
+
+**추천 대상**: 장기 프로젝트, 새로운 기술 도입 의지가 있는 경우
+
+---
+
+### C안: 하이브리드 접근 (균형)
+
+**특징**:
+- 핵심 기능만 먼저 모듈화 (quotation, order)
+- 나머지는 현재 상태 유지
+- 점차 범위 확대
+
+**장점**:
+- ✅ 빠른 성과 확인 가능
+- ✅ 리스크 중간
+- ✅ 우선순위 기반 개선
+
+**단점**:
+- ❌ 일관성 유지 어려움
+- ❌ 기술 부채 일부 유지
+
+**추천 대상**: 빠른 개선이 필요한 특정 모듈이 있는 경우
+
+---
+
+## 💡 추천 방향
+
+**현재 상황 고려사항**:
+1. ✅ 실제 운영 환경 테스트 예정 (제이씨엠전기 1개월)
+2. ✅ 남은 메뉴 개발 완료 필요
+3. ✅ 안정성 중시
+
+**추천**: **A안 (점진적 리팩토링)** + **C안 (우선순위 접근)** 조합
+
+**구체적 실행 방안**:
+
+1. **현재 (1-2개월)**: 남은 메뉴 개발 완료 + 운영 테스트
+   - 기존 방식대로 개발 진행
+   - 운영 중 발견된 문제점 문서화
+
+2. **1차 리팩토링 (2-3개월)**: 핵심 모듈 개선
+   - 가장 복잡한 2개 모듈 선택 (quotation, order)
+   - 해당 모듈만 모듈화 적용
+   - 성과 측정 및 피드백
+
+3. **2차 리팩토링 (3-4개월)**: 전체 확대
+   - 나머지 모듈로 확대
+   - 백엔드 리팩토링 시작
+   - 빌드 도구 도입 검토
+
+---
+
+## 📝 다음 단계
+
+리팩토링 시작 결정 시:
+
+1. **킥오프 미팅**
+   - 리팩토링 목표 명확화
+   - 우선순위 결정
+   - 일정 수립
+
+2. **파일럿 프로젝트**
+   - 1개 모듈 선택하여 POC (Proof of Concept)
+   - 새로운 구조 검증
+   - 문제점 파악
+
+3. **본격 진행**
+   - 단계별 실행
+   - 주간 리뷰
+   - 지속적 개선
+
+---
+
+## 📚 참고 자료
+
+### 추천 학습 자료
+
+**JavaScript 모듈**:
+- MDN Web Docs - JavaScript Modules: https://developer.mozilla.org/ko/docs/Web/JavaScript/Guide/Modules
+- ES6 In Depth 시리즈
+
+**설계 패턴**:
+- MVC Pattern
+- Repository Pattern
+- Factory Pattern
+
+**빌드 도구**:
+- Vite 공식 문서: https://vitejs.dev/
+- Webpack 공식 문서: https://webpack.js.org/
+
+**코드 품질**:
+- Clean Code (Robert C. Martin)
+- Refactoring (Martin Fowler)
+
+---
+
+## 📞 문의 및 지원
+
+리팩토링 진행 시 Claude Code가 각 단계별로 지원 가능:
+
+- 코드 리뷰 및 개선 제안
+- 리팩토링 코드 작성
+- 테스트 코드 작성
+- 문서화 지원
+
+---
+
+**최종 업데이트**: 2025-11-11
+**다음 검토일**: 제이씨엠전기 1개월 병행 테스트 완료 후

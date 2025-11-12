@@ -1829,22 +1829,10 @@ async function deleteOrder(orderDate, orderNo) {
 
     const master = result.data.master;
 
+    // 발주번호 표시 (간단하게)
+    const orderNumber = `${master.발주일자}-${master.발주번호}`;
     const deleteContent = document.getElementById('orderDeleteContent');
-    deleteContent.innerHTML = `
-      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
-        <div style="margin-bottom: 12px;"><strong>발주일자:</strong> ${
-          master.발주일자 ? master.발주일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '-'
-        }</div>
-        <div style="margin-bottom: 12px;"><strong>발주번호:</strong> ${master.발주번호 || '-'}</div>
-        <div style="margin-bottom: 12px;"><strong>매입처명:</strong> ${master.매입처명 || '-'}</div>
-        <div style="margin-bottom: 12px;"><strong>제목:</strong> ${master.제목 || '-'}</div>
-        <div><strong>입고희망일자:</strong> ${
-          master.입고희망일자
-            ? master.입고희망일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')
-            : '-'
-        }</div>
-      </div>
-    `;
+    deleteContent.textContent = `발주번호: ${orderNumber}`;
 
     // 현재 삭제할 발주 정보 저장
     window.currentDeleteOrderDate = orderDate;

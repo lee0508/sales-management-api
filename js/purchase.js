@@ -107,7 +107,6 @@ async function loadPurchaseStatements() {
                 <button class="btn-icon btn-view" onclick="openPurchaseStatementDetailModal('${row.전표번호}')" title="보기">보기</button>
                 <button class="btn-icon btn-edit" style="display: none;" onclick="editPurchaseStatement('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon btn-delete" style="display: none;" onclick="openPurchaseStatementDeleteModal('${row.거래일자}', ${row.거래번호}, '${row.전표번호}')" title="삭제">삭제</button>
-                <button class="btn-icon" onclick="printPurchaseStatement('${row.거래일자}', ${row.거래번호})" title="인쇄" style="background: #9333ea;">출력</button>
               </div>
             `;
           },

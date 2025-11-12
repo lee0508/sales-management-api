@@ -1753,23 +1753,15 @@ input[type='checkbox'] {
   }
 }
 
+/* 출력 버튼 (보라색) - 견적 테이블용 */
 .btn-print {
-  padding: 12px 24px;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s;
+  background: #9333ea;
 }
 
 .btn-print:hover {
-  background: #45a049;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  background: #7c3aed;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(147, 51, 234, 0.3);
 }
 
 /* 프린트 미리보기 모달 */
