@@ -33,13 +33,11 @@ $(document).ready(function () {
       actionDiv.find('.btn-edit').show();
       actionDiv.find('.btn-delete').show();
       actionDiv.find('.btn-approve').show();
-      actionDiv.find('.btn-print').hide();  // ✅ 출력 버튼 숨김
     } else {
       actionDiv.find('.btn-view').show();
       actionDiv.find('.btn-edit').hide();
       actionDiv.find('.btn-delete').hide();
       actionDiv.find('.btn-approve').hide();
-      actionDiv.find('.btn-print').show();  // ✅ 출력 버튼 표시
     }
   });
 
@@ -64,6 +62,9 @@ $(document).ready(function () {
       console.log('✅ 견적 상세 DataTable 정리 완료');
     }
   }
+
+  // ✅ 전역으로 즉시 노출 (HTML에서 호출할 수 있도록)
+  window.closeQuotationDetailModal = closeQuotationDetailModal;
 
   // ✅ 상세 보기 모달 닫기 버튼
   $('#closeQuotationDetailModal').on('click', () => {
@@ -274,7 +275,6 @@ $(document).ready(function () {
                     ? `<button class="btn-icon btn-approve" style="display: none; background: #28a745;" onclick="approveQuotation('${row.견적일자}', ${row.견적번호})" title="승인">승인</button>`
                     : ''
                 }
-                <button class="btn-icon btn-print" onclick="printQuotation('${row.견적일자}', ${row.견적번호})" title="인쇄">출력</button>
               </div>
             `;
           },
@@ -321,6 +321,12 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
       makeModalDraggable('quotationDetailModal', 'quotationDetailModalHeader');
       window.quotationDetailModalDraggable = true;
     }
+
+    // ✅ 출력 버튼을 위해 현재 견적 정보 저장
+    window.currentQuotationDetail = {
+      견적일자: quotationDate,
+      견적번호: quotationNo,
+    };
 
     try {
       // 견적 마스터+상세 조회 (기존 API 사용)
@@ -2860,9 +2866,145 @@ function filterQuotations() {
   }
 }
 
+/**
+ * 견적서 출력 함수
+ * @param {string} quotationDate - 견적일자 (YYYYMMDD)
+ * @param {number} quotationNo - 견적번호
+ */
+async function printQuotation(quotationDate, quotationNo) {
+  try {
+    console.log('📄 견적서 출력 시작:', { 견적일자: quotationDate, 견적번호: quotationNo });
+
+    // API 호출하여 견적 데이터 가져오기
+    const response = await fetch(`/api/quotations/${quotationDate}/${quotationNo}`);
+    const result = await response.json();
+
+    if (!result.success || !result.data) {
+      alert('견적 정보를 불러올 수 없습니다.');
+      return;
+    }
+
+    const { master, detail } = result.data;
+
+    // 출력 창 생성
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+
+    // HTML 생성
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>견적서 - ${master.견적일자}-${master.견적번호}</title>
+        <style>
+          body { font-family: '맑은 고딕', Arial, sans-serif; padding: 40px; }
+          h1 { text-align: center; margin-bottom: 30px; }
+          .info { margin-bottom: 20px; }
+          .info-row { display: flex; margin-bottom: 10px; }
+          .info-label { width: 120px; font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #333; padding: 8px; text-align: left; }
+          th { background: #f0f0f0; font-weight: bold; }
+          td.number { text-align: right; }
+          .total-row { font-weight: bold; background: #f9f9f9; }
+          @media print {
+            body { padding: 20px; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>견 적 서</h1>
+        <div class="info">
+          <div class="info-row">
+            <span class="info-label">견적번호:</span>
+            <span>${master.견적일자}-${master.견적번호}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">견적일자:</span>
+            <span>${master.견적일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">매출처명:</span>
+            <span>${master.매출처명 || '-'}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">비고:</span>
+            <span>${master.적요 || '-'}</span>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>품목코드</th>
+              <th>품명</th>
+              <th>규격</th>
+              <th>수량</th>
+              <th>단가</th>
+              <th>금액</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${detail.map((item, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${item.자재코드 || '-'}</td>
+                <td>${item.자재명 || '-'}</td>
+                <td>${item.규격 || '-'}</td>
+                <td class="number">${(item.수량 || 0).toLocaleString()}</td>
+                <td class="number">${(item.출고단가 || 0).toLocaleString()}</td>
+                <td class="number">${(item.금액 || 0).toLocaleString()}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="6" style="text-align: right;">합계</td>
+              <td class="number">${detail.reduce((sum, item) => sum + (item.금액 || 0), 0).toLocaleString()}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    console.log('✅ 견적서 출력 완료');
+  } catch (error) {
+    console.error('❌ 견적서 출력 실패:', error);
+    alert('견적서 출력 중 오류가 발생했습니다.');
+  }
+}
+
+/**
+ * 상세 모달에서 출력 버튼 클릭 시 호출되는 래퍼 함수
+ */
+function printQuotationFromDetail() {
+  if (!window.currentQuotationDetail) {
+    alert('출력할 견적 정보가 없습니다.');
+    return;
+  }
+
+  const { 견적일자, 견적번호 } = window.currentQuotationDetail;
+  printQuotation(견적일자, 견적번호);
+  console.log('✅ 견적서 출력:', { 견적일자, 견적번호 });
+}
+
 // 전역 함수 노출
 window.editQuotation = editQuotation;
 window.deleteQuotation = deleteQuotation;
 window.approveQuotation = approveQuotation;
 window.makeModalDraggable = makeModalDraggable;
 window.filterQuotations = filterQuotations;
+window.printQuotation = printQuotation;
+window.printQuotationFromDetail = printQuotationFromDetail;
+window.closeQuotationDetailModal = closeQuotationDetailModal;

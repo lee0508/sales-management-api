@@ -4552,15 +4552,16 @@ app.delete('/api/transactions/:date/:no', requireAuth, async (req, res) => {
   try {
     const { date: 거래일자, no: 거래번호 } = req.params;
 
-    console.log(`✅ 거래명세서 삭제 요청: ${거래일자}-${거래번호}`);
+    console.log(`✅ 거래명세서 삭제 요청 (소프트 삭제): ${거래일자}-${거래번호}`);
 
-    // 거래명세서 삭제 (자재입출내역에서 해당 거래일자 + 거래번호 삭제)
+    // 소프트 삭제: 사용구분을 9로 설정 (실제 데이터는 삭제하지 않음)
     const result = await pool.request()
       .input('거래일자', sql.VarChar(8), 거래일자)
       .input('거래번호', sql.Real, parseFloat(거래번호))
       .query(`
-        DELETE FROM 자재입출내역
-        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
+        UPDATE 자재입출내역
+        SET 사용구분 = 9
+        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호 AND 사용구분 = 0
       `);
 
     if (result.rowsAffected[0] === 0) {
@@ -4570,7 +4571,7 @@ app.delete('/api/transactions/:date/:no', requireAuth, async (req, res) => {
       });
     }
 
-    console.log(`✅ 거래명세서 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`);
+    console.log(`✅ 거래명세서 소프트 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`);
 
     res.json({
       success: true,
@@ -5452,14 +5453,16 @@ app.delete('/api/purchase-statements/:date/:no', requireAuth, async (req, res) =
   try {
     const { date: 거래일자, no: 거래번호 } = req.params;
 
-    console.log(`✅ 매입전표 삭제 요청: ${거래일자}-${거래번호}`);
+    console.log(`✅ 매입전표 삭제 요청 (소프트 삭제): ${거래일자}-${거래번호}`);
 
+    // 소프트 삭제: 사용구분을 9로 설정 (실제 데이터는 삭제하지 않음)
     const result = await pool.request()
       .input('거래일자', sql.VarChar(8), 거래일자)
       .input('거래번호', sql.Real, parseFloat(거래번호))
       .query(`
-        DELETE FROM 자재입출내역
-        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
+        UPDATE 자재입출내역
+        SET 사용구분 = 9
+        WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호 AND 사용구분 = 0
       `);
 
     if (result.rowsAffected[0] === 0) {
@@ -5469,7 +5472,7 @@ app.delete('/api/purchase-statements/:date/:no', requireAuth, async (req, res) =
       });
     }
 
-    console.log(`✅ 매입전표 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`);
+    console.log(`✅ 매입전표 소프트 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`);
 
     res.json({
       success: true,

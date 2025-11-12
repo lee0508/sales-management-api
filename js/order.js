@@ -163,10 +163,6 @@ $(document).ready(function () {
                       style="padding: 6px 12px; font-size: 13px; margin-right: 4px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none;">
                 삭제
               </button>
-              <button class="btn-icon" onclick="printOrder('${row.발주일자}', ${row.발주번호})" title="인쇄"
-                      style="padding: 6px 12px; font-size: 13px; background: #9333ea; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                출력
-              </button>
             </div>
           `;
         },
@@ -258,6 +254,12 @@ async function viewOrderDetail(orderDate, orderNo) {
 
     const master = result.data.master;
     const details = result.data.detail || [];
+
+    // 💾 현재 발주 상세 정보 저장 (출력 버튼용)
+    window.currentOrderDetail = {
+      발주일자: orderDate,
+      발주번호: orderNo,
+    };
 
     // 마스터 정보 HTML
     const masterHtml = `
@@ -369,20 +371,34 @@ async function viewOrderDetail(orderDate, orderNo) {
         </div>
       </div>
 
-      <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 2px solid #e5e7eb;">
+      <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
         <button onclick="closeOrderDetailModal()" style="
-          padding: 12px 24px;
-          background: #f3f4f6;
+          padding: 10px 20px;
+          background: #dc2626;
+          color: white;
           border: none;
-          border-radius: 8px;
+          border-radius: 6px;
           font-size: 14px;
           font-weight: 500;
           cursor: pointer;
-          color: #374151;
-          transition: all 0.2s;
-        " onmouseover="this.style.background='#e5e7eb';"
-           onmouseout="this.style.background='#f3f4f6';">
-          닫기
+          transition: background 0.2s;
+        " onmouseover="this.style.background='#b91c1c';"
+           onmouseout="this.style.background='#dc2626';">
+          ✕ 닫기
+        </button>
+        <button onclick="printOrderFromDetail()" style="
+          padding: 10px 20px;
+          background: #9333ea;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s;
+        " onmouseover="this.style.background='#7c3aed';"
+           onmouseout="this.style.background='#9333ea';">
+          📄 출력
         </button>
       </div>
     `;
@@ -3003,3 +3019,22 @@ async function submitNewOrder(event) {
     alert('발주서 저장 중 오류가 발생했습니다: ' + error.message);
   }
 }
+
+/**
+ * 발주 상세 모달에서 출력 버튼 클릭 시 호출되는 래퍼 함수
+ * 현재 저장된 발주 정보를 사용하여 printOrder 함수 호출
+ */
+function printOrderFromDetail() {
+  if (!window.currentOrderDetail) {
+    alert('출력할 발주서 정보가 없습니다.');
+    return;
+  }
+
+  const { 발주일자, 발주번호 } = window.currentOrderDetail;
+  printOrder(발주일자, 발주번호);
+  console.log('✅ 발주서 출력:', { 발주일자, 발주번호 });
+}
+
+// 전역 함수로 노출 (HTML onclick 핸들러에서 사용)
+window.printOrderFromDetail = printOrderFromDetail;
+window.closeOrderDetailModal = closeOrderDetailModal;

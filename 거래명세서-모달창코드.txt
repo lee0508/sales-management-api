@@ -1,0 +1,343 @@
+<!-- ✅ 거래명세서 작성 - 자재 추가 모달 -->
+          <div id="newTransactionDetailAddModal" class="modal" style="display: none">
+            <div class="modal-content" style="max-width: 600px">
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                "
+              >
+                <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
+                  품목 추가
+                </h2>
+                <button
+                  onclick="closeNewTransactionDetailAddModal()"
+                  style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                  onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 16px">
+                <!-- ✅ 자재 검색 영역 -->
+                <div>
+                  <label
+                    style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
+                    >자재 검색</label
+                  >
+                  <div style="display: flex; gap: 8px">
+                    <input
+                      type="text"
+                      id="newTransactionMaterialSearchInput"
+                      style="
+                        flex: 1;
+                        padding: 10px 12px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 8px;
+                        font-size: 14px;
+                      "
+                      placeholder="자재명 또는 품목코드로 검색"
+                      onkeypress="if(event.key === 'Enter') searchNewTransactionMaterials()"
+                    />
+                    <button
+                      onclick="searchNewTransactionMaterials()"
+                      style="
+                        padding: 10px 20px;
+                        background: #3b82f6;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        color: white;
+                        transition: all 0.2s;
+                        white-space: nowrap;
+                      "
+                      onmouseover="this.style.background='#2563eb';"
+                      onmouseout="this.style.background='#3b82f6';"
+                    >
+                      검색
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ✅ 검색 결과 테이블 (3컬럼, 클릭 가능) -->
+                <div id="newTransactionMaterialSearchResults" style="display: none">
+                  <label
+                    style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
+                    >검색 결과</label
+                  >
+                  <div
+                    style="
+                      max-height: 300px;
+                      overflow-y: auto;
+                      border: 1px solid #e5e7eb;
+                      border-radius: 8px;
+                    "
+                  >
+                    <table
+                      id="newTransactionMaterialSearchTable"
+                      style="width: 100%; border-collapse: collapse"
+                    >
+                      <thead style="background: #f9fafb; position: sticky; top: 0">
+                        <tr>
+                          <th
+                            style="
+                              padding: 10px 12px;
+                              text-align: left;
+                              border-bottom: 2px solid #e5e7eb;
+                              font-weight: 600;
+                              font-size: 13px;
+                              color: #374151;
+                            "
+                          >
+                            품목코드
+                          </th>
+                          <th
+                            style="
+                              padding: 10px 12px;
+                              text-align: left;
+                              border-bottom: 2px solid #e5e7eb;
+                              font-weight: 600;
+                              font-size: 13px;
+                              color: #374151;
+                            "
+                          >
+                            품명
+                          </th>
+                          <th
+                            style="
+                              padding: 10px 12px;
+                              text-align: left;
+                              border-bottom: 2px solid #e5e7eb;
+                              font-weight: 600;
+                              font-size: 13px;
+                              color: #374151;
+                            "
+                          >
+                            규격
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody id="newTransactionMaterialSearchTableBody"></tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- ✅ 선택된 자재 표시 (파란색 카드) -->
+                <div
+                  id="newTransactionSelectedMaterialInfo"
+                  style="
+                    display: none;
+                    background: #f0f9ff;
+                    padding: 12px;
+                    border-radius: 8px;
+                    border: 2px solid #bfdbfe;
+                  "
+                >
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: start;
+                      margin-bottom: 4px;
+                    "
+                  >
+                    <div>
+                      <div
+                        style="font-weight: 600; color: #1e40af; font-size: 15px"
+                        id="newTransactionSelectedMaterialName"
+                      >
+                        -
+                      </div>
+                      <div
+                        style="font-size: 12px; color: #6b7280; margin-top: 2px"
+                        id="newTransactionSelectedMaterialCode"
+                      >
+                        -
+                      </div>
+                    </div>
+                    <button
+                      onclick="clearNewSelectedTransactionMaterial()"
+                      style="
+                        padding: 4px 12px;
+                        background: white;
+                        border: 1px solid #bfdbfe;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        cursor: pointer;
+                        color: #2563eb;
+                        font-weight: 500;
+                      "
+                      onmouseover="this.style.background='#eff6ff';"
+                      onmouseout="this.style.background='white';"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ✅ 수량 입력 -->
+                <div>
+                  <label
+                    style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
+                    >수량 *</label
+                  >
+                  <input
+                    type="number"
+                    id="newTransactionAddDetailQuantity"
+                    value="1"
+                    min="0"
+                    step="0.01"
+                    oninput="calculateNewTransactionDetailAmount()"
+                    style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                    "
+                  />
+                </div>
+
+                <!-- ✅ 단가 입력 + 이전단가 버튼 -->
+                <div>
+                  <label
+                    style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
+                    >출고단가 (원) *</label
+                  >
+                  <div style="display: flex; gap: 8px; align-items: center">
+                    <input
+                      type="number"
+                      id="newTransactionAddDetailPrice"
+                      value="0"
+                      min="0"
+                      step="1"
+                      oninput="calculateNewTransactionDetailAmount()"
+                      style="
+                        flex: 1;
+                        padding: 10px 12px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 8px;
+                        font-size: 14px;
+                      "
+                    />
+                    <button
+                      onclick="showNewTransactionPriceHistory()"
+                      style="
+                        padding: 10px 20px;
+                        background: #9333ea;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        color: white;
+                        transition: all 0.2s;
+                        white-space: nowrap;
+                      "
+                      onmouseover="this.style.background='#7e22ce';"
+                      onmouseout="this.style.background='#9333ea';"
+                    >
+                      이전 단가
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ✅ 공급가액 표시 (읽기 전용) -->
+                <div>
+                  <label
+                    style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
+                    >공급가액 (원)</label
+                  >
+                  <input
+                    type="text"
+                    id="newTransactionAddDetailAmount"
+                    readonly
+                    value="0"
+                    style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      background: #f9fafb;
+                      color: #1f2937;
+                      font-weight: 600;
+                    "
+                  />
+                </div>
+              </div>
+
+              <!-- ✅ 버튼 영역 -->
+              <div
+                style="
+                  display: flex;
+                  gap: 10px;
+                  margin-top: 24px;
+                  padding-top: 24px;
+                  border-top: 1px solid #e5e7eb;
+                "
+              >
+                <button
+                  type="button"
+                  onclick="closeNewTransactionDetailAddModal()"
+                  style="
+                    flex: 1;
+                    padding: 12px 20px;
+                    background: #f3f4f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: #374151;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#e5e7eb';"
+                  onmouseout="this.style.background='#f3f4f6';"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onclick="confirmNewTransactionDetailAdd()"
+                  style="
+                    flex: 1;
+                    padding: 12px 20px;
+                    background: #2563eb;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#1d4ed8';"
+                  onmouseout="this.style.background='#2563eb';"
+                >
+                  추가하기
+                </button>
+              </div>
+            </div>
+          </div>

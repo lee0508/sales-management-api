@@ -109,11 +109,10 @@ async function loadTransactions() {
           render: (data, type, row) => {
             return `
               <div id="transaction-actions-${row.거래일자}_${row.거래번호}" style="display: flex; gap: 4px; justify-content: center;">
-                <button class="btn-icon btn-view" onclick="openTransactionDetailModal('${row.명세서번호}')" title="보기">보기</button>
+                <button class="btn-icon btn-view" onclick="openTransactionDetailModal('${row.명세서번호}')" title="보기">상세</button>
                 <button class="btn-icon btn-edit" style="display: none;" onclick="editTransaction('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon btn-delete" style="display: none;" onclick="deleteTransaction('${row.거래일자}', ${row.거래번호})" title="삭제">삭제</button>
                 <!--<button class="btn-icon btn-approve" style="display: none;" onclick="approveTransaction('${row.거래일자}', ${row.거래번호})" title="확정">확정</button>-->
-                <button class="btn-icon btn-print" onclick="printTransaction('${row.거래일자}', ${row.거래번호})" title="인쇄" style="background: #9333ea;">출력</button>
               </div>
             `;
           },
@@ -152,13 +151,11 @@ async function loadTransactions() {
             actionDiv.find('.btn-edit').show();
             actionDiv.find('.btn-delete').show();
             actionDiv.find('.btn-approve').show();
-            actionDiv.find('.btn-print').hide();  // ✅ 출력 버튼 숨김
           } else {
             actionDiv.find('.btn-view').show();
             actionDiv.find('.btn-edit').hide();
             actionDiv.find('.btn-delete').hide();
             actionDiv.find('.btn-approve').hide();
-            actionDiv.find('.btn-print').show();  // ✅ 출력 버튼 표시
           }
         });
       },
@@ -184,21 +181,19 @@ async function loadTransactions() {
         });
 
         if (isChecked) {
-          // 체크됨: 보기 버튼 숨기고 수정/삭제/확정 버튼 표시
+          // 체크됨: 상세 버튼 숨기고 수정/삭제/확정 버튼 표시
           actionDiv.find('.btn-view').hide();
           actionDiv.find('.btn-edit').show();
           actionDiv.find('.btn-delete').show();
           actionDiv.find('.btn-approve').show();
-          actionDiv.find('.btn-print').hide();  // ✅ 출력 버튼 숨김
           console.log('✅ 버튼 표시 완료 - 수정/삭제/확정 버튼 visible');
         } else {
-          // 체크 해제: 수정/삭제/확정 버튼 숨기고 보기 버튼 표시
+          // 체크 해제: 수정/삭제/확정 버튼 숨기고 상세 버튼 표시
           actionDiv.find('.btn-view').show();
           actionDiv.find('.btn-edit').hide();
           actionDiv.find('.btn-delete').hide();
           actionDiv.find('.btn-approve').hide();
-          actionDiv.find('.btn-print').show();  // ✅ 출력 버튼 표시
-          console.log('✅ 버튼 표시 완료 - 보기 버튼 visible');
+          console.log('✅ 버튼 표시 완료 - 상세 버튼 visible');
         }
       });
 
@@ -264,6 +259,13 @@ async function openTransactionDetailModal(transactionNo) {
     // API는 details 배열만 반환 (master는 없음)
     const details = result.data || [];
     const firstDetail = details[0] || {};
+
+    // ✅ 출력 버튼을 위해 현재 거래명세서 정보 저장
+    window.currentTransactionDetail = {
+      거래일자: date,
+      거래번호: no,
+      명세서번호: transactionNo,
+    };
 
     // 기본 정보 표시
     document.getElementById('detailTransactionNo').textContent = transactionNo;
@@ -1932,4 +1934,19 @@ function updateNewTransactionTotals() {
   document.getElementById('transactionCreateGrandTotal').textContent = grandTotal.toLocaleString();
 
   console.log('✅ 합계 업데이트:', { 공급가액: totalSupply, 부가세: totalVat, 총액: grandTotal });
+}
+
+// ✅ 상세 모달에서 출력 버튼 클릭 시 호출
+function printTransactionFromDetail() {
+  if (!window.currentTransactionDetail) {
+    alert('출력할 거래명세서 정보가 없습니다.');
+    return;
+  }
+
+  const { 거래일자, 거래번호 } = window.currentTransactionDetail;
+
+  // 기존 printTransaction 함수 호출
+  printTransaction(거래일자, 거래번호);
+
+  console.log('✅ 거래명세서 출력:', { 거래일자, 거래번호 });
 }
