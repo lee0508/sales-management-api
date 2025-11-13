@@ -1,0 +1,141 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp자재원장인쇄]    Script Date: 11/13/2025 11:14:36 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER OFF
+GO
+
+ALTER PROCEDURE [dbo].[sp자재원장인쇄] 
+      (@ParAppPgDate VarChar(8) = '', @ParKindCode VarChar(2) = '00', @ParMtCode VarChar(20) = '', 
+       @ParMtName VarChar(20) = '', @ParStateCode int = 0, @ParAppBranchCode VarChar(2) = '01', 
+       @ParExceptionCodeGbn TinyInt = 1, @ParSupCode VarChar(8) = '' )
+
+AS
+
+IF @ParExceptionCodeGbn = 1
+   BEGIN
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명, 
+           ISNULL(T1.분류코드,'') AS 분류코드, ISNULL(T4.분류명,'') AS 분류명, 
+           ISNULL(T1.세부코드,'') AS 세부코드, T3.자재명 AS 자재명, 
+           T3.규격 AS 규격, T3.단위 AS 단위, T3.폐기율 AS 폐기율, 
+           과세구분 = CASE WHEN T3.과세구분 = 0 THEN '비과세'
+                           WHEN T3.과세구분 = 1 THEN '과  세'
+                           ELSE '오  류'
+                      END,
+           사용구분 = CASE WHEN T3.사용구분 = 0 THEN '정    상'
+                           WHEN T3.사용구분 = 9 THEN '사용불가'
+                           ELSE '오    류'
+                      END,
+           T1.적정재고 AS 적정재고, 
+           ISNULL(T1.최종입고일자,'') AS 최종입고일자, ISNULL(T1.최종출고일자,'') AS 최종출고일자, 
+           (SELECT ISNULL(SUM(입고누계수량-출고누계수량),0) 
+              FROM 자재원장마감 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND 마감년월 >= (SUBSTRING(@ParAppPGDate, 1, 4) + '00')
+               AND 마감년월 <  (SUBSTRING(@ParAppPGDate, 1, 6))) AS 이월재고, 
+           (SELECT ISNULL(SUM(입고수량),0) 
+              FROM 자재입출내역 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND 입출고구분 = 1
+               AND 입출고일자 BETWEEN (SUBSTRING(@ParAppPgDate, 1, 6) + '01') AND @ParAppPgDate) AS 입고수량,                                  
+           (SELECT ISNULL(SUM(출고수량),0) 
+              FROM 자재입출내역 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND 입출고구분 = 2
+               AND 입출고일자 BETWEEN (SUBSTRING(@ParAppPgDate, 1, 6) + '01') AND @ParAppPgDate) AS 출고수량,
+           (SELECT ISNULL(SUM(입고수량 - 출고수량),0) 
+              FROM 자재입출내역 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND (입출고구분 = 5 OR 입출고구분 = 6)
+               AND 입출고일자 BETWEEN (SUBSTRING(@ParAppPgDate, 1, 6) + '01') AND @ParAppPgDate) AS 재고조정수량,                                  
+           (SELECT ISNULL(SUM(입고수량 - 출고수량),0) 
+              FROM 자재입출내역 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND (입출고구분 = 11 OR 입출고구분 = 12)
+               AND 입출고일자 BETWEEN (SUBSTRING(@ParAppPgDate, 1, 6) + '01') AND @ParAppPgDate) AS 재고이동수량,
+           ISNULL(T1.주매입처코드, '') AS 주매입처코드, ISNULL(T5.매입처명, '') AS 주매입처명,
+           T1.입고단가1 AS 입고단가1, T1.입고단가2 AS 입고단가2, T1.입고단가3 AS 입고단가3, 
+           T1.출고단가1 AS 출고단가1, T1.출고단가2 AS 출고단가2, T1.출고단가3 AS 출고단가3
+      FROM 자재원장 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 자재 T3 
+             ON T3.분류코드 = T1.분류코드 AND T3.세부코드 = T1.세부코드 
+      LEFT JOIN 자재분류 T4 ON T4.분류코드 = T1.분류코드 
+      LEFT JOIN 매입처 T5 ON T5.사업장코드 = T1.사업장코드 AND T5.매입처코드 = T1.주매입처코드
+     WHERE (T1.사업장코드 = @ParAppBranchCode AND T1.사용구분 = @ParStateCode)
+       AND (T1.분류코드) LIKE '%' + LTRIM(@ParKindCode) + '%'
+       AND (T1.세부코드 LIKE '%' + LTRIM(@ParMtCode) + '%')
+       AND (T3.자재명 LIKE '%' + LTRIM(@ParMtName) + '%')
+       AND (T1.주매입처코드 LIKE '%' + LTRIM(@ParSupCode) + '%')
+       AND NOT (DATALENGTH(T1.세부코드) = 9 AND UPPER(SUBSTRING(T1.세부코드, 1, 4)) = 'CODE' 
+           AND T1.세부코드 LIKE 'CODE_____' AND ISNUMERIC(SUBSTRING(T1.세부코드, 5, 5)) = 1)             
+     ORDER BY T1.분류코드, T1.세부코드
+  END
+ELSE
+   BEGIN
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명, 
+           ISNULL(T1.분류코드,'') AS 분류코드, ISNULL(T4.분류명,'') AS 분류명, 
+           ISNULL(T1.세부코드,'') AS 세부코드, T3.자재명 AS 자재명, 
+           T3.규격 AS 규격, T3.단위 AS 단위, T3.폐기율 AS 폐기율, 
+           과세구분 = CASE WHEN T3.과세구분 = 0 THEN '비과세'
+                           WHEN T3.과세구분 = 1 THEN '과  세'
+                           ELSE '오  류'
+                      END,
+           사용구분 = CASE WHEN T3.사용구분 = 0 THEN '정    상'
+                           WHEN T3.사용구분 = 9 THEN '사용불가'
+                           ELSE '오    류'
+                      END,
+           T1.적정재고 AS 적정재고, 
+           ISNULL(T1.최종입고일자,'') AS 최종입고일자, ISNULL(T1.최종출고일자,'') AS 최종출고일자, 
+           (SELECT ISNULL(SUM(입고누계수량-출고누계수량),0) 
+              FROM 자재원장마감 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND 마감년월 >= (SUBSTRING(@ParAppPGDate, 1, 4) + '00')
+               AND 마감년월 <  (SUBSTRING(@ParAppPGDate, 1, 6))) AS 이월재고, 
+           (SELECT ISNULL(SUM(입고수량),0) 
+              FROM 자재입출내역 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND 입출고구분 = 1
+               AND 입출고일자 BETWEEN (SUBSTRING(@ParAppPgDate, 1, 6) + '01') AND @ParAppPgDate) AS 입고수량,                                  
+           (SELECT ISNULL(SUM(출고수량),0) 
+              FROM 자재입출내역 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND 입출고구분 = 2
+               AND 입출고일자 BETWEEN (SUBSTRING(@ParAppPgDate, 1, 6) + '01') AND @ParAppPgDate) AS 출고수량,
+           (SELECT ISNULL(SUM(입고수량 - 출고수량),0) 
+              FROM 자재입출내역 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND (입출고구분 = 5 OR 입출고구분 = 6)
+               AND 입출고일자 BETWEEN (SUBSTRING(@ParAppPgDate, 1, 6) + '01') AND @ParAppPgDate) AS 재고조정수량,                                  
+           (SELECT ISNULL(SUM(입고수량 - 출고수량),0) 
+              FROM 자재입출내역 
+             WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+               AND 사업장코드 = T1.사업장코드 
+               AND (입출고구분 = 11 OR 입출고구분 = 12)
+               AND 입출고일자 BETWEEN (SUBSTRING(@ParAppPgDate, 1, 6) + '01') AND @ParAppPgDate) AS 재고이동수량,
+           ISNULL(T1.주매입처코드, '') AS 주매입처코드, ISNULL(T5.매입처명, '') AS 주매입처명,
+           T1.입고단가1 AS 입고단가1, T1.입고단가2 AS 입고단가2, T1.입고단가3 AS 입고단가3, 
+           T1.출고단가1 AS 출고단가1, T1.출고단가2 AS 출고단가2, T1.출고단가3 AS 출고단가3
+      FROM 자재원장 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 자재 T3 
+             ON T3.분류코드 = T1.분류코드 AND T3.세부코드 = T1.세부코드 
+      LEFT JOIN 자재분류 T4 ON T4.분류코드 = T1.분류코드 
+      LEFT JOIN 매입처 T5 ON T5.사업장코드 = T1.사업장코드 AND T5.매입처코드 = T1.주매입처코드
+     WHERE (T1.사업장코드 = @ParAppBranchCode AND T1.사용구분 = @ParStateCode)
+       AND (T1.분류코드) LIKE '%' + LTRIM(@ParKindCode) + '%'
+       AND (T1.세부코드 LIKE '%' + LTRIM(@ParMtCode) + '%')
+       AND (T3.자재명 LIKE '%' + LTRIM(@ParMtName) + '%')
+       AND (T1.주매입처코드 LIKE '%' + LTRIM(@ParSupCode) + '%')
+     ORDER BY T1.분류코드, T1.세부코드
+  END

@@ -1,0 +1,55 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp견적서인쇄]    Script Date: 11/13/2025 11:03:40 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+ALTER PROCEDURE [dbo].[sp견적서인쇄] 
+      (@ParBranchCode VarChar(2) = '01', @ParOrderDate VarChar(8) = '', @ParOrderNo Real = 0, @ParOrderGbn Tinyint = 0)
+
+AS
+  IF @ParOrderGbn = 0 
+     BEGIN 
+       SELECT T1.사업장코드, T1.견적일자, T1.견적번호, T1.출고희망일자,
+              T1.매출처코드, T3.매출처명, T3.담당자명 AS 참조, T1.제목 AS 제목, T1.적요 AS 참조란,
+              T2.자재코드, ISNULL(T4.자재명,'') AS 품명,                      
+              T4.규격 AS 규격, T2.수량 AS 수량, T4.단위 AS 단위,
+              T2.계산서발행여부, 0 AS 출고단가, 0 AS 출고부가, (0 * T2.수량) AS 금액,
+              T2.적요 AS 적요, T1.유효일수 AS 유효일수,
+              DATEDIFF(day, CONVERT(DATETIME, T1.견적일자), CONVERT(DATETIME, T1.출고희망일자)) AS 견적후납기일수
+        FROM 견적 T1
+       INNER JOIN 견적내역 T2
+               ON T2.사업장코드 = T1.사업장코드 AND T2.견적일자 = T1.견적일자 AND T2.견적번호 = T1.견적번호  
+        LEFT JOIN 매출처 T3 ON T3.사업장코드 = T2.사업장코드 AND T3.매출처코드 = T2.매출처코드
+        LEFT JOIN 자재 T4 ON (T4.분류코드 + T4.세부코드) = T2.자재코드
+       WHERE T1.사업장코드 = @ParBranchCode
+         AND T1.견적일자 = @ParOrderDate
+         AND T1.견적번호 = @ParOrderNo
+         AND (T1.상태코드 = 1 OR T1.상태코드 = 2) AND T1.사용구분 = 0 
+         AND (T2.상태코드 = 1 OR T2.상태코드 = 2) AND T2.사용구분 = 0
+       ORDER BY T1.사업장코드, T1.견적일자, T1.견적번호, T2.견적시간
+     END
+  ELSE
+     BEGIN 
+       SELECT T1.사업장코드, T1.견적일자, T1.견적번호, T1.출고희망일자,
+              T1.매출처코드, T3.매출처명, T3.담당자명 AS 참조, T1.제목 AS 제목, T1.적요 AS 참조란,
+              T2.자재코드, ISNULL(T4.자재명,'') AS 품명,                      
+              T4.규격 AS 규격, T2.수량 AS 수량,  T4.단위 AS 단위,
+              T2.계산서발행여부, T2.출고단가 AS 출고단가, T2.출고부가 AS 출고부가, (T2.출고단가 * T2.수량) AS 금액,
+              T2.적요 AS 적요, T1.유효일수 AS 유효일수, 
+              DATEDIFF(day, CONVERT(DATETIME, T1.견적일자), CONVERT(DATETIME, T1.출고희망일자)) AS 견적후납기일수
+         FROM 견적 T1
+        INNER JOIN 견적내역 T2
+                ON T2.사업장코드 = T1.사업장코드 AND T2.견적일자 = T1.견적일자 AND T2.견적번호 = T1.견적번호  
+         LEFT JOIN 매출처 T3 ON T3.사업장코드 = T2.사업장코드 AND T3.매출처코드 = T2.매출처코드
+         LEFT JOIN 자재 T4 ON (T4.분류코드 + T4.세부코드) = T2.자재코드
+        WHERE T1.사업장코드 = @ParBranchCode
+          AND T1.견적일자 = @ParOrderDate
+          AND T1.견적번호 = @ParOrderNo
+          AND (T1.상태코드 = 1 OR T1.상태코드 = 2) AND T1.사용구분 = 0 
+          AND (T2.상태코드 = 1 OR T2.상태코드 = 2) AND T2.사용구분 = 0
+        ORDER BY T1.사업장코드, T1.견적일자, T1.견적번호, T2.견적시간
+     END

@@ -1,0 +1,27 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp매입세금계산서장부현황인쇄]    Script Date: 11/13/2025 11:20:39 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+ALTER PROCEDURE [dbo].[sp매입세금계산서장부현황인쇄] 
+      (@ParBranchCode VarChar(02) ='01', @ParFDate VarChar(8) = '', @ParTDate VarChar(8) = '',    
+       @ParSupplierCode Varchar(8) = '')
+
+AS
+    SELECT T1.사업장코드 AS 사업장코드, T1.작성일자 AS 작성일자, T1.작성시간,
+           T1.매입처코드 AS 매입처코드, T2.매입처명 AS 매입처명, 
+           T1.공급가액 AS 공급가액, T1.세액 AS 세액, 
+           T1.품목및규격 AS 품목및규격, T1.수량 AS 수량, 
+           T1.금액구분 AS 금액구분, T1.영청구분 AS 영청구분, T1.발행여부 AS 발행여부,
+           T1.작성구분 AS 작성구분, T1.미지급구분 AS 미지급구분, T1.사용구분 AS 사용구분 
+      FROM 매입세금계산서장부 T1 
+      LEFT JOIN 매입처 T2 ON T2.사업장코드 = T1.사업장코드 AND T2.매입처코드 = T1.매입처코드 
+     WHERE T1.사업장코드 = @ParBranchCode AND T1.사용구분 = 0
+       AND T1.작성일자 BETWEEN @ParFDate AND @ParTDate
+       AND T1.매입처코드 LIKE '%' + LTRIM(@ParSupplierCode) + '%'
+     ORDER BY T1.사업장코드, T1.작성일자, T1.작성시간
+

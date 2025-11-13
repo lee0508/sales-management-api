@@ -1,0 +1,43 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp자재정보인쇄]    Script Date: 11/13/2025 11:15:33 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+ALTER PROCEDURE [dbo].[sp자재정보인쇄] 
+      (@AppGroupCode VarChar(2) = '00', @AppStateCode int = 0)
+
+AS
+BEGIN
+    IF @AppGroupCode = '00'
+       BEGIN 
+           SELECT ISNULL(T1.분류코드,'') AS 분류코드, ISNULL(T2.분류명,'') AS 분류명, 
+                  ISNULL(T1.세부코드,'') AS 세부코드, T1.자재명 AS 자재명, 
+                  T1.바코드 AS 바코드, T1.규격 AS 규격, T1.단위 AS 단위, T1.폐기율 AS 폐기율, 
+                  과세구분 = CASE WHEN T1.과세구분 = 0 THEN '비과세' WHEN T1.과세구분 = 1 THEN '과  세' ELSE '오  류' END,
+                  사용구분 = CASE WHEN T1.사용구분 = 0 THEN '정  상' WHEN T1.사용구분 = 9 THEN '삭  제' ELSE '오  류' END
+             FROM 자재 T1 
+             LEFT JOIN 자재분류 T2 
+                    ON T2.분류코드 = T1.분류코드 
+            WHERE T1.사용구분 = @AppStateCode 
+            ORDER BY T1.분류코드, T1.세부코드  
+       END     
+    ELSE 
+       BEGIN
+           SELECT ISNULL(T1.분류코드,'') AS 분류코드, ISNULL(T2.분류명,'') AS 분류명, 
+                  ISNULL(T1.세부코드,'') AS 세부코드, T1.자재명 AS 자재명, 
+                  T1.바코드 AS 바코드, T1.규격 AS 규격, T1.단위 AS 단위, T1.폐기율 AS 폐기율, 
+                  과세구분 = CASE WHEN T1.과세구분 = 0 THEN '비과세' WHEN T1.과세구분 = 1 THEN '과  세' ELSE '오  류' END,
+                  사용구분 = CASE WHEN T1.사용구분 = 0 THEN '정  상' WHEN T1.사용구분 = 9 THEN '삭  제' ELSE '오  류' END
+             FROM 자재 T1 
+             LEFT JOIN 자재분류 T2 ON T2.분류코드 = T1.분류코드 
+            WHERE T1.분류코드 = SUBSTRING(@AppGroupCode,1,2) 
+              AND T1.사용구분 = @AppStateCode 
+            ORDER BY T1.분류코드, T1.세부코드  
+       END
+END
+
+

@@ -1,0 +1,623 @@
+          <!-- 계정과목관리 페이지 -->
+          <div id="accountCatagoryPage" class="page-content hidden">
+            <h2 style="display: none">계정과목관리</h2>
+            <div
+              class="toolbar"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 16px;
+              "
+            >
+              <!-- 왼쪽: 검색 영역 -->
+              <div style="display: flex; gap: 8px; align-items: center">
+                <input
+                  type="text"
+                  id="accountListSearchInput"
+                  placeholder="계정코드 또는 계정명 검색..."
+                  style="
+                    padding: 10px 16px;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    width: 280px;
+                    outline: none;
+                  "
+                />
+                <button
+                  class="btn btn-primary"
+                  onclick="searchAccounts()"
+                  style="
+                    padding: 10px 20px;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  🔍 검색
+                </button>
+                <button
+                  class="btn btn-light"
+                  onclick="resetAccountSearch()"
+                  style="
+                    padding: 10px 16px;
+                    background: #f8f9fa;
+                    color: #333;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  초기화
+                </button>
+              </div>
+
+              <!-- 오른쪽: 액션 버튼 영역 -->
+              <div style="display: flex; gap: 8px">
+                <button
+                  class="btn btn-success"
+                  onclick="openAccountModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #28a745;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  <span style="font-size: 18px; margin-right: 4px">+</span> 신규 등록
+                </button>
+              </div>
+            </div>
+
+            <!-- ✅ DataTables 적용용 테이블 -->
+            <table id="accountTable" class="display" style="width: 100%">
+              <thead>
+                <tr>
+                  <th style="width: 40px">
+                    <input
+                      type="checkbox"
+                      id="selectAllAccounts"
+                      title="전체 선택"
+                      aria-label="전체 선택"
+                    />
+                  </th>
+                  <th>순번</th>
+                  <th>계정코드</th>
+                  <th>계정명</th>
+                  <th>합계시산표</th>
+                  <th>적요</th>
+                  <th>사용구분</th>
+                  <th>수정일자</th>
+                  <th style="width: 180px">관리</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+
+          <!-- 계정과목 상세보기 모달 -->
+          <div
+            id="accountDetailModal"
+            style="
+              display: none;
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 1000;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <div
+              style="
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                width: 90%;
+                max-width: 600px;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              "
+            >
+              <!-- 고정된 제목 영역 -->
+              <div
+                id="accountDetailModalHeader"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                  cursor: move;
+                  user-select: none;
+                "
+              >
+                <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
+                  계정과목 상세정보
+                </h2>
+                <button
+                  onclick="closeAccountDetailModal()"
+                  style="
+                    background: #f0f0f0;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                  "
+                  onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
+                  onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
+                <div>
+                  <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #6b7280">계정코드</label>
+                  <div id="detailAccountCode" style="padding: 8px 0; color: #1f2937">-</div>
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #6b7280">계정명</label>
+                  <div id="detailAccountName" style="padding: 8px 0; color: #1f2937">-</div>
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #6b7280">합계시산표연결</label>
+                  <div id="detailAccountTrialBalance" style="padding: 8px 0; color: #1f2937">-</div>
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #6b7280">사용구분</label>
+                  <div id="detailAccountStatus" style="padding: 8px 0; color: #1f2937">-</div>
+                </div>
+                <div style="grid-column: 1 / -1">
+                  <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #6b7280">적요</label>
+                  <div id="detailAccountDescription" style="padding: 8px 0; color: #1f2937">-</div>
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #6b7280">수정일자</label>
+                  <div id="detailAccountModifiedDate" style="padding: 8px 0; color: #1f2937">-</div>
+                </div>
+              </div>
+
+              <div style="margin-top: 24px; display: flex; justify-content: flex-end">
+                <button
+                  onclick="closeAccountDetailModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                  "
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 계정과목 신규등록 모달 -->
+          <div
+            id="accountCreateModal"
+            style="
+              display: none;
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 1000;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <div
+              style="
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                width: 90%;
+                max-width: 600px;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              "
+            >
+              <!-- 고정된 제목 영역 -->
+              <div
+                id="accountCreateModalHeader"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                  cursor: move;
+                  user-select: none;
+                "
+              >
+                <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
+                  계정과목 신규등록
+                </h2>
+                <button
+                  onclick="closeAccountModal()"
+                  style="
+                    background: #f0f0f0;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                  "
+                  onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
+                  onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';"
+                >
+                  ×
+                </button>
+              </div>
+
+              <!-- 계정코드 -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  계정코드 * (4자리)
+                </label>
+                <input
+                  type="text"
+                  id="accountCode"
+                  maxlength="4"
+                  required
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  "
+                  placeholder="4자리 계정코드"
+                />
+              </div>
+
+              <!-- 계정명 -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  계정명 *
+                </label>
+                <input
+                  type="text"
+                  id="accountName"
+                  required
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  "
+                  placeholder="계정명"
+                />
+              </div>
+
+              <!-- 합계시산표연결여부 -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  합계시산표연결
+                </label>
+                <select
+                  id="accountTrialBalance"
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  "
+                >
+                  <option value="Y">연결</option>
+                  <option value="N">미연결</option>
+                </select>
+              </div>
+
+              <!-- 적요 -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  적요
+                </label>
+                <textarea
+                  id="accountDescription"
+                  rows="3"
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    resize: vertical;
+                  "
+                  placeholder="적요"
+                ></textarea>
+              </div>
+
+              <!-- 사용구분 -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  사용구분
+                </label>
+                <select
+                  id="accountStatus"
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  "
+                >
+                  <option value="0">사용중</option>
+                  <option value="1">미사용</option>
+                </select>
+              </div>
+
+              <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 8px">
+                <button
+                  onclick="closeAccountModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                  "
+                >
+                  취소
+                </button>
+                <button
+                  onclick="saveAccount()"
+                  style="
+                    padding: 10px 20px;
+                    background: #28a745;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                  "
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 계정과목 수정 모달 -->
+          <div
+            id="accountEditModal"
+            style="
+              display: none;
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 1000;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <div
+              style="
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                width: 90%;
+                max-width: 600px;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              "
+            >
+              <!-- 고정된 제목 영역 -->
+              <div
+                id="accountEditModalHeader"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                  cursor: move;
+                  user-select: none;
+                "
+              >
+                <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
+                  계정과목 수정
+                </h2>
+                <button
+                  onclick="closeAccountEditModal()"
+                  style="
+                    background: #f0f0f0;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                  "
+                  onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
+                  onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';"
+                >
+                  ×
+                </button>
+              </div>
+
+              <!-- 계정코드 (읽기 전용) -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  계정코드
+                </label>
+                <input
+                  type="text"
+                  id="editAccountCode"
+                  readonly
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    background: #f9fafb;
+                  "
+                />
+              </div>
+
+              <!-- 계정명 -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  계정명 *
+                </label>
+                <input
+                  type="text"
+                  id="editAccountName"
+                  required
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  "
+                  placeholder="계정명"
+                />
+              </div>
+
+              <!-- 합계시산표연결여부 -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  합계시산표연결
+                </label>
+                <select
+                  id="editAccountTrialBalance"
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  "
+                >
+                  <option value="Y">연결</option>
+                  <option value="N">미연결</option>
+                </select>
+              </div>
+
+              <!-- 적요 -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  적요
+                </label>
+                <textarea
+                  id="editAccountDescription"
+                  rows="3"
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    resize: vertical;
+                  "
+                  placeholder="적요"
+                ></textarea>
+              </div>
+
+              <!-- 사용구분 -->
+              <div style="margin-bottom: 16px">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">
+                  사용구분
+                </label>
+                <select
+                  id="editAccountStatus"
+                  style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  "
+                >
+                  <option value="0">사용중</option>
+                  <option value="1">미사용</option>
+                </select>
+              </div>
+
+              <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 8px">
+                <button
+                  onclick="closeAccountEditModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                  "
+                >
+                  취소
+                </button>
+                <button
+                  onclick="updateAccount()"
+                  style="
+                    padding: 10px 20px;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                  "
+                >
+                  수정
+                </button>
+              </div>
+            </div>
+          </div>

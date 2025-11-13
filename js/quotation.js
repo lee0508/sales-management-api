@@ -1457,6 +1457,12 @@ function deleteQuotation(quotationDate, quotationNo) {
 
   // 모달 표시
   modal.style.display = 'flex';
+
+  // 드래그 기능 활성화 (최초 1회만 실행)
+  if (typeof makeModalDraggable === 'function' && !window.quotationDeleteModalDraggable) {
+    makeModalDraggable('quotationDeleteModal', 'quotationDeleteModalHeader');
+    window.quotationDeleteModalDraggable = true;
+  }
 }
 
 // ✅ 견적 삭제 모달 닫기
@@ -2871,12 +2877,12 @@ function filterQuotations() {
  * @param {string} quotationDate - 견적일자 (YYYYMMDD)
  * @param {number} quotationNo - 견적번호
  */
-async function printQuotation(quotationDate, quotationNo) {
+async function printQuotation(quotationDate, quotationNo, mode = 1) {
   try {
-    console.log('📄 견적서 출력 시작:', { 견적일자: quotationDate, 견적번호: quotationNo });
+    console.log('📄 견적서 출력 시작:', { 견적일자: quotationDate, 견적번호: quotationNo, mode });
 
-    // API 호출하여 견적 데이터 가져오기
-    const response = await fetch(`/api/quotations/${quotationDate}/${quotationNo}`);
+    // 새로운 인쇄 전용 API 호출
+    const response = await fetch(`/api/quotations/${quotationDate}/${quotationNo}/print?mode=${mode}`);
     const result = await response.json();
 
     if (!result.success || !result.data) {
@@ -2884,10 +2890,16 @@ async function printQuotation(quotationDate, quotationNo) {
       return;
     }
 
-    const { master, detail } = result.data;
+    const { header, items } = result.data;
 
-    // 출력 창 생성
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    // 출력 창 생성 (A4 크기)
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+
+    // 날짜 포맷팅 함수
+    const formatDate = (dateStr) => {
+      if (!dateStr) return '-';
+      return dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+    };
 
     // HTML 생성
     const html = `
@@ -2895,80 +2907,344 @@ async function printQuotation(quotationDate, quotationNo) {
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>견적서 - ${master.견적일자}-${master.견적번호}</title>
+        <title>견적서 - ${header.견적일자}-${header.견적번호}</title>
         <style>
-          body { font-family: '맑은 고딕', Arial, sans-serif; padding: 40px; }
-          h1 { text-align: center; margin-bottom: 30px; }
-          .info { margin-bottom: 20px; }
-          .info-row { display: flex; margin-bottom: 10px; }
-          .info-label { width: 120px; font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #333; padding: 8px; text-align: left; }
-          th { background: #f0f0f0; font-weight: bold; }
-          td.number { text-align: right; }
-          .total-row { font-weight: bold; background: #f9f9f9; }
+          @page {
+            size: A4;
+            margin: 20mm;
+          }
+
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: '맑은 고딕', 'Malgun Gothic', Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            padding: 10mm;
+            background: white;
+          }
+
+          .document {
+            width: 170mm;
+            margin: 0 auto;
+            background: white;
+          }
+
+          /* 제목 */
+          .title {
+            text-align: center;
+            font-size: 24pt;
+            font-weight: bold;
+            margin-bottom: 15mm;
+            letter-spacing: 10px;
+          }
+
+          /* 정보 박스 컨테이너 */
+          .info-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8mm;
+            gap: 5mm;
+          }
+
+          .info-box {
+            flex: 1;
+            border: 2px solid #333;
+            padding: 3mm;
+          }
+
+          .info-box-title {
+            font-size: 11pt;
+            font-weight: bold;
+            margin-bottom: 2mm;
+            padding-bottom: 1mm;
+            border-bottom: 1px solid #999;
+          }
+
+          .info-row {
+            display: flex;
+            margin-bottom: 1.5mm;
+            font-size: 9pt;
+          }
+
+          .info-label {
+            width: 70px;
+            font-weight: bold;
+            color: #333;
+          }
+
+          .info-value {
+            flex: 1;
+            color: #000;
+          }
+
+          /* 견적 정보 섹션 */
+          .quotation-info {
+            border: 2px solid #333;
+            padding: 3mm;
+            margin-bottom: 8mm;
+          }
+
+          .quotation-info-row {
+            display: flex;
+            margin-bottom: 1.5mm;
+            font-size: 9pt;
+          }
+
+          .quotation-info-row .info-label {
+            width: 90px;
+          }
+
+          /* 품목 테이블 */
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8mm;
+            font-size: 9pt;
+          }
+
+          th {
+            background-color: #f0f0f0;
+            border: 1px solid #333;
+            padding: 2mm 1mm;
+            text-align: center;
+            font-weight: bold;
+            font-size: 9pt;
+          }
+
+          td {
+            border: 1px solid #333;
+            padding: 1.5mm 1mm;
+            text-align: center;
+            font-size: 8.5pt;
+          }
+
+          td.left {
+            text-align: left;
+            padding-left: 2mm;
+          }
+
+          td.right {
+            text-align: right;
+            padding-right: 2mm;
+          }
+
+          /* 합계 섹션 */
+          .total-section {
+            border: 2px solid #333;
+            padding: 3mm;
+            background-color: #f9f9f9;
+          }
+
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 1.5mm 0;
+            font-size: 10pt;
+          }
+
+          .total-row.grand-total {
+            font-size: 12pt;
+            font-weight: bold;
+            border-top: 2px solid #333;
+            padding-top: 3mm;
+            margin-top: 2mm;
+          }
+
+          .total-label {
+            font-weight: bold;
+          }
+
+          .total-value {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+          }
+
+          /* 하단 참고사항 */
+          .notes {
+            margin-top: 8mm;
+            padding: 3mm;
+            border: 1px solid #999;
+            background-color: #fafafa;
+            font-size: 8pt;
+            line-height: 1.6;
+          }
+
           @media print {
-            body { padding: 20px; }
+            body {
+              padding: 0;
+            }
+            .document {
+              width: 100%;
+            }
+            @page {
+              margin: 15mm;
+            }
           }
         </style>
       </head>
       <body>
-        <h1>견 적 서</h1>
-        <div class="info">
-          <div class="info-row">
-            <span class="info-label">견적번호:</span>
-            <span>${master.견적일자}-${master.견적번호}</span>
+        <div class="document">
+          <!-- 제목 -->
+          <div class="title">견 적 서</div>
+
+          <!-- 정보 박스 -->
+          <div class="info-container">
+            <!-- 공급자 정보 -->
+            <div class="info-box">
+              <div class="info-box-title">공급자 정보</div>
+              <div class="info-row">
+                <span class="info-label">상호:</span>
+                <span class="info-value">${header.사업장명}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">대표자:</span>
+                <span class="info-value">${header.대표자명}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">사업자번호:</span>
+                <span class="info-value">${header.사업자번호}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">전화:</span>
+                <span class="info-value">${header.전화번호}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">팩스:</span>
+                <span class="info-value">${header.팩스번호}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">주소:</span>
+                <span class="info-value">${header.주소}</span>
+              </div>
+            </div>
+
+            <!-- 고객 정보 -->
+            <div class="info-box">
+              <div class="info-box-title">고객 정보</div>
+              <div class="info-row">
+                <span class="info-label">상호:</span>
+                <span class="info-value">${header.매출처명}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">담당자:</span>
+                <span class="info-value">${header.담당자명}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">전화:</span>
+                <span class="info-value">${header.매출처전화}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">팩스:</span>
+                <span class="info-value">${header.매출처팩스}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">주소:</span>
+                <span class="info-value">${header.매출처주소}</span>
+              </div>
+            </div>
           </div>
-          <div class="info-row">
-            <span class="info-label">견적일자:</span>
-            <span>${master.견적일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')}</span>
+
+          <!-- 견적 정보 -->
+          <div class="quotation-info">
+            <div class="quotation-info-row">
+              <span class="info-label">견적번호:</span>
+              <span class="info-value">${header.견적일자}-${header.견적번호}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">견적일자:</span>
+              <span class="info-value">${formatDate(header.견적일자)}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">출고희망일:</span>
+              <span class="info-value">${formatDate(header.출고희망일자)}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">납기일수:</span>
+              <span class="info-value">${header.납기일수}일</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">유효일수:</span>
+              <span class="info-value">${header.유효일수}일</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">제목:</span>
+              <span class="info-value">${header.제목}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">적요:</span>
+              <span class="info-value">${header.적요}</span>
+            </div>
           </div>
-          <div class="info-row">
-            <span class="info-label">매출처명:</span>
-            <span>${master.매출처명 || '-'}</span>
+
+          <!-- 품목 테이블 -->
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 5%;">No</th>
+                <th style="width: 25%;">품명</th>
+                <th style="width: 25%;">규격</th>
+                <th style="width: 8%;">수량</th>
+                <th style="width: 7%;">단위</th>
+                ${mode === 1 ? '<th style="width: 12%;">단가</th>' : ''}
+                ${mode === 1 ? '<th style="width: 12%;">부가세</th>' : ''}
+                ${mode === 1 ? '<th style="width: 15%;">금액</th>' : ''}
+                ${mode === 0 ? '<th style="width: 30%;">비고</th>' : '<th style="width: 15%;">비고</th>'}
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((item, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td class="left">${item.품명 || '-'}</td>
+                  <td class="left">${item.규격 || '-'}</td>
+                  <td class="right">${(item.수량 || 0).toLocaleString()}</td>
+                  <td>${item.단위 || '-'}</td>
+                  ${mode === 1 ? `<td class="right">${(item.단가 || 0).toLocaleString()}</td>` : ''}
+                  ${mode === 1 ? `<td class="right">${(item.부가 || 0).toLocaleString()}</td>` : ''}
+                  ${mode === 1 ? `<td class="right">${(item.금액 || 0).toLocaleString()}</td>` : ''}
+                  <td class="left">${item.적요 || ''}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          ${mode === 1 ? `
+          <!-- 합계 섹션 -->
+          <div class="total-section">
+            <div class="total-row">
+              <span class="total-label">공급가액:</span>
+              <span class="total-value">${header.총공급가액.toLocaleString()} 원</span>
+            </div>
+            <div class="total-row">
+              <span class="total-label">부가세(10%):</span>
+              <span class="total-value">${header.총부가세.toLocaleString()} 원</span>
+            </div>
+            <div class="total-row grand-total">
+              <span class="total-label">합계금액:</span>
+              <span class="total-value">${header.총합계.toLocaleString()} 원</span>
+            </div>
           </div>
-          <div class="info-row">
-            <span class="info-label">비고:</span>
-            <span>${master.적요 || '-'}</span>
+          ` : ''}
+
+          <!-- 하단 참고사항 -->
+          <div class="notes">
+            <strong>※ 참고사항</strong><br>
+            · 본 견적서는 ${formatDate(header.견적일자)}부터 ${header.유효일수}일간 유효합니다.<br>
+            · 상기 금액으로 견적 드립니다.<br>
+            · 기타 문의사항은 연락 바랍니다.
           </div>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>No.</th>
-              <th>품목코드</th>
-              <th>품명</th>
-              <th>규격</th>
-              <th>수량</th>
-              <th>단가</th>
-              <th>금액</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${detail.map((item, index) => `
-              <tr>
-                <td>${index + 1}</td>
-                <td>${item.자재코드 || '-'}</td>
-                <td>${item.자재명 || '-'}</td>
-                <td>${item.규격 || '-'}</td>
-                <td class="number">${(item.수량 || 0).toLocaleString()}</td>
-                <td class="number">${(item.출고단가 || 0).toLocaleString()}</td>
-                <td class="number">${(item.금액 || 0).toLocaleString()}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-          <tfoot>
-            <tr class="total-row">
-              <td colspan="6" style="text-align: right;">합계</td>
-              <td class="number">${detail.reduce((sum, item) => sum + (item.금액 || 0), 0).toLocaleString()}</td>
-            </tr>
-          </tfoot>
-        </table>
-
         <script>
           window.onload = function() {
-            window.print();
+            setTimeout(() => {
+              window.print();
+            }, 500);
           };
         </script>
       </body>

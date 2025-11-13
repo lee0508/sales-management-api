@@ -1,0 +1,33 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp계정코드관리보고서인쇄]    Script Date: 11/13/2025 11:19:38 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER OFF
+GO
+
+ALTER PROCEDURE [dbo].[sp계정코드관리보고서인쇄] 
+      (@ParBranchcode VarChar(2) = '01', @ParUsageCode int = 0, @ParSortGbn int = 0)
+
+AS
+
+IF @ParSortGbn = 0 
+   BEGIN
+     SELECT T1.계정코드 AS 계정코드, T1.계정명 AS 계정명,
+            T1.합계시산표연결여부 AS 합계시산표연결여부, T1.적요 AS 적요,             
+            사용구분 = CASE WHEN T1.사용구분 = 0 THEN '정    상'
+                            WHEN T1.사용구분 = 9 THEN '사용불가'
+                       ELSE '오    류' END
+       FROM 계정과목 T1 
+      ORDER BY T1.계정코드
+   END
+ELSE
+   BEGIN
+     SELECT T1.계정코드 AS 계정코드, T1.계정명 AS 계정명,
+            T1.합계시산표연결여부 AS 합계시산표연결여부, T1.적요 AS 적요,             
+            사용구분 = CASE WHEN T1.사용구분 = 0 THEN '정    상'
+                            WHEN T1.사용구분 = 9 THEN '사용불가'
+                       ELSE '오    류' END
+       FROM 계정과목 T1 
+      ORDER BY T1.계정명
+   END

@@ -1,0 +1,42 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp거래명세서A4백지_인쇄]    Script Date: 11/13/2025 11:04:20 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER OFF
+GO
+
+ALTER PROCEDURE [dbo].[sp거래명세서A4백지_인쇄] 
+      (@ParStrBranchCode VarChar(02) = '01', @ParStrDealDate VarChar(08) = '', @ParLngLogCnt Real = 0)
+
+AS
+
+  SELECT T1.사업장코드 AS 사업장코드, T1.거래일자 AS 거래일자, T1.거래번호 AS 거래번호, 
+         T1.매출처코드 AS 매출처코드,
+         ISNULL(T4.사업자번호, '') AS 좌등록번호, ISNULL(T4.사업장명, '') AS 좌상호,
+         ISNULL(T4.대표자명, '') AS 좌성명, (ISNULL(T4.주소, '') + SPACE(1) + ISNULL(T4.번지, '')) AS 좌주소, 
+         ISNULL(T4.업태, '') AS 좌업태, ISNULL(T4.업종, '') AS 좌종목,
+         ISNULL(T3.사업자번호, '') AS 우등록번호, ISNULL(T3.매출처명, '') AS 우상호, 
+         ISNULL(T3.대표자명, '') AS 우성명, (ISNULL(T3.주소, '') + SPACE(1) + ISNULL(T3.번지, '')) AS 우주소, 
+         ISNULL(T3.업태, '') AS 우업태, ISNULL(T3.업종, '') AS 우종목, 
+        (SELECT SUM(출고수량 * 출고단가) FROM 자재입출내역 
+          WHERE 사업장코드 = @ParStrBranchCode
+            AND 입출고구분 = 2 AND 사용구분 = 0
+            AND 거래일자 = @ParStrDealDate
+            AND 거래번호 = @ParLngLogCnt) AS 총금액,
+        (SELECT COUNT(세부코드) FROM 자재입출내역 
+          WHERE 사업장코드 = @ParStrBranchCode
+            AND 입출고구분 = 2 AND 사용구분 = 0
+            AND 거래일자 = @ParStrDealDate
+            AND 거래번호 = @ParLngLogCnt) AS 건수,
+        (T1.분류코드 + T1.세부코드) AS 코드, T2.자재명 AS 품명, T2.규격 AS 규격, 
+         T1.출고수량 AS 수량, T2.단위 AS 단위, T1.출고단가 AS 단가, T1.출고부가 AS 부가, (T1.출고단가 * T1.출고수량) AS 출고금액
+    FROM 자재입출내역 T1 
+    LEFT JOIN 자재 T2 ON T2.분류코드 = T1.분류코드 AND T2.세부코드 = T1.세부코드
+    LEFT JOIN 매출처 T3 ON T3.매출처코드 = T1.매출처코드
+    LEFT JOIN 사업장 T4 ON T3.사업장코드 = T1.사업장코드
+   WHERE T1.사업장코드 = @ParStrBranchCode
+     AND T1.입출고구분 = 2 AND T1.사용구분 = 0 
+     AND T1.거래일자 = @ParStrDealDate
+     AND T1.거래번호 = @ParLngLogCnt
+   ORDER BY T1.사업장코드, T1.거래일자, T1.거래번호, T1.입출고시간

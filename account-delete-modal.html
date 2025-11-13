@@ -1,0 +1,119 @@
+          <!-- 계정과목 삭제 확인 모달 -->
+          <div
+            id="accountDeleteModal"
+            style="
+              display: none;
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 1000;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <div
+              style="
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                width: 90%;
+                max-width: 450px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              "
+            >
+              <div
+                id="accountDeleteModalHeader"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #fee2e2;
+                  cursor: move;
+                  user-select: none;
+                "
+              >
+                <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #dc2626">
+                  계정과목 삭제
+                </h2>
+                <button
+                  onclick="closeAccountDeleteModal()"
+                  style="
+                    background: #f0f0f0;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                  "
+                  onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
+                  onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style="margin-bottom: 24px">
+                <p style="font-size: 16px; color: #1f2937; margin: 0 0 16px 0">
+                  다음 계정과목을 삭제하시겠습니까?
+                </p>
+                <div
+                  id="accountDeleteInfo"
+                  style="
+                    padding: 16px;
+                    background: #fef2f2;
+                    border: 1px solid #fecaca;
+                    border-radius: 8px;
+                    font-weight: 500;
+                    color: #991b1b;
+                  "
+                >
+                  계정코드: -
+                </div>
+                <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0">
+                  ※ 삭제된 계정과목은 사용구분이 '삭제'로 변경됩니다.
+                </p>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 8px">
+                <button
+                  onclick="closeAccountDeleteModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                  "
+                >
+                  취소
+                </button>
+                <button
+                  onclick="confirmAccountDelete()"
+                  style="
+                    padding: 10px 20px;
+                    background: #dc2626;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                  "
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          </div>

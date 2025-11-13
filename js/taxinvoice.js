@@ -6,6 +6,7 @@
 let taxInvoiceTable = null;
 let currentEditTaxInvoice = null; // 현재 수정 중인 세금계산서 데이터
 let currentDeleteTaxInvoice = null; // 삭제할 세금계산서 정보 임시 저장
+let currentTaxInvoiceDetail = null; // 현재 상세 보기 중인 세금계산서 정보 (인쇄용)
 
 /**
  * 세금계산서 목록 로드
@@ -360,6 +361,13 @@ window.openTaxInvoiceDetailModal = async function (작성년도, 책번호, 일�
       ],
     });
 
+    // 전역 변수에 저장 (인쇄용)
+    window.currentTaxInvoiceDetail = {
+      작성년도: master.작성년도,
+      책번호: master.책번호,
+      일련번호: master.일련번호,
+    };
+
     // 모달 표시
     const modal = document.getElementById('taxInvoiceDetailModal');
     modal.classList.remove('hidden');
@@ -668,5 +676,433 @@ function formatDateForInput(dateStr) {
   if (!dateStr || dateStr.length !== 8) return '';
   return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
 }
+
+/**
+ * 세금계산서 인쇄 함수
+ * @param {string} 작성년도 - 작성년도 (YYYY)
+ * @param {number} 책번호 - 책번호
+ * @param {number} 일련번호 - 일련번호
+ */
+async function printTaxInvoice(작성년도, 책번호, 일련번호) {
+  try {
+    console.log('📄 세금계산서 인쇄 시작:', { 작성년도, 책번호, 일련번호 });
+
+    // 새로운 인쇄 전용 API 호출
+    const response = await fetch(`/api/tax-invoices/${작성년도}/${책번호}/${일련번호}/print`);
+    const result = await response.json();
+
+    if (!result.success || !result.data) {
+      alert('세금계산서 정보를 불러올 수 없습니다.');
+      return;
+    }
+
+    const { header } = result.data;
+
+    // 출력 창 생성 (A4 크기)
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+
+    // 날짜 포맷팅 함수
+    const formatPrintDate = (dateStr) => {
+      if (!dateStr) return '-';
+      return dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+    };
+
+    // 사업자번호 포맷팅 (000-00-00000)
+    const formatBusinessNo = (no) => {
+      if (!no) return '-';
+      const cleaned = no.replace(/[^0-9]/g, '');
+      if (cleaned.length === 10) {
+        return `${cleaned.substring(0, 3)}-${cleaned.substring(3, 5)}-${cleaned.substring(5)}`;
+      }
+      return no;
+    };
+
+    // HTML 생성 - 전자세금계산서 표준 양식 스타일
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>세금계산서 - ${header.작성년도}-${header.책번호}-${header.일련번호}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 15mm;
+          }
+
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: '맑은 고딕', 'Malgun Gothic', Arial, sans-serif;
+            font-size: 9pt;
+            line-height: 1.3;
+            padding: 5mm;
+            background: white;
+          }
+
+          .document {
+            width: 180mm;
+            margin: 0 auto;
+            background: white;
+            border: 2px solid #000;
+          }
+
+          /* 제목 */
+          .title {
+            text-align: center;
+            font-size: 20pt;
+            font-weight: bold;
+            padding: 8mm 0 6mm 0;
+            border-bottom: 2px solid #000;
+            letter-spacing: 8px;
+          }
+
+          /* 승인번호 */
+          .approval-section {
+            text-align: right;
+            padding: 2mm 5mm;
+            font-size: 8pt;
+            border-bottom: 1px solid #ccc;
+          }
+
+          /* 공급자/공급받는자 정보 */
+          .info-section {
+            display: flex;
+            border-bottom: 2px solid #000;
+          }
+
+          .info-column {
+            flex: 1;
+            padding: 3mm;
+          }
+
+          .info-column.left {
+            border-right: 2px solid #000;
+          }
+
+          .info-title {
+            font-size: 10pt;
+            font-weight: bold;
+            margin-bottom: 2mm;
+            padding-bottom: 1mm;
+            border-bottom: 1px solid #666;
+          }
+
+          .info-row {
+            display: flex;
+            margin-bottom: 1.5mm;
+            font-size: 8.5pt;
+          }
+
+          /* 두 개의 필드를 같은 라인에 표시 */
+          .info-row-dual {
+            display: flex;
+            margin-bottom: 1.5mm;
+            font-size: 8.5pt;
+          }
+
+          .info-row-dual .info-group {
+            display: flex;
+            flex: 1;
+          }
+
+          .info-label {
+            width: 70px;
+            font-weight: bold;
+            color: #333;
+          }
+
+          .info-value {
+            flex: 1;
+            color: #000;
+          }
+
+          .info-row-dual .info-label {
+            width: 70px;
+            font-weight: bold;
+            color: #333;
+          }
+
+          .info-row-dual .info-value {
+            flex: 1;
+            color: #000;
+            margin-right: 2mm;
+          }
+
+          /* 금액 정보 */
+          .amount-section {
+            display: flex;
+            border-bottom: 2px solid #000;
+          }
+
+          .amount-box {
+            flex: 1;
+            text-align: center;
+            padding: 3mm 0;
+            border-right: 1px solid #000;
+          }
+
+          .amount-box:last-child {
+            border-right: none;
+          }
+
+          .amount-label {
+            font-size: 8pt;
+            font-weight: bold;
+            margin-bottom: 2mm;
+            color: #333;
+          }
+
+          .amount-value {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #000;
+            font-family: 'Courier New', monospace;
+          }
+
+          /* 품목 정보 */
+          .item-section {
+            padding: 3mm;
+            border-bottom: 2px solid #000;
+            min-height: 60mm;
+          }
+
+          .item-title {
+            font-size: 9pt;
+            font-weight: bold;
+            margin-bottom: 2mm;
+            padding-bottom: 1mm;
+            border-bottom: 1px solid #999;
+          }
+
+          .item-row {
+            display: flex;
+            margin-bottom: 1mm;
+            font-size: 8.5pt;
+          }
+
+          .item-label {
+            width: 60px;
+            font-weight: bold;
+          }
+
+          .item-value {
+            flex: 1;
+          }
+
+          /* 하단 참고사항 */
+          .footer-section {
+            padding: 3mm;
+            font-size: 7.5pt;
+            line-height: 1.6;
+            background-color: #fafafa;
+          }
+
+          /* 발행일시 */
+          .issue-date {
+            text-align: right;
+            padding: 2mm 3mm;
+            font-size: 8pt;
+            border-top: 1px solid #ccc;
+          }
+
+          @media print {
+            body {
+              padding: 0;
+            }
+            .document {
+              width: 100%;
+              border: none;
+            }
+            @page {
+              margin: 10mm;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="document">
+          <!-- 제목 -->
+          <div class="title">세 금 계 산 서</div>
+
+          <!-- 승인번호 (전자세금계산서인 경우) -->
+          <div class="approval-section">
+            승인번호: ${header.작성년도}-${header.책번호}-${header.일련번호}
+          </div>
+
+          <!-- 공급자/공급받는자 정보 -->
+          <div class="info-section">
+            <!-- 공급자 정보 (좌측) -->
+            <div class="info-column left">
+              <div class="info-title">공급자</div>
+              <div class="info-row">
+                <span class="info-label">등록번호</span>
+                <span class="info-value">${formatBusinessNo(header.좌등록번호)}</span>
+              </div>
+              <div class="info-row-dual">
+                <div class="info-group">
+                  <span class="info-label">상호(법인명)</span>
+                  <span class="info-value">${header.좌상호법인명}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">성명(대표자)</span>
+                  <span class="info-value">${header.좌성명}</span>
+                </div>
+              </div>
+              <div class="info-row">
+                <span class="info-label">사업장주소</span>
+                <span class="info-value">${header.좌사업장주소}</span>
+              </div>
+              <div class="info-row-dual">
+                <div class="info-group">
+                  <span class="info-label">업태</span>
+                  <span class="info-value">${header.좌업태}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">종목</span>
+                  <span class="info-value">${header.좌종목}</span>
+                </div>
+              </div>
+              <div class="info-row">
+                <span class="info-label">전화번호</span>
+                <span class="info-value">${header.좌전화번호}</span>
+              </div>
+            </div>
+
+            <!-- 공급받는자 정보 (우측) -->
+            <div class="info-column">
+              <div class="info-title">공급받는자</div>
+              <div class="info-row">
+                <span class="info-label">등록번호</span>
+                <span class="info-value">${formatBusinessNo(header.우등록번호)}</span>
+              </div>
+              <div class="info-row-dual">
+                <div class="info-group">
+                  <span class="info-label">상호(법인명)</span>
+                  <span class="info-value">${header.우상호법인명}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">성명(대표자)</span>
+                  <span class="info-value">${header.우성명}</span>
+                </div>
+              </div>
+              <div class="info-row">
+                <span class="info-label">사업장주소</span>
+                <span class="info-value">${header.우사업장주소}</span>
+              </div>
+              <div class="info-row-dual">
+                <div class="info-group">
+                  <span class="info-label">업태</span>
+                  <span class="info-value">${header.우업태}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">종목</span>
+                  <span class="info-value">${header.우종목}</span>
+                </div>
+              </div>
+              <div class="info-row">
+                <span class="info-label">전화번호</span>
+                <span class="info-value">${header.우전화번호}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 금액 정보 -->
+          <div class="amount-section">
+            <div class="amount-box">
+              <div class="amount-label">공급가액</div>
+              <div class="amount-value">${header.공급가액.toLocaleString()}</div>
+            </div>
+            <div class="amount-box">
+              <div class="amount-label">세액</div>
+              <div class="amount-value">${header.세액.toLocaleString()}</div>
+            </div>
+            <div class="amount-box">
+              <div class="amount-label">합계금액</div>
+              <div class="amount-value">${header.합계금액.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <!-- 품목 정보 -->
+          <div class="item-section">
+            <div class="item-title">품목 정보</div>
+            <div class="item-row">
+              <span class="item-label">작성일자</span>
+              <span class="item-value">${formatPrintDate(header.작성일자)}</span>
+            </div>
+            <div class="item-row">
+              <span class="item-label">품목 및 규격</span>
+              <span class="item-value">${header.품목및규격}</span>
+            </div>
+            <div class="item-row">
+              <span class="item-label">건수</span>
+              <span class="item-value">${(header.수량 || 0).toLocaleString()}</span>
+            </div>
+            <div class="item-row">
+              <span class="item-label">비고</span>
+              <span class="item-value">
+                ${header.금액구분 === 1 ? '[현금]' : ''}
+                ${header.영청구분 === 1 ? '[영수]' : header.영청구분 === 2 ? '[청구]' : ''}
+                ${header.미수구분 === 1 ? '[미수]' : ''}
+              </span>
+            </div>
+          </div>
+
+          <!-- 하단 참고사항 -->
+          <div class="footer-section">
+            <strong>※ 참고사항</strong><br>
+            · 이 세금계산서는 부가가치세법 제32조 및 제54조에 의하여 발급되었습니다.<br>
+            · 공급가액과 세액을 별도로 구분하여 기재하였습니다.<br>
+            · 세금계산서 관련 문의사항은 공급자에게 연락 바랍니다.
+          </div>
+
+          <!-- 발행일시 -->
+          <div class="issue-date">
+            발행일시: ${formatPrintDate(header.작성일자)}
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(() => {
+              window.print();
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    console.log('✅ 세금계산서 인쇄 완료');
+  } catch (error) {
+    console.error('❌ 세금계산서 인쇄 실패:', error);
+    alert('세금계산서 인쇄 중 오류가 발생했습니다.');
+  }
+}
+
+/**
+ * 상세 모달에서 출력 버튼 클릭 시 호출되는 래퍼 함수
+ */
+function printTaxInvoiceFromDetail() {
+  if (!window.currentTaxInvoiceDetail) {
+    alert('출력할 세금계산서 정보가 없습니다.');
+    return;
+  }
+
+  const { 작성년도, 책번호, 일련번호 } = window.currentTaxInvoiceDetail;
+  printTaxInvoice(작성년도, 책번호, 일련번호);
+  console.log('✅ 세금계산서 출력:', { 작성년도, 책번호, 일련번호 });
+}
+
+// 전역 함수 노출
+window.printTaxInvoice = printTaxInvoice;
+window.printTaxInvoiceFromDetail = printTaxInvoiceFromDetail;
 
 console.log('✅ taxinvoice.js 로드 완료');

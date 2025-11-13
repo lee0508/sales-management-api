@@ -1950,3 +1950,371 @@ function printTransactionFromDetail() {
 
   console.log('✅ 거래명세서 출력:', { 거래일자, 거래번호 });
 }
+
+// ✅ 거래명세서 인쇄 함수
+async function printTransaction(거래일자, 거래번호) {
+  try {
+    console.log('✅ 거래명세서 인쇄 시작:', { 거래일자, 거래번호 });
+
+    // API 호출하여 인쇄용 데이터 가져오기
+    const response = await fetch(`/api/transactions/${거래일자}/${거래번호}/print`, {
+      credentials: 'include',
+    });
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '거래명세서 인쇄 데이터를 불러올 수 없습니다.');
+    }
+
+    const { header, details } = result.data;
+
+    // 인쇄 창 열기
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+
+    if (!printWindow) {
+      alert('팝업 차단으로 인해 인쇄 창을 열 수 없습니다. 팝업 차단을 해제해주세요.');
+      return;
+    }
+
+    // 거래일자 포맷 변환 (YYYYMMDD → YYYY년 MM월 DD일)
+    const 거래일자_포맷 = 거래일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1년 $2월 $3일');
+
+    // 총금액에 부가세 포함 계산
+    const 총공급가액 = details.reduce((sum, item) => sum + (item.출고금액 || 0), 0);
+    const 총부가세 = details.reduce((sum, item) => sum + (item.부가 || 0), 0);
+    const 총합계 = 총공급가액 + 총부가세;
+
+    // HTML 생성
+    printWindow.document.write(`
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>거래명세서 - ${거래일자}-${거래번호}</title>
+  <style>
+    @media print {
+      @page {
+        size: A4;
+        margin: 10mm;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+      font-size: 11pt;
+      line-height: 1.4;
+      color: #000;
+      background: #fff;
+      padding: 20px;
+    }
+
+    .print-container {
+      max-width: 210mm;
+      margin: 0 auto;
+      background: white;
+    }
+
+    /* 제목 */
+    .print-header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #000;
+    }
+
+    .print-header h1 {
+      font-size: 24pt;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .print-header .transaction-info {
+      font-size: 10pt;
+      color: #555;
+    }
+
+    /* 좌우 정보 섹션 */
+    .info-section {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+      font-size: 10pt;
+    }
+
+    .info-box {
+      flex: 1;
+      border: 1px solid #000;
+      padding: 12px;
+    }
+
+    .info-box h3 {
+      font-size: 11pt;
+      font-weight: bold;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .info-row {
+      display: flex;
+      margin-bottom: 4px;
+    }
+
+    .info-label {
+      width: 80px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .info-value {
+      flex: 1;
+      color: #000;
+    }
+
+    /* 품목 테이블 */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 10pt;
+    }
+
+    .items-table th,
+    .items-table td {
+      border: 1px solid #000;
+      padding: 6px 8px;
+      text-align: center;
+    }
+
+    .items-table th {
+      background-color: #f0f0f0;
+      font-weight: bold;
+    }
+
+    .items-table td.left {
+      text-align: left;
+    }
+
+    .items-table td.right {
+      text-align: right;
+    }
+
+    /* 합계 섹션 */
+    .total-section {
+      margin-top: 20px;
+      text-align: right;
+    }
+
+    .total-table {
+      display: inline-block;
+      border: 2px solid #000;
+      font-size: 11pt;
+    }
+
+    .total-table table {
+      border-collapse: collapse;
+    }
+
+    .total-table td {
+      padding: 8px 16px;
+      border: 1px solid #000;
+    }
+
+    .total-table .label {
+      font-weight: bold;
+      background-color: #f0f0f0;
+      text-align: center;
+      width: 100px;
+    }
+
+    .total-table .value {
+      text-align: right;
+      font-weight: bold;
+      font-size: 13pt;
+      min-width: 150px;
+    }
+
+    /* 인쇄 버튼 */
+    .print-button-container {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .print-button {
+      padding: 12px 32px;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14pt;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .print-button:hover {
+      background-color: #1d4ed8;
+    }
+
+    .print-button:active {
+      background-color: #1e40af;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    <!-- 제목 -->
+    <div class="print-header">
+      <h1>거 래 명 세 서</h1>
+      <div class="transaction-info">
+        명세서번호: ${거래일자}-${거래번호} | 거래일자: ${거래일자_포맷}
+      </div>
+    </div>
+
+    <!-- 좌우 정보 섹션 -->
+    <div class="info-section">
+      <!-- 좌측: 공급자 (회사) 정보 -->
+      <div class="info-box">
+        <h3>공급자</h3>
+        <div class="info-row">
+          <div class="info-label">사업자번호</div>
+          <div class="info-value">${header.좌등록번호 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">상호</div>
+          <div class="info-value">${header.좌상호 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">대표자명</div>
+          <div class="info-value">${header.좌성명 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">주소</div>
+          <div class="info-value">${header.좌주소 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">업태</div>
+          <div class="info-value">${header.좌업태 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">종목</div>
+          <div class="info-value">${header.좌종목 || '-'}</div>
+        </div>
+      </div>
+
+      <!-- 우측: 공급받는자 (매출처) 정보 -->
+      <div class="info-box">
+        <h3>공급받는자</h3>
+        <div class="info-row">
+          <div class="info-label">사업자번호</div>
+          <div class="info-value">${header.우등록번호 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">상호</div>
+          <div class="info-value">${header.우상호 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">대표자명</div>
+          <div class="info-value">${header.우성명 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">주소</div>
+          <div class="info-value">${header.우주소 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">업태</div>
+          <div class="info-value">${header.우업태 || '-'}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">종목</div>
+          <div class="info-value">${header.우종목 || '-'}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 품목 테이블 -->
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width: 40px;">No</th>
+          <th style="width: 100px;">품목코드</th>
+          <th style="width: 200px;">품명</th>
+          <th style="width: 150px;">규격</th>
+          <th style="width: 70px;">수량</th>
+          <th style="width: 60px;">단위</th>
+          <th style="width: 100px;">단가</th>
+          <th style="width: 100px;">공급가액</th>
+          <th style="width: 80px;">부가세</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${details
+          .map(
+            (item, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.코드 ? item.코드.substring(2) : '-'}</td>
+          <td class="left">${item.품명 || '-'}</td>
+          <td class="left">${item.규격 || '-'}</td>
+          <td class="right">${(item.수량 || 0).toLocaleString()}</td>
+          <td>${item.단위 || '-'}</td>
+          <td class="right">${(item.단가 || 0).toLocaleString()}</td>
+          <td class="right">${(item.출고금액 || 0).toLocaleString()}</td>
+          <td class="right">${(item.부가 || 0).toLocaleString()}</td>
+        </tr>
+        `,
+          )
+          .join('')}
+      </tbody>
+    </table>
+
+    <!-- 합계 섹션 -->
+    <div class="total-section">
+      <div class="total-table">
+        <table>
+          <tr>
+            <td class="label">공급가액</td>
+            <td class="value">${총공급가액.toLocaleString()} 원</td>
+          </tr>
+          <tr>
+            <td class="label">부가세</td>
+            <td class="value">${총부가세.toLocaleString()} 원</td>
+          </tr>
+          <tr>
+            <td class="label">합계</td>
+            <td class="value">${총합계.toLocaleString()} 원</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 인쇄 버튼 -->
+    <div class="print-button-container no-print">
+      <button class="print-button" onclick="window.print()">인쇄하기</button>
+    </div>
+  </div>
+</body>
+</html>
+    `);
+
+    printWindow.document.close();
+    console.log('✅ 거래명세서 인쇄 창 열기 완료');
+  } catch (err) {
+    console.error('❌ 거래명세서 인쇄 오류:', err);
+    alert('거래명세서 인쇄 중 오류가 발생했습니다: ' + err.message);
+  }
+}

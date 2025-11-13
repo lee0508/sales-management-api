@@ -1,0 +1,86 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp자재시세인쇄]    Script Date: 11/13/2025 11:14:04 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER OFF
+GO
+
+
+ALTER PROCEDURE [dbo].[sp자재시세인쇄] 
+      (@AppMtGroupCode VarChar(6) = '', @AppSupplierCode VarChar(8) = '', @AppStandardDate VarChar(8) = '', 
+       @AppMtName VarChar(20) = '', @AppChkCode int = 1, @AppStateCode int = 0, @AppBranchCode Varchar(2) = '01')
+
+AS
+IF @AppChkCode = 0
+   BEGIN
+       SELECT ISNULL(T1.분류코드,'') AS 분류코드, ISNULL(T4.분류명,'') AS 분류명,
+              ISNULL(T1.세부코드,'') AS 세부코드, ISNULL(T2.자재명,'') AS 자재명, 
+              ISNULL(T1.매입처코드,'') AS 매입처코드, ISNULL(T3.매입처명,'') AS 매입처명,
+              ISNULL(T1.적용일자,'') AS 적용일자, ISNULL(T2.규격,'') AS 규격, ISNULL(T2.단위,'') AS 단위, 
+              과세구분 = CASE WHEN T2.과세구분 = 0 THEN '비과세'
+                              WHEN T2.과세구분 = 1 THEN '과  세'
+                              ELSE '오  류'
+                        END,
+              ISNULl(T1.입고단가,0) AS 입고단가, ISNULL(T1.입고부가,0) AS 입고부가, 
+              ISNULl(T1.출고단가,0) AS 출고단가, ISNULL(T1.출고부가,0) AS 출고부가, 
+              ISNULL(T1.마진율,0) AS 마진율,
+              사용구분 = CASE WHEN T2.사용구분 = 0 THEN '정  상'
+                              WHEN T2.사용구분 = 9 THEN '삭  제'
+                              ELSE '오  류'
+                         END
+         FROM 자재시세 T1 
+         LEFT JOIN 자재 T2 
+                ON T2.분류코드 = T1.분류코드 AND T2.세부코드 = T1.세부코드 
+         LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드 
+         LEFT JOIN 자재분류 T4 ON T4.분류코드 = T1.분류코드 
+        WHERE (T1.사업장코드 = @AppBranchCode AND T1.사용구분 = @AppStateCode)
+          AND (T1.분류코드) LIKE '%' + LTRIM(@AppMtGroupCode) + '%'
+          AND (T1.매입처코드 LIKE '%' + LTRIM(@AppSupplierCode) + '%')
+          AND (T2.자재명 LIKE '%' + LTRIM(@AppMtName) + '%')
+          AND (T1.적용일자 BETWEEN 
+                          (SELECT TOP 1 적용일자 
+                             FROM 자재시세
+                            WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드
+                              AND 적용일자 <= @AppStandardDate
+                              AND 사업장코드 = @AppBranchCode
+                            ORDER BY T1.적용일자 DESC)
+                              AND @AppStandardDate)
+        ORDER BY T1.분류코드, T1.세부코드, T1.적용일자 DESC  
+   END
+ELSE
+   BEGIN
+       SELECT ISNULL(T1.분류코드,'') AS 분류코드, ISNULL(T4.분류명,'') AS 분류명,
+              ISNULL(T1.세부코드,'') AS 세부코드, ISNULL(T2.자재명,'') AS 자재명, 
+              ISNULL(T1.매입처코드,'') AS 매입처코드, ISNULL(T3.매입처명,'') AS 매입처명,
+              ISNULL(T1.적용일자,'') AS 적용일자, ISNULL(T2.규격,'') AS 규격, ISNULL(T2.단위,'') 단위, 
+              과세구분 = CASE WHEN T2.과세구분 = 0 THEN '비과세'
+                              WHEN T2.과세구분 = 1 THEN '과  세'
+                              ELSE '오  류'
+                        END,
+              ISNULl(T1.입고단가,0) AS 입고단가, ISNULL(T1.입고부가,0) AS 입고부가, 
+              ISNULl(T1.출고단가,0) AS 출고단가, ISNULL(T1.출고부가,0) AS 출고부가, 
+              ISNULL(T1.마진율,0) AS 마진율,
+              사용구분 = CASE WHEN T2.사용구분 = 0 THEN '정  상'
+                              WHEN T2.사용구분 = 9 THEN '삭  제'
+                              ELSE '오  류'
+                         END
+         FROM 자재시세 T1 
+         LEFT JOIN 자재 T2 
+                ON T2.분류코드 = T1.분류코드 AND T2.세부코드 = T1.세부코드 
+         LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드 
+         LEFT JOIN 자재분류 T4 ON T4.분류코드 = T1.분류코드 
+        WHERE (T1.사업장코드 = @AppBranchCode AND T1.사용구분 = @AppStateCode)
+          AND (T1.분류코드) LIKE '%' + LTRIM(@AppMtGroupCode) + '%'
+          AND (T1.매입처코드 LIKE '%' + LTRIM(@AppSupplierCode) + '%')
+          AND (T2.자재명 LIKE '%' + LTRIM(@AppMtName) + '%')
+          AND (T1.적용일자 = (SELECT TOP 1 적용일자 FROM 자재시세 
+                               WHERE 분류코드 = T1.분류코드 AND 세부코드 = T1.세부코드 
+                                 AND 매입처코드 = T1.매입처코드 
+                                 AND 적용일자 <= @AppStandardDate
+                                 AND 사업장코드 = @AppBranchCode
+                               ORDER BY 적용일자 DESC))
+        ORDER BY T1.분류코드, T1.세부코드, T1.적용일자 DESC  
+   END
+
+

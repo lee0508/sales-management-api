@@ -9,7 +9,17 @@ const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const BASE_PATH = process.env.BASE_PATH || '/sales-management-api';
+// Git Bash converts /path to C:/Program Files/Git/path, so normalize it
+let BASE_PATH = process.env.BASE_PATH || '/sales-management-api';
+// Fix Git Bash path conversion issue
+if (BASE_PATH.includes('Program Files') || BASE_PATH.includes('\\')) {
+  BASE_PATH = '/sales-management-api';
+}
+// Ensure BASE_PATH starts with / and doesn't contain backslashes
+BASE_PATH = BASE_PATH.replace(/\\/g, '/');
+if (!BASE_PATH.startsWith('/')) {
+  BASE_PATH = '/' + BASE_PATH;
+}
 
 const path = require('path');
 
@@ -1650,6 +1660,229 @@ app.delete('/api/suppliers_delete/:code', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('매입처 삭제 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// ==================== 계정과목 API ====================
+
+// 계정과목 리스트 조회
+app.get('/api/accounts', async (req, res) => {
+  try {
+    const { search = '' } = req.query;
+
+    const request = pool.request();
+
+    let query = `
+      SELECT 계정코드, 계정명, 합계시산표연결여부, 적요, 사용구분, 수정일자, 사용자코드
+      FROM 계정과목
+      WHERE 1=1
+    `;
+
+    // 검색어가 있으면 계정명 또는 계정코드로 검색
+    if (search) {
+      request.input('search', sql.NVarChar, `%${search}%`);
+      query += ` AND (계정명 LIKE @search OR 계정코드 LIKE @search)`;
+    }
+
+    query += ` ORDER BY 계정코드`;
+
+    const result = await request.query(query);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error('❌ /api/accounts 오류:', err);
+    res.status(500).json({ success: false, message: '계정과목 조회 실패' });
+  }
+});
+
+// 계정과목 상세 조회
+app.get('/api/accounts/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    const result = await pool
+      .request()
+      .input('계정코드', sql.VarChar(4), code)
+      .query('SELECT * FROM 계정과목 WHERE 계정코드 = @계정코드');
+
+    if (result.recordset.length > 0) {
+      res.json({
+        success: true,
+        data: result.recordset[0],
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: '계정과목을 찾을 수 없습니다.',
+      });
+    }
+  } catch (err) {
+    console.error('계정과목 상세 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 계정과목 신규 등록
+app.post('/api/accounts', requireAuth, async (req, res) => {
+  try {
+    const { 계정코드, 계정명, 합계시산표연결여부, 적요, 사용구분 } = req.body;
+
+    console.log('===== 계정과목 신규 등록 요청 =====');
+    console.log('계정코드:', 계정코드);
+    console.log('계정명:', 계정명);
+
+    // 세션에서 사용자코드 가져오기
+    const 사용자코드 = req.session?.user?.사용자코드;
+    if (!사용자코드) {
+      console.log('❌ 세션에 사용자코드 없음 - 401 반환');
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
+
+    console.log('✅ 세션 인증 성공 - 사용자코드:', 사용자코드);
+
+    // 중복 확인
+    const checkResult = await pool
+      .request()
+      .input('계정코드', sql.VarChar(4), 계정코드)
+      .query('SELECT COUNT(*) as cnt FROM 계정과목 WHERE 계정코드 = @계정코드');
+
+    if (checkResult.recordset[0].cnt > 0) {
+      return res.status(400).json({
+        success: false,
+        message: '이미 존재하는 계정코드입니다.',
+      });
+    }
+
+    // 수정일자 생성 (YYYYMMDD 형식)
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    // 계정과목 등록
+    await pool
+      .request()
+      .input('계정코드', sql.VarChar(4), 계정코드)
+      .input('계정명', sql.VarChar(30), 계정명)
+      .input('합계시산표연결여부', sql.VarChar(1), 합계시산표연결여부 || 'Y')
+      .input('적요', sql.VarChar(60), 적요 || '')
+      .input('사용구분', sql.TinyInt, 사용구분 || 0)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .query(`
+        INSERT INTO 계정과목 (
+          계정코드, 계정명, 합계시산표연결여부, 적요, 사용구분, 수정일자, 사용자코드
+        ) VALUES (
+          @계정코드, @계정명, @합계시산표연결여부, @적요, @사용구분, @수정일자, @사용자코드
+        )
+      `);
+
+    console.log('✅ 계정과목 등록 성공');
+
+    res.json({
+      success: true,
+      message: '계정과목이 등록되었습니다.',
+      data: { 계정코드 },
+    });
+  } catch (err) {
+    console.error('❌ 계정과목 등록 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 계정과목 수정
+app.put('/api/accounts/:code', requireAuth, async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { 계정명, 합계시산표연결여부, 적요, 사용구분 } = req.body;
+
+    console.log('===== 계정과목 수정 요청 =====');
+    console.log('계정코드:', code);
+    console.log('계정명:', 계정명);
+
+    // 세션에서 사용자코드 가져오기
+    const 사용자코드 = req.session?.user?.사용자코드;
+    if (!사용자코드) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
+
+    // 수정일자 생성 (YYYYMMDD 형식)
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    await pool
+      .request()
+      .input('계정코드', sql.VarChar(4), code)
+      .input('계정명', sql.VarChar(30), 계정명)
+      .input('합계시산표연결여부', sql.VarChar(1), 합계시산표연결여부)
+      .input('적요', sql.VarChar(60), 적요 || '')
+      .input('사용구분', sql.TinyInt, 사용구분)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .query(`
+        UPDATE 계정과목 SET
+          계정명 = @계정명,
+          합계시산표연결여부 = @합계시산표연결여부,
+          적요 = @적요,
+          사용구분 = @사용구분,
+          수정일자 = @수정일자,
+          사용자코드 = @사용자코드
+        WHERE 계정코드 = @계정코드
+      `);
+
+    console.log('✅ 계정과목 수정 성공');
+
+    res.json({
+      success: true,
+      message: '계정과목이 수정되었습니다.',
+    });
+  } catch (err) {
+    console.error('❌ 계정과목 수정 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 계정과목 삭제 (사용구분을 9로 변경)
+app.delete('/api/accounts/:code', requireAuth, async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    // 세션에서 사용자코드 가져오기
+    const 사용자코드 = req.session?.user?.사용자코드;
+    if (!사용자코드) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
+
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    await pool
+      .request()
+      .input('계정코드', sql.VarChar(4), code)
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .query(`
+        UPDATE 계정과목 SET
+          사용구분 = 9,
+          사용자코드 = @사용자코드,
+          수정일자 = @수정일자
+        WHERE 계정코드 = @계정코드
+      `);
+
+    res.json({
+      success: true,
+      message: '계정과목이 삭제되었습니다.',
+    });
+  } catch (err) {
+    console.error('계정과목 삭제 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
@@ -4146,6 +4379,260 @@ app.get('/api/transactions/:id', async (req, res) => {
      - 경로: /api/transactions/:date/:no
      - date: YYYYMMDD, no: 입출고번호 (정수 or 실수)
 */
+// ✅ 거래명세서 인쇄용 API (거래명세서A4백지_인쇄 stored procedure 기반)
+app.get('/api/transactions/:date/:no/print', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    console.log('✅ 거래명세서 인쇄 요청:', { date, no, 사업장코드 });
+
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('거래일자', sql.VarChar(8), date)
+      .input('거래번호', sql.Real, parseFloat(no))
+      .query(`
+        SELECT
+          T1.사업장코드, T1.거래일자, T1.거래번호,
+          T1.매출처코드,
+          -- 좌측 (사업장 정보)
+          ISNULL(T4.사업자번호, '') AS 좌등록번호,
+          ISNULL(T4.사업장명, '') AS 좌상호,
+          ISNULL(T4.대표자명, '') AS 좌성명,
+          (ISNULL(T4.주소, '') + SPACE(1) + ISNULL(T4.번지, '')) AS 좌주소,
+          ISNULL(T4.업태, '') AS 좌업태,
+          ISNULL(T4.업종, '') AS 좌종목,
+          -- 우측 (매출처 정보)
+          ISNULL(T3.사업자번호, '') AS 우등록번호,
+          ISNULL(T3.매출처명, '') AS 우상호,
+          ISNULL(T3.대표자명, '') AS 우성명,
+          (ISNULL(T3.주소, '') + SPACE(1) + ISNULL(T3.번지, '')) AS 우주소,
+          ISNULL(T3.업태, '') AS 우업태,
+          ISNULL(T3.업종, '') AS 우종목,
+          -- 총금액 계산 (서브쿼리)
+          (SELECT SUM(출고수량 * 출고단가)
+           FROM 자재입출내역
+           WHERE 사업장코드 = @사업장코드
+             AND 입출고구분 = 2 AND 사용구분 = 0
+             AND 거래일자 = @거래일자
+             AND 거래번호 = @거래번호) AS 총금액,
+          -- 건수 계산 (서브쿼리)
+          (SELECT COUNT(세부코드)
+           FROM 자재입출내역
+           WHERE 사업장코드 = @사업장코드
+             AND 입출고구분 = 2 AND 사용구분 = 0
+             AND 거래일자 = @거래일자
+             AND 거래번호 = @거래번호) AS 건수,
+          -- 상세 품목 정보
+          (T1.분류코드 + T1.세부코드) AS 코드,
+          ISNULL(T2.자재명, '') AS 품명,
+          ISNULL(T2.규격, '') AS 규격,
+          T1.출고수량 AS 수량,
+          ISNULL(T2.단위, '') AS 단위,
+          T1.출고단가 AS 단가,
+          T1.출고부가 AS 부가,
+          (T1.출고단가 * T1.출고수량) AS 출고금액
+        FROM 자재입출내역 T1
+        LEFT JOIN 자재 T2 ON T2.분류코드 = T1.분류코드 AND T2.세부코드 = T1.세부코드
+        LEFT JOIN 매출처 T3 ON T3.매출처코드 = T1.매출처코드
+        LEFT JOIN 사업장 T4 ON T3.사업장코드 = T1.사업장코드
+        WHERE T1.사업장코드 = @사업장코드
+          AND T1.입출고구분 = 2
+          AND T1.사용구분 = 0
+          AND T1.거래일자 = @거래일자
+          AND T1.거래번호 = @거래번호
+        ORDER BY T1.사업장코드, T1.거래일자, T1.거래번호, T1.입출고시간
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '거래명세서를 찾을 수 없습니다.',
+      });
+    }
+
+    // 첫 번째 레코드에서 헤더 정보 추출
+    const firstRecord = result.recordset[0];
+
+    res.json({
+      success: true,
+      data: {
+        header: {
+          사업장코드: firstRecord.사업장코드,
+          거래일자: firstRecord.거래일자,
+          거래번호: firstRecord.거래번호,
+          매출처코드: firstRecord.매출처코드,
+          // 좌측 (회사 정보)
+          좌등록번호: firstRecord.좌등록번호,
+          좌상호: firstRecord.좌상호,
+          좌성명: firstRecord.좌성명,
+          좌주소: firstRecord.좌주소,
+          좌업태: firstRecord.좌업태,
+          좌종목: firstRecord.좌종목,
+          // 우측 (매출처 정보)
+          우등록번호: firstRecord.우등록번호,
+          우상호: firstRecord.우상호,
+          우성명: firstRecord.우성명,
+          우주소: firstRecord.우주소,
+          우업태: firstRecord.우업태,
+          우종목: firstRecord.우종목,
+          // 합계
+          총금액: firstRecord.총금액,
+          건수: firstRecord.건수,
+        },
+        details: result.recordset.map(item => ({
+          코드: item.코드,
+          품명: item.품명,
+          규격: item.규격,
+          수량: item.수량,
+          단위: item.단위,
+          단가: item.단가,
+          부가: item.부가,
+          출고금액: item.출고금액,
+        })),
+      },
+    });
+
+    console.log('✅ 거래명세서 인쇄 데이터 반환:', result.recordset.length, '건');
+  } catch (err) {
+    console.error('❌ 거래명세서 인쇄 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+// 견적서 인쇄 API - 견적서인쇄sp.txt 기반
+app.get('/api/quotations/:date/:no/print', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+    const mode = parseInt(req.query.mode) || 0; // 0=가격숨김, 1=가격표시
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    console.log('✅ 견적서 인쇄 조회 요청:', { date, no, mode, 사업장코드 });
+
+    // 견적서인쇄sp와 동일한 로직
+    const query = mode === 0 ? `
+      SELECT T1.사업장코드, T1.견적일자, T1.견적번호, T1.출고희망일자,
+             T1.매출처코드, T3.매출처명, T3.담당자명 AS 참조, T1.제목 AS 제목, T1.적요 AS 참조란,
+             T2.자재코드, ISNULL(T4.자재명,'') AS 품명,
+             T4.규격 AS 규격, T2.수량 AS 수량, T4.단위 AS 단위,
+             T2.계산서발행여부, 0 AS 출고단가, 0 AS 출고부가, (0 * T2.수량) AS 금액,
+             T2.적요 AS 적요, T1.유효일수 AS 유효일수,
+             DATEDIFF(day, CONVERT(DATETIME, T1.견적일자), CONVERT(DATETIME, T1.출고희망일자)) AS 견적후납기일수,
+             T5.사업장명, T5.사업자번호, T5.대표자명, T5.전화번호, T5.팩스번호, T5.주소, T5.번지,
+             T3.전화번호 AS 매출처전화, T3.팩스번호 AS 매출처팩스, T3.주소 AS 매출처주소, T3.번지 AS 매출처번지
+        FROM 견적 T1
+       INNER JOIN 견적내역 T2
+               ON T2.사업장코드 = T1.사업장코드 AND T2.견적일자 = T1.견적일자 AND T2.견적번호 = T1.견적번호
+        LEFT JOIN 매출처 T3 ON T3.사업장코드 = T2.사업장코드 AND T3.매출처코드 = T2.매출처코드
+        LEFT JOIN 자재 T4 ON (T4.분류코드 + T4.세부코드) = T2.자재코드
+        LEFT JOIN 사업장 T5 ON T5.사업장코드 = T1.사업장코드
+       WHERE T1.사업장코드 = @사업장코드
+         AND T1.견적일자 = @견적일자
+         AND T1.견적번호 = @견적번호
+         AND (T1.상태코드 = 1 OR T1.상태코드 = 2) AND T1.사용구분 = 0
+         AND (T2.상태코드 = 1 OR T2.상태코드 = 2) AND T2.사용구분 = 0
+       ORDER BY T1.사업장코드, T1.견적일자, T1.견적번호, T2.견적시간
+    ` : `
+      SELECT T1.사업장코드, T1.견적일자, T1.견적번호, T1.출고희망일자,
+             T1.매출처코드, T3.매출처명, T3.담당자명 AS 참조, T1.제목 AS 제목, T1.적요 AS 참조란,
+             T2.자재코드, ISNULL(T4.자재명,'') AS 품명,
+             T4.규격 AS 규격, T2.수량 AS 수량, T4.단위 AS 단위,
+             T2.계산서발행여부, T2.출고단가 AS 출고단가, T2.출고부가 AS 출고부가, (T2.출고단가 * T2.수량) AS 금액,
+             T2.적요 AS 적요, T1.유효일수 AS 유효일수,
+             DATEDIFF(day, CONVERT(DATETIME, T1.견적일자), CONVERT(DATETIME, T1.출고희망일자)) AS 견적후납기일수,
+             T5.사업장명, T5.사업자번호, T5.대표자명, T5.전화번호, T5.팩스번호, T5.주소, T5.번지,
+             T3.전화번호 AS 매출처전화, T3.팩스번호 AS 매출처팩스, T3.주소 AS 매출처주소, T3.번지 AS 매출처번지
+        FROM 견적 T1
+       INNER JOIN 견적내역 T2
+               ON T2.사업장코드 = T1.사업장코드 AND T2.견적일자 = T1.견적일자 AND T2.견적번호 = T1.견적번호
+        LEFT JOIN 매출처 T3 ON T3.사업장코드 = T2.사업장코드 AND T3.매출처코드 = T2.매출처코드
+        LEFT JOIN 자재 T4 ON (T4.분류코드 + T4.세부코드) = T2.자재코드
+        LEFT JOIN 사업장 T5 ON T5.사업장코드 = T1.사업장코드
+       WHERE T1.사업장코드 = @사업장코드
+         AND T1.견적일자 = @견적일자
+         AND T1.견적번호 = @견적번호
+         AND (T1.상태코드 = 1 OR T1.상태코드 = 2) AND T1.사용구분 = 0
+         AND (T2.상태코드 = 1 OR T2.상태코드 = 2) AND T2.사용구분 = 0
+        ORDER BY T1.사업장코드, T1.견적일자, T1.견적번호, T2.견적시간
+    `;
+
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('견적일자', sql.VarChar(8), date)
+      .input('견적번호', sql.Real, parseFloat(no))
+      .query(query);
+
+    if (result.recordset.length === 0) {
+      return res.json({
+        success: false,
+        message: '견적서를 찾을 수 없습니다.',
+      });
+    }
+
+    const firstRow = result.recordset[0];
+
+    // 품목별 합계 계산
+    const items = result.recordset.map((row) => ({
+      품명: row.품명 || '',
+      규격: row.규격 || '',
+      수량: row.수량 || 0,
+      단위: row.단위 || '',
+      단가: row.출고단가 || 0,
+      부가: row.출고부가 || 0,
+      금액: row.금액 || 0,
+      적요: row.적요 || '',
+    }));
+
+    const 총공급가액 = items.reduce((sum, item) => sum + (item.금액 || 0), 0);
+    const 총부가세 = items.reduce((sum, item) => sum + (item.부가 || 0), 0);
+    const 총합계 = 총공급가액 + 총부가세;
+
+    res.json({
+      success: true,
+      data: {
+        header: {
+          사업장명: firstRow.사업장명 || '',
+          사업자번호: firstRow.사업자번호 || '',
+          대표자명: firstRow.대표자명 || '',
+          전화번호: firstRow.전화번호 || '',
+          팩스번호: firstRow.팩스번호 || '',
+          주소: (firstRow.주소 || '') + ' ' + (firstRow.번지 || ''),
+          견적일자: firstRow.견적일자 || '',
+          견적번호: firstRow.견적번호 || '',
+          출고희망일자: firstRow.출고희망일자 || '',
+          매출처코드: firstRow.매출처코드 || '',
+          매출처명: firstRow.매출처명 || '',
+          매출처전화: firstRow.매출처전화 || '',
+          매출처팩스: firstRow.매출처팩스 || '',
+          매출처주소: (firstRow.매출처주소 || '') + ' ' + (firstRow.매출처번지 || ''),
+          담당자명: firstRow.참조 || '',
+          제목: firstRow.제목 || '',
+          적요: firstRow.참조란 || '',
+          유효일수: firstRow.유효일수 || 0,
+          납기일수: firstRow.견적후납기일수 || 0,
+          총공급가액: 총공급가액,
+          총부가세: 총부가세,
+          총합계: 총합계,
+        },
+        items: items,
+      },
+    });
+
+    console.log('✅ 견적서 인쇄 데이터 반환:', result.recordset.length, '건');
+  } catch (err) {
+    console.error('❌ 견적서 인쇄 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
 app.get('/api/transactions/:date/:no', async (req, res) => {
   try {
     const { date, no } = req.params;
@@ -4639,6 +5126,117 @@ app.put('/api/transactions/:date/:no/approve', requireAuth, async (req, res) => 
 // ================================
 // 세금계산서관리 API (Tax Invoices)
 // ================================
+
+// 세금계산서 인쇄 API - 세금계산서A4인쇄sp.txt 기반
+app.get('/api/tax-invoices/:작성년도/:책번호/:일련번호/print', async (req, res) => {
+  try {
+    const { 작성년도, 책번호, 일련번호 } = req.params;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    console.log('✅ 세금계산서 인쇄 조회 요청:', { 사업장코드, 작성년도, 책번호, 일련번호 });
+
+    // 세금계산서A4백지_인쇄 SP 로직 (@ParintJangGbn = 0 - 세금계산서 테이블 조회)
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성년도', sql.VarChar(4), 작성년도)
+      .input('책번호', sql.Real, parseFloat(책번호))
+      .input('일련번호', sql.Real, parseFloat(일련번호))
+      .query(`
+        SELECT T1.사업장코드, T1.작성년도, T1.책번호, T1.일련번호,
+               T1.매출처코드,
+               ISNULL(T3.사업자번호, '') AS 좌등록번호,
+               ISNULL(T3.사업장명, '') AS 좌상호법인명,
+               ISNULL(T3.대표자명, '') AS 좌성명,
+               (ISNULL(T3.주소, '') + SPACE(1) + ISNULL(T3.번지, '')) AS 좌사업장주소,
+               ISNULL(T3.업태, '') AS 좌업태,
+               ISNULL(T3.업종, '') AS 좌종목,
+               ISNULL(T3.전화번호, '') AS 좌전화번호,
+               ISNULL(T3.팩스번호, '') AS 좌팩스번호,
+               ISNULL(T2.사업자번호, '') AS 우등록번호,
+               ISNULL(T2.매출처명, '') AS 우상호법인명,
+               ISNULL(T2.대표자명, '') AS 우성명,
+               (ISNULL(T2.주소, '') + SPACE(1) + ISNULL(T2.번지, '')) AS 우사업장주소,
+               ISNULL(T2.업태, '') AS 우업태,
+               ISNULL(T2.업종, '') AS 우종목,
+               ISNULL(T2.전화번호, '') AS 우전화번호,
+               ISNULL(T2.팩스번호, '') AS 우팩스번호,
+               T1.작성일자,
+               T1.공급가액,
+               T1.세액,
+               T1.품목및규격,
+               T1.수량,
+               T1.금액구분,
+               T1.영청구분,
+               T1.미수구분
+          FROM 세금계산서 T1
+          LEFT JOIN 매출처 T2 ON T2.매출처코드 = T1.매출처코드 AND T2.사업장코드 = T1.사업장코드
+          LEFT JOIN 사업장 T3 ON T3.사업장코드 = T1.사업장코드
+         WHERE T1.사업장코드 = @사업장코드
+           AND T1.작성년도 = @작성년도
+           AND T1.책번호 = @책번호
+           AND T1.일련번호 = @일련번호
+           AND T1.사용구분 = 0
+         ORDER BY T1.사업장코드, T1.작성년도, T1.책번호, T1.일련번호
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.json({
+        success: false,
+        message: '세금계산서를 찾을 수 없습니다.',
+      });
+    }
+
+    const data = result.recordset[0];
+
+    res.json({
+      success: true,
+      data: {
+        header: {
+          // 좌측 (공급자 - 사업장)
+          좌등록번호: data.좌등록번호,
+          좌상호법인명: data.좌상호법인명,
+          좌성명: data.좌성명,
+          좌사업장주소: data.좌사업장주소,
+          좌업태: data.좌업태,
+          좌종목: data.좌종목,
+          좌전화번호: data.좌전화번호,
+          좌팩스번호: data.좌팩스번호,
+          // 우측 (공급받는자 - 매출처)
+          우등록번호: data.우등록번호,
+          우상호법인명: data.우상호법인명,
+          우성명: data.우성명,
+          우사업장주소: data.우사업장주소,
+          우업태: data.우업태,
+          우종목: data.우종목,
+          우전화번호: data.우전화번호,
+          우팩스번호: data.우팩스번호,
+          // 세금계산서 정보
+          작성년도: data.작성년도,
+          책번호: data.책번호,
+          일련번호: data.일련번호,
+          작성일자: data.작성일자,
+          품목및규격: data.품목및규격,
+          수량: data.수량,
+          공급가액: data.공급가액,
+          세액: data.세액,
+          합계금액: (data.공급가액 || 0) + (data.세액 || 0),
+          금액구분: data.금액구분,
+          영청구분: data.영청구분,
+          미수구분: data.미수구분,
+        },
+      },
+    });
+
+    console.log('✅ 세금계산서 인쇄 데이터 반환');
+  } catch (err) {
+    console.error('❌ 세금계산서 인쇄 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
 
 // ✅ 세금계산서 목록 조회
 app.get('/api/tax-invoices', async (req, res) => {

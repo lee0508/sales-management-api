@@ -58,11 +58,12 @@ function formatPhoneNumber(num) {
 // ===========================
 
 /**
- * 견적서 프린트 함수
+ * 견적서 프린트 함수 (구버전 - 사용 안 함, quotation.js의 새 버전 사용)
  * @param {string} 견적일자 - YYYYMMDD 형식
  * @param {number} 견적번호 - 견적 번호
+ * @deprecated - Use printQuotation from quotation.js instead
  */
-async function printQuotation(견적일자, 견적번호) {
+async function printQuotation_OLD_DEPRECATED(견적일자, 견적번호) {
   try {
     // API에서 견적서 데이터 가져오기
     const response = await fetch(`/api/quotations/${견적일자}/${견적번호}`);
@@ -991,7 +992,7 @@ function executePrint() {
 }
 
 // Window 전역 함수로 export
-window.printQuotation = printQuotation;
+// window.printQuotation = printQuotation; // ❌ 주석 처리 - quotation.js의 새 인쇄 함수 사용
 window.printOrder = printOrder;
 window.printTransaction = printTransaction;
 window.printPurchaseStatement = printPurchaseStatement;

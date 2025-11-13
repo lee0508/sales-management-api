@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>회계관리 - 계정과목 및 현금출납 관리</title>
+    <style>
+      body {
+        font-family: 'Noto Sans KR', sans-serif;
+        margin: 20px;
+        background-color: #f5f6fa;
+      }
+      h2,
+      h3 {
+        color: #333;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        background: #fff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px 12px;
+        text-align: center;
+      }
+      th {
+        background-color: #4a69bd;
+        color: #fff;
+      }
+      input,
+      select,
+      button {
+        padding: 6px 10px;
+        margin: 4px;
+      }
+      button {
+        cursor: pointer;
+        background: #4a69bd;
+        color: white;
+        border: none;
+        border-radius: 4px;
+      }
+      button:hover {
+        background: #1e3799;
+      }
+      .form-section,
+      .toolbar {
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      .summary {
+        font-weight: bold;
+        background: #fff;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-around;
+        width: 60%;
+      }
+      .toolbar label {
+        margin-right: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- <h2>계정과목 목록</h2>
+    <table id="accountTable">
+      <thead>
+        <tr>
+          <th>계정코드</th>
+          <th>계정명</th>
+          <th>합계시산표연결</th>
+          <th>적요</th>
+          <th>사용구분</th>
+          <th>수정일자</th>
+          <th>사용자코드</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table> -->
+
+    <h2>현금출납 관리</h2>
+    <!-- <div class="form-section">
+      <label>일자: <input type="date" id="date" /></label>
+      <label
+        >계정과목:
+        <select id="accountSelect"></select>
+      </label>
+      <label
+        >수입/지출:
+        <select id="type">
+          <option value="in">수입</option>
+          <option value="out">지출</option>
+        </select>
+      </label>
+      <label>금액: <input type="number" id="amount" placeholder="금액 입력" /></label>
+      <label>적요: <input type="text" id="desc" placeholder="내용 입력" /></label>
+      <button onclick="addTransaction()">등록</button>
+    </div> -->
+
+    <!-- 🔍 검색 툴바 -->
+    <div class="toolbar">
+      <label
+        >계정과목:
+        <select id="filterAccount">
+          <option value="">전체</option>
+        </select>
+      </label>
+      <label>시작일: <input type="date" id="filterStart" /></label>
+      <label>종료일: <input type="date" id="filterEnd" /></label>
+      <button onclick="filterTransactions()">검색</button>
+      <button onclick="resetFilter()">전체보기</button>
+      <button onclick="addTransaction()">등록</button>
+    </div>
+
+    <h3>현금출납 내역</h3>
+    <table id="cashTable">
+      <thead>
+        <tr>
+          <th>일자</th>
+          <th>계정과목</th>
+          <th>차대구분</th>
+          <th>구분</th>
+          <th>금액</th>
+          <th>적요</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <!-- 합계 표시 -->
+    <div class="summary">
+      <span>수입 합계: <span id="incomeTotal">0</span> 원</span>
+      <span>지출 합계: <span id="expenseTotal">0</span> 원</span>
+      <span>잔액: <span id="balanceTotal">0</span> 원</span>
+    </div>
+
+    <script>
+      // 계정과목 샘플 데이터
+      const accounts = [
+        {
+          code: '1000',
+          name: '현금',
+          connect: 'Y',
+          note: '현금 자산 계정',
+          use: 0,
+          date: '20251112',
+          user: 'A001',
+        },
+        {
+          code: '1100',
+          name: '보통예금',
+          connect: 'Y',
+          note: '기업은행 예금 계정',
+          use: 0,
+          date: '20251112',
+          user: 'A001',
+        },
+        {
+          code: '1200',
+          name: '매출채권',
+          connect: 'Y',
+          note: '외상 매출 관련',
+          use: 0,
+          date: '20251112',
+          user: 'A001',
+        },
+        {
+          code: '2000',
+          name: '매입채무',
+          connect: 'Y',
+          note: '외상 매입 관련',
+          use: 0,
+          date: '20251112',
+          user: 'A001',
+        },
+        {
+          code: '2100',
+          name: '미지급금',
+          connect: 'N',
+          note: '기타 미지급금',
+          use: 0,
+          date: '20251112',
+          user: 'A001',
+        },
+        {
+          code: '3000',
+          name: '자본금',
+          connect: 'Y',
+          note: '자본금 계정',
+          use: 0,
+          date: '20251112',
+          user: 'A001',
+        },
+      ];
+
+      // 초기 계정 목록 표시
+      const accountTableBody = document.querySelector('#accountTable tbody');
+      const accountSelect = document.querySelector('#accountSelect');
+      const filterAccount = document.querySelector('#filterAccount');
+
+      accounts.forEach((acc) => {
+        const row = `<tr>
+        <td>${acc.code}</td>
+        <td>${acc.name}</td>
+        <td>${acc.connect}</td>
+        <td>${acc.note}</td>
+        <td>${acc.use}</td>
+        <td>${acc.date}</td>
+        <td>${acc.user}</td>
+      </tr>`;
+        accountTableBody.insertAdjacentHTML('beforeend', row);
+        accountSelect.insertAdjacentHTML(
+          'beforeend',
+          `<option value="${acc.name}">${acc.name}</option>`,
+        );
+        filterAccount.insertAdjacentHTML(
+          'beforeend',
+          `<option value="${acc.name}">${acc.name}</option>`,
+        );
+      });
+
+      // 출납 데이터 배열
+      let transactions = [];
+      let incomeTotal = 0;
+      let expenseTotal = 0;
+
+      function addTransaction() {
+        const date = document.getElementById('date').value;
+        const accountName = document.getElementById('accountSelect').value;
+        const account = accounts.find((a) => a.name === accountName);
+        const dc = account ? (account.dc === 'D' ? '차변' : '대변') : '-';
+        const type = document.getElementById('type').value;
+        const amount = parseInt(document.getElementById('amount').value);
+        const desc = document.getElementById('desc').value;
+
+        if (!date || !amount) {
+          alert('일자와 금액은 필수 입력입니다.');
+          return;
+        }
+
+        const row = `<tr>
+          <td>${date}</td>
+          <td>${accountName}</td>
+          <td>${dc}</td> <!-- ✅ 차대 표시 -->
+          <td>${type === 'in' ? '수입' : '지출'}</td>
+          <td>${amount.toLocaleString()}</td>
+          <td>${desc}</td>
+        </tr>`;
+        document.querySelector('#cashTable tbody').insertAdjacentHTML('beforeend', row);
+      }
+
+      // 테이블 표시
+      function renderTable(data) {
+        const cashTableBody = document.querySelector('#cashTable tbody');
+        cashTableBody.innerHTML = '';
+
+        data.forEach((tr) => {
+          const row = `<tr>
+          <td>${tr.date}</td>
+          <td>${tr.account}</td>
+          <td>${tr.type === 'in' ? '수입' : '지출'}</td>
+          <td>${tr.amount.toLocaleString()}</td>
+          <td>${tr.desc}</td>
+        </tr>`;
+          cashTableBody.insertAdjacentHTML('beforeend', row);
+        });
+      }
+
+      // 합계 갱신
+      function updateTotals(data = transactions) {
+        incomeTotal = 0;
+        expenseTotal = 0;
+
+        data.forEach((tr) => {
+          if (tr.type === 'in') incomeTotal += tr.amount;
+          else expenseTotal += tr.amount;
+        });
+
+        const balance = incomeTotal - expenseTotal;
+        document.getElementById('incomeTotal').innerText = incomeTotal.toLocaleString();
+        document.getElementById('expenseTotal').innerText = expenseTotal.toLocaleString();
+        document.getElementById('balanceTotal').innerText = balance.toLocaleString();
+      }
+
+      // 🔍 검색 필터 기능
+      function filterTransactions() {
+        const accountFilter = document.getElementById('filterAccount').value;
+        const start = document.getElementById('filterStart').value;
+        const end = document.getElementById('filterEnd').value;
+
+        let filtered = transactions;
+
+        if (accountFilter) {
+          filtered = filtered.filter((tr) => tr.account === accountFilter);
+        }
+
+        if (start) {
+          filtered = filtered.filter((tr) => tr.date >= start);
+        }
+        if (end) {
+          filtered = filtered.filter((tr) => tr.date <= end);
+        }
+
+        renderTable(filtered);
+        updateTotals(filtered);
+      }
+
+      // 전체보기
+      function resetFilter() {
+        document.getElementById('filterAccount').value = '';
+        document.getElementById('filterStart').value = '';
+        document.getElementById('filterEnd').value = '';
+        renderTable(transactions);
+        updateTotals();
+      }
+    </script>
+  </body>
+</html>

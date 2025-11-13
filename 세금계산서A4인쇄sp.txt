@@ -1,0 +1,53 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp세금계산서A4백지_인쇄]    Script Date: 11/13/2025 11:05:49 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER OFF
+GO
+
+ALTER PROCEDURE [dbo].[sp세금계산서A4백지_인쇄] 
+      (@ParstrBranchCode VarChar(02) = '01', @ParstrMakeYear VarChar(04) = '', @ParlngLogCnt1 Real = 0, @ParlngLogCnt2 Real = 0, 
+       @ParintJangGbn Int = 0, @ParstrMakeDate VarChar(08) = '', @ParstrMakeTime VarChar(12) = '', @ParstrSupplierCode VarChar(08) = '')
+AS
+
+  IF @ParintJangGbn = 1
+     BEGIN 
+       SELECT T1.사업장코드 AS 사업장코드, T1.작성년도 AS 작성년도, T1.책번호 AS 책번호, T1.일련번호 AS 일련번호,
+              T1.매출처코드 AS 매출처코드, 
+              ISNULL(T3.사업자번호, '') AS 좌등록번호, ISNULL(T3.사업장명, '') AS 좌상호법인명,
+              ISNULL(T3.대표자명, '') AS 좌성명, (ISNULL(T3.주소, '') + SPACE(1) + ISNULL(T3.번지, '')) AS 좌사업장주소, 
+              ISNULL(T3.업태, '') AS 좌업태, ISNULL(T3.업종, '') AS 좌종목, 
+              ISNULL(T2.사업자번호, '') AS 우등록번호, ISNULL(T2.매출처명, '') AS 우상호법인명, 
+              ISNULL(T2.대표자명, '') AS 우성명, (ISNULL(T2.주소, '') + SPACE(1) + ISNULL(T2.번지, '')) AS 우사업장주소, 
+              ISNULL(T2.업태, '') AS 우업태, ISNULL(T2.업종, '') AS 우종목, 
+              T1.작성일자 AS 작성일자, T1.공급가액 AS 공급가액, T1.세액 AS 세액, T1.품목및규격 AS 품목및규격, T1.수량 AS 수량, 
+              T1.금액구분 AS 금액구분, T1.영청구분 AS 영청구분, T1.미수구분 AS 미수구분 
+         FROM 매출세금계산서장부 T1 
+         LEFT JOIN 매출처 T2 ON T2.매출처코드 = T1.매출처코드 
+         LEFT JOIN 사업장 T3 ON T3.사업장코드 = T1.사업장코드
+        WHERE T1.사업장코드 = @ParstrBranchCode AND T1.작성일자 = @ParstrMakeDate
+          AND T1.작성시간 = @ParstrMakeTime AND T1.매출처코드 = @ParstrSupplierCode
+          AND T1.사용구분 = 0
+        ORDER BY T1.사업장코드, T1.작성일자, T1.작성시간, T1.매출처코드
+     END
+  ELSE
+     BEGIN 
+       SELECT T1.사업장코드 AS 사업장코드, T1.작성년도 AS 작성년도, T1.책번호 AS 책번호, T1.일련번호 AS 일련번호, 
+              T1.매출처코드 AS 매출처코드, 
+              ISNULL(T3.사업자번호, '') AS 좌등록번호, ISNULL(T3.사업장명, '') AS 좌상호법인명,
+              ISNULL(T3.대표자명, '') AS 좌성명, (ISNULL(T3.주소, '') + SPACE(1) + ISNULL(T3.번지, '')) AS 좌사업장주소, 
+              ISNULL(T3.업태, '') AS 좌업태, ISNULL(T3.업종, '') AS 좌종목, 
+              ISNULL(T2.사업자번호, '') AS 우등록번호, ISNULL(T2.매출처명, '') AS 우상호법인명, 
+              ISNULL(T2.대표자명, '') AS 우성명, (ISNULL(T2.주소, '') + SPACE(1) + ISNULL(T2.번지, '')) AS 우사업장주소, 
+              ISNULL(T2.업태, '') AS 우업태, ISNULL(T2.업종, '') AS 우종목, 
+              T1.작성일자 AS 작성일자, T1.공급가액 AS 공급가액, T1.세액 AS 세액, T1.품목및규격 AS 품목및규격, T1.수량 AS 수량, 
+              T1.금액구분 AS 금액구분, T1.영청구분 AS 영청구분, T1.미수구분 AS 미수구분 
+         FROM 세금계산서 T1 
+         LEFT JOIN 매출처 T2 ON T2.매출처코드 = T1.매출처코드 
+         LEFT JOIN 사업장 T3 ON T3.사업장코드 = T1.사업장코드
+        WHERE T1.사업장코드 = @ParstrBranchCode AND T1.작성년도 = @ParstrMakeYear
+          AND T1.책번호 = @ParlngLogCnt1 AND T1.일련번호 = @ParlngLogCnt2 AND T1.사용구분 = 0 
+        ORDER BY T1.사업장코드, T1.작성년도, T1.책번호, T1.일련번호
+     END
+
