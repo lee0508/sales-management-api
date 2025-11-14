@@ -2074,6 +2074,17 @@ async function printTransaction(거래일자, 거래번호) {
       margin-bottom: 4px;
     }
 
+    /* 두 개의 필드를 같은 라인에 표시 */
+    .info-row-dual {
+      display: flex;
+      margin-bottom: 4px;
+    }
+
+    .info-row-dual .info-group {
+      display: flex;
+      flex: 1;
+    }
+
     .info-label {
       width: 80px;
       font-weight: 600;
@@ -2083,6 +2094,18 @@ async function printTransaction(거래일자, 거래번호) {
     .info-value {
       flex: 1;
       color: #000;
+    }
+
+    .info-row-dual .info-label {
+      width: 80px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .info-row-dual .info-value {
+      flex: 1;
+      color: #000;
+      margin-right: 2mm;
     }
 
     /* 품목 테이블 */
@@ -2194,25 +2217,29 @@ async function printTransaction(거래일자, 거래번호) {
           <div class="info-label">사업자번호</div>
           <div class="info-value">${header.좌등록번호 || '-'}</div>
         </div>
-        <div class="info-row">
-          <div class="info-label">상호</div>
-          <div class="info-value">${header.좌상호 || '-'}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">대표자명</div>
-          <div class="info-value">${header.좌성명 || '-'}</div>
+        <div class="info-row-dual">
+          <div class="info-group">
+            <div class="info-label">상호</div>
+            <div class="info-value">${header.좌상호 || '-'}</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">대표자명</div>
+            <div class="info-value">${header.좌성명 || '-'}</div>
+          </div>
         </div>
         <div class="info-row">
           <div class="info-label">주소</div>
           <div class="info-value">${header.좌주소 || '-'}</div>
         </div>
-        <div class="info-row">
-          <div class="info-label">업태</div>
-          <div class="info-value">${header.좌업태 || '-'}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">종목</div>
-          <div class="info-value">${header.좌종목 || '-'}</div>
+        <div class="info-row-dual">
+          <div class="info-group">
+            <div class="info-label">업태</div>
+            <div class="info-value">${header.좌업태 || '-'}</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">종목</div>
+            <div class="info-value">${header.좌종목 || '-'}</div>
+          </div>
         </div>
       </div>
 
@@ -2223,25 +2250,29 @@ async function printTransaction(거래일자, 거래번호) {
           <div class="info-label">사업자번호</div>
           <div class="info-value">${header.우등록번호 || '-'}</div>
         </div>
-        <div class="info-row">
-          <div class="info-label">상호</div>
-          <div class="info-value">${header.우상호 || '-'}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">대표자명</div>
-          <div class="info-value">${header.우성명 || '-'}</div>
+        <div class="info-row-dual">
+          <div class="info-group">
+            <div class="info-label">상호</div>
+            <div class="info-value">${header.우상호 || '-'}</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">대표자명</div>
+            <div class="info-value">${header.우성명 || '-'}</div>
+          </div>
         </div>
         <div class="info-row">
           <div class="info-label">주소</div>
           <div class="info-value">${header.우주소 || '-'}</div>
         </div>
-        <div class="info-row">
-          <div class="info-label">업태</div>
-          <div class="info-value">${header.우업태 || '-'}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">종목</div>
-          <div class="info-value">${header.우종목 || '-'}</div>
+        <div class="info-row-dual">
+          <div class="info-group">
+            <div class="info-label">업태</div>
+            <div class="info-value">${header.우업태 || '-'}</div>
+          </div>
+          <div class="info-group">
+            <div class="info-label">종목</div>
+            <div class="info-value">${header.우종목 || '-'}</div>
+          </div>
         </div>
       </div>
     </div>

@@ -2901,6 +2901,47 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
       return dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
     };
 
+    // 숫자를 한자로 변환하는 함수
+    const numberToKoreanHanja = (num) => {
+      // 입력값 검증 및 변환
+      if (num === undefined || num === null || num === '' || isNaN(num)) {
+        return '零';
+      }
+
+      // 숫자로 변환
+      const numValue = typeof num === 'string' ? parseInt(num) : num;
+
+      if (numValue === 0 || isNaN(numValue)) {
+        return '零';
+      }
+
+      const digits = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+      const units = ['', '十', '百', '千'];
+      const bigUnits = ['', '萬', '億', '兆'];
+
+      let result = '';
+      let unitIndex = 0;
+
+      const numStr = numValue.toString();
+      const len = numStr.length;
+
+      for (let i = 0; i < len; i++) {
+        const digit = parseInt(numStr[len - 1 - i]);
+        const unit = units[i % 4];
+
+        if (digit !== 0) {
+          result = digits[digit] + unit + result;
+        }
+
+        if ((i + 1) % 4 === 0 && i !== len - 1) {
+          result = bigUnits[unitIndex + 1] + result;
+          unitIndex++;
+        }
+      }
+
+      return result || '零';
+    };
+
     // HTML 생성
     const html = `
       <!DOCTYPE html>
@@ -3007,20 +3048,54 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
             font-size: 9pt;
           }
 
+          /* 페이지 분할 시 테이블 헤더 반복 */
+          thead {
+            display: table-header-group;
+          }
+
+          tbody {
+            display: table-row-group;
+          }
+
           th {
             background-color: #f0f0f0;
-            border: 1px solid #333;
+            border: none;
             padding: 2mm 1mm;
             text-align: center;
             font-weight: bold;
             font-size: 9pt;
           }
 
+          /* 페이지 넘김 시 헤더 다시 출력 */
+          @media print {
+            thead {
+              display: table-header-group;
+            }
+
+            tr {
+              page-break-inside: avoid;
+            }
+
+            .quotation-info {
+              page-break-after: auto;
+            }
+
+            .total-section {
+              page-break-before: avoid;
+            }
+
+            .notes {
+              page-break-before: avoid;
+            }
+          }
+
           td {
-            border: 1px solid #333;
+            border: none;
+            border-bottom: 1px solid #333;
             padding: 1.5mm 1mm;
             text-align: center;
             font-size: 8.5pt;
+            min-height: 15mm;
           }
 
           td.left {
@@ -3031,6 +3106,23 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
           td.right {
             text-align: right;
             padding-right: 2mm;
+          }
+
+          /* 견적금액 표시 행 */
+          .amount-row {
+            display: flex;
+            margin-bottom: 1.5mm;
+            font-size: 10pt;
+            font-weight: bold;
+          }
+
+          .amount-row .info-label {
+            width: 90px;
+          }
+
+          .amount-hanja {
+            color: #000;
+            font-size: 11pt;
           }
 
           /* 합계 섹션 */
@@ -3092,64 +3184,20 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
           <!-- 제목 -->
           <div class="title">견 적 서</div>
 
-          <!-- 정보 박스 -->
+          <!-- 정보 박스 (주석 처리)
           <div class="info-container">
-            <!-- 공급자 정보 -->
             <div class="info-box">
               <div class="info-box-title">공급자 정보</div>
-              <div class="info-row">
-                <span class="info-label">상호:</span>
-                <span class="info-value">${header.사업장명}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">대표자:</span>
-                <span class="info-value">${header.대표자명}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">사업자번호:</span>
-                <span class="info-value">${header.사업자번호}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">전화:</span>
-                <span class="info-value">${header.전화번호}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">팩스:</span>
-                <span class="info-value">${header.팩스번호}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">주소:</span>
-                <span class="info-value">${header.주소}</span>
-              </div>
+              ...
             </div>
-
-            <!-- 고객 정보 -->
             <div class="info-box">
               <div class="info-box-title">고객 정보</div>
-              <div class="info-row">
-                <span class="info-label">상호:</span>
-                <span class="info-value">${header.매출처명}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">담당자:</span>
-                <span class="info-value">${header.담당자명}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">전화:</span>
-                <span class="info-value">${header.매출처전화}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">팩스:</span>
-                <span class="info-value">${header.매출처팩스}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">주소:</span>
-                <span class="info-value">${header.매출처주소}</span>
-              </div>
+              ...
             </div>
           </div>
+          -->
 
-          <!-- 견적 정보 -->
+          <!-- 견적 정보 (공급자 위치로 이동) -->
           <div class="quotation-info">
             <div class="quotation-info-row">
               <span class="info-label">견적번호:</span>
@@ -3160,16 +3208,24 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
               <span class="info-value">${formatDate(header.견적일자)}</span>
             </div>
             <div class="quotation-info-row">
+              <span class="info-label">수신:</span>
+              <span class="info-value">${header.매출처명}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">담당자:</span>
+              <span class="info-value">${header.담당자명}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">전화번호:</span>
+              <span class="info-value">${header.매출처전화}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">팩스번호:</span>
+              <span class="info-value">${header.매출처팩스}</span>
+            </div>
+            <div class="quotation-info-row">
               <span class="info-label">출고희망일:</span>
               <span class="info-value">${formatDate(header.출고희망일자)}</span>
-            </div>
-            <div class="quotation-info-row">
-              <span class="info-label">납기일수:</span>
-              <span class="info-value">${header.납기일수}일</span>
-            </div>
-            <div class="quotation-info-row">
-              <span class="info-label">유효일수:</span>
-              <span class="info-value">${header.유효일수}일</span>
             </div>
             <div class="quotation-info-row">
               <span class="info-label">제목:</span>
@@ -3179,6 +3235,10 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
               <span class="info-label">적요:</span>
               <span class="info-value">${header.적요}</span>
             </div>
+            <div class="amount-row">
+              <span class="info-label">견적금액:</span>
+              <span class="amount-hanja">${numberToKoreanHanja(header.총합계)} (${header.총합계.toLocaleString()} 원)</span>
+            </div>
           </div>
 
           <!-- 품목 테이블 -->
@@ -3186,14 +3246,14 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
             <thead>
               <tr>
                 <th style="width: 5%;">No</th>
-                <th style="width: 25%;">품명</th>
-                <th style="width: 25%;">규격</th>
-                <th style="width: 8%;">수량</th>
-                <th style="width: 7%;">단위</th>
-                ${mode === 1 ? '<th style="width: 12%;">단가</th>' : ''}
-                ${mode === 1 ? '<th style="width: 12%;">부가세</th>' : ''}
-                ${mode === 1 ? '<th style="width: 15%;">금액</th>' : ''}
-                ${mode === 0 ? '<th style="width: 30%;">비고</th>' : '<th style="width: 15%;">비고</th>'}
+                <th style="width: 20%;">품명</th>
+                <th style="width: 20%;">규격</th>
+                <th style="width: 7%;">수량</th>
+                <th style="width: 6%;">단위</th>
+                ${mode === 1 ? '<th style="width: 10%;">단가</th>' : ''}
+                ${mode === 1 ? '<th style="width: 10%;">부가세</th>' : ''}
+                ${mode === 1 ? '<th style="width: 12%;">금액</th>' : ''}
+                ${mode === 0 ? '<th style="width: 42%;">비고</th>' : '<th style="width: 20%;">비고</th>'}
               </tr>
             </thead>
             <tbody>

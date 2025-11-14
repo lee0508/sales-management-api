@@ -512,19 +512,13 @@ function generateOrderPrintHTML(data, mode = 1) {
         <div class="print-info-row">
           <span class="print-info-label" style="width: 90px; font-weight: bold;">적요:</span>
           <span class="print-info-value">${master.적요 || ''}</span>
-        </div>
-        ${
-          mode === 1
-            ? `
+        </div>        
         <div class="print-info-row" style="margin-bottom: 1.5mm; font-size: 10pt; font-weight: bold;">
           <span class="print-info-label" style="width: 90px;">발주금액:</span>
           <span style="color: #000; font-size: 11pt;">${numberToKoreanHanja(
             합계금액,
           )} (${formatCurrency(합계금액)})</span>
         </div>
-        `
-            : ''
-        }
       </div>
 
       <table class="print-table">

@@ -1625,11 +1625,17 @@ input[type='checkbox'] {
 
 .print-table thead {
   background-color: #f5f5f5;
+  display: table-header-group; /* 페이지 넘김 시 헤더 반복 */
+}
+
+.print-table tbody {
+  display: table-row-group;
 }
 
 .print-table th,
 .print-table td {
-  border: 1px solid #000;
+  border: none;
+  border-bottom: 1px solid #000;
   padding: 8px 6px;
   text-align: center;
 }
@@ -1650,6 +1656,29 @@ input[type='checkbox'] {
 .print-table tfoot td {
   font-weight: bold;
   background-color: #f9f9f9;
+}
+
+/* 페이지 분할 처리 */
+@media print {
+  .print-table thead {
+    display: table-header-group; /* 각 페이지마다 헤더 출력 */
+  }
+
+  .print-table tr {
+    page-break-inside: avoid; /* 행이 페이지 경계에서 분할되지 않도록 */
+  }
+
+  .print-info-section {
+    page-break-after: auto; /* 정보 섹션 이후 자동 페이지 분할 */
+  }
+
+  .print-total-section {
+    page-break-before: avoid; /* 합계 섹션은 앞 내용과 함께 유지 */
+  }
+
+  .print-footer {
+    page-break-before: avoid; /* 하단 참고사항은 앞 내용과 함께 유지 */
+  }
 }
 
 /* 금액 표시 */

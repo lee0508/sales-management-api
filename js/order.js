@@ -350,10 +350,10 @@ async function viewOrderDetail(orderDate, orderNo) {
                   ).toLocaleString()}</td>
                   <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${(
                     item.입고단가 || 0
-                  ).toLocaleString()}원</td>
+                  ).toLocaleString()}</td>
                   <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${(
                     item.출고단가 || 0
-                  ).toLocaleString()}원</td>
+                  ).toLocaleString()}</td>
                 </tr>
               `,
                       )
@@ -388,7 +388,7 @@ async function viewOrderDetail(orderDate, orderNo) {
         </button>
         <button onclick="printOrderFromDetail()" style="
           padding: 10px 20px;
-          background: #9333ea;
+          background: #2563eb;
           color: white;
           border: none;
           border-radius: 6px;
@@ -396,8 +396,8 @@ async function viewOrderDetail(orderDate, orderNo) {
           font-weight: 500;
           cursor: pointer;
           transition: background 0.2s;
-        " onmouseover="this.style.background='#7c3aed';"
-           onmouseout="this.style.background='#9333ea';">
+        " onmouseover="this.style.background='#1d4ed8';"
+           onmouseout="this.style.background='#2563eb';">
           📄 출력
         </button>
       </div>
@@ -3022,7 +3022,7 @@ async function submitNewOrder(event) {
 
 /**
  * 발주 상세 모달에서 출력 버튼 클릭 시 호출되는 래퍼 함수
- * 현재 저장된 발주 정보를 사용하여 printOrder 함수 호출
+ * 현재 저장된 발주 정보를 사용하여 printOrder 함수 호출 (항상 가격 표시)
  */
 function printOrderFromDetail() {
   if (!window.currentOrderDetail) {
@@ -3031,7 +3031,7 @@ function printOrderFromDetail() {
   }
 
   const { 발주일자, 발주번호 } = window.currentOrderDetail;
-  printOrder(발주일자, 발주번호);
+  printOrder(발주일자, 발주번호, 1); // 항상 가격 표시 모드
   console.log('✅ 발주서 출력:', { 발주일자, 발주번호 });
 }
 
