@@ -3021,6 +3021,479 @@ async function submitNewOrder(event) {
 }
 
 /**
+ * 견적서 출력 함수
+ * @param {string} orderDate - 발주일자 (YYYYMMDD)
+ * @param {number} orderNo - 견적번호
+ */
+async function printOrder(orderDate, orderNo, mode = 1) {
+  try {
+    console.log('📄 발주서 출력 시작:', { 발주일자: orderDate, 발주번호: orderNo, mode });
+
+    // 새로운 인쇄 전용 API 호출
+    const response = await fetch(`/api/orders/${orderDate}/${orderNo}/print?mode=${mode}`);
+    const result = await response.json();
+
+    if (!result.success || !result.data) {
+      alert('발주 정보를 불러올 수 없습니다.');
+      return;
+    }
+
+    const { header, items } = result.data;
+
+    // 출력 창 생성 (A4 크기)
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+
+    // 날짜 포맷팅 함수
+    const formatDate = (dateStr) => {
+      if (!dateStr) return '-';
+      return dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+    };
+
+    // 숫자를 한자로 변환하는 함수
+    const numberToKoreanHanja = (num) => {
+      // 입력값 검증 및 변환
+      if (num === undefined || num === null || num === '' || isNaN(num)) {
+        return '零';
+      }
+
+      // 숫자로 변환
+      const numValue = typeof num === 'string' ? parseInt(num) : num;
+
+      if (numValue === 0 || isNaN(numValue)) {
+        return '零';
+      }
+
+      const digits = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+      const units = ['', '十', '百', '千'];
+      const bigUnits = ['', '萬', '億', '兆'];
+
+      let result = '';
+      let unitIndex = 0;
+
+      const numStr = numValue.toString();
+      const len = numStr.length;
+
+      for (let i = 0; i < len; i++) {
+        const digit = parseInt(numStr[len - 1 - i]);
+        const unit = units[i % 4];
+
+        if (digit !== 0) {
+          result = digits[digit] + unit + result;
+        }
+
+        if ((i + 1) % 4 === 0 && i !== len - 1) {
+          result = bigUnits[unitIndex + 1] + result;
+          unitIndex++;
+        }
+      }
+
+      return result || '零';
+    };
+
+    // HTML 생성
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>발주서 - ${header.발주일자}-${header.발주번호}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 20mm;
+          }
+
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: '맑은 고딕', 'Malgun Gothic', Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            padding: 10mm;
+            background: white;
+          }
+
+          .document {
+            width: 170mm;
+            margin: 0 auto;
+            background: white;
+          }
+
+          /* 제목 */
+          .title {
+            text-align: center;
+            font-size: 24pt;
+            font-weight: bold;
+            margin-bottom: 15mm;
+            letter-spacing: 10px;
+          }
+
+          /* 정보 박스 컨테이너 */
+          .info-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8mm;
+            gap: 5mm;
+          }
+
+          .info-box {
+            flex: 1;
+            border: 2px solid #333;
+            padding: 3mm;
+          }
+
+          .info-box-title {
+            font-size: 11pt;
+            font-weight: bold;
+            margin-bottom: 2mm;
+            padding-bottom: 1mm;
+            border-bottom: 1px solid #999;
+          }
+
+          .info-row {
+            display: flex;
+            margin-bottom: 1.5mm;
+            font-size: 9pt;
+          }
+
+          .info-label {
+            width: 70px;
+            font-weight: bold;
+            color: #333;
+          }
+
+          .info-value {
+            flex: 1;
+            color: #000;
+          }
+
+          /* 견적 정보 섹션 */
+          .quotation-info {
+            border: 2px solid #333;
+            padding: 3mm;
+            margin-bottom: 8mm;
+          }
+
+          .quotation-info-row {
+            display: flex;
+            margin-bottom: 1.5mm;
+            font-size: 9pt;
+          }
+
+          .quotation-info-row .info-label {
+            width: 90px;
+          }
+
+          /* 품목 테이블 */
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8mm;
+            font-size: 9pt;
+          }
+
+          /* 페이지 분할 시 테이블 헤더 반복 */
+          thead {
+            display: table-header-group;
+          }
+
+          tbody {
+            display: table-row-group;
+          }
+
+          th {
+            background-color: #f0f0f0;
+            border: none;
+            padding: 2mm 1mm;
+            text-align: center;
+            font-weight: bold;
+            font-size: 9pt;
+            border-bottom: 2px solid #999;
+          }
+
+          /* 페이지 넘김 시 헤더 다시 출력 */
+          @media print {
+            thead {
+              display: table-header-group;
+            }
+
+            tr {
+              page-break-inside: avoid;
+            }
+
+            .quotation-info {
+              page-break-after: auto;
+            }
+
+            table {
+              page-break-after: auto;
+            }
+
+            .total-section {
+              page-break-before: avoid;
+              page-break-inside: avoid;
+              page-break-after: avoid;
+            }
+
+            .notes {
+              page-break-before: avoid;
+              page-break-inside: avoid;
+            }
+          }
+
+          td {
+            border: none;
+            border-bottom: 1px solid #333;
+            padding: 1mm 1mm;
+            text-align: center;
+            font-size: 8.5pt;
+            min-height: 10mm;
+          }
+
+          td.left {
+            text-align: left;
+            padding-left: 2mm;
+          }
+
+          td.right {
+            text-align: right;
+            padding-right: 2mm;
+          }
+
+          /* 발주금액 표시 행 */
+          .amount-row {
+            display: flex;
+            margin-bottom: 1.5mm;
+            font-size: 10pt;
+            font-weight: bold;
+          }
+
+          .amount-row .info-label {
+            width: 90px;
+          }
+
+          .amount-hanja {
+            color: #000;
+            font-size: 11pt;
+          }
+
+          /* 합계 섹션 */
+          .total-section {
+            border: 2px solid #333;
+            padding: 3mm;
+            background-color: #f9f9f9;
+            page-break-inside: avoid;
+          }
+
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 1.5mm 0;
+            font-size: 10pt;
+          }
+
+          .total-row.grand-total {
+            font-size: 12pt;
+            font-weight: bold;
+            border-top: 2px solid #333;
+            padding-top: 3mm;
+            margin-top: 2mm;
+          }
+
+          .total-label {
+            font-weight: bold;
+          }
+
+          .total-value {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+          }
+
+          /* 하단 참고사항 */
+          .notes {
+            margin-top: 8mm;
+            padding: 3mm;
+            border: 1px solid #999;
+            background-color: #fafafa;
+            font-size: 8pt;
+            line-height: 1.6;
+            page-break-inside: avoid;
+          }
+
+          @media print {
+            body {
+              padding: 0;
+            }
+            .document {
+              width: 100%;
+            }
+            @page {
+              margin: 15mm;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="document">
+          <!-- 제목 -->
+          <div class="title">발 주 서</div>
+
+          <!-- 정보 박스 (주석 처리)
+          <div class="info-container">
+            <div class="info-box">
+              <div class="info-box-title">공급자 정보</div>
+              ...
+            </div>
+            <div class="info-box">
+              <div class="info-box-title">고객 정보</div>
+              ...
+            </div>
+          </div>
+          -->
+
+          <!-- 견적 정보 (공급자 위치로 이동) -->
+          <div class="quotation-info">
+            <div class="quotation-info-row">
+              <span class="info-label">발주번호:</span>
+              <span class="info-value">${header.발주일자}-${header.발주번호}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">발주일자:</span>
+              <span class="info-value">${formatDate(header.발주일자)}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">수신:</span>
+              <span class="info-value">${header.매입처명}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">담당자:</span>
+              <span class="info-value">${header.매입처담당자}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">전화번호:</span>
+              <span class="info-value">${header.매입처전화}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">팩스번호:</span>
+              <span class="info-value">${header.매입처팩스}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">입고희망일:</span>
+              <span class="info-value">${formatDate(header.입고희망일자)}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">제목:</span>
+              <span class="info-value">${header.제목}</span>
+            </div>
+            <div class="quotation-info-row">
+              <span class="info-label">적요:</span>
+              <span class="info-value">${header.적요}</span>
+            </div>
+            <div class="amount-row">
+              <span class="info-label">발주금액:</span>
+              <span class="amount-hanja">${numberToKoreanHanja(
+                header.총합계,
+              )} (${header.총합계.toLocaleString()} 원)</span>
+            </div>
+          </div>
+
+          <!-- 품목 테이블 -->
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 5%;">No</th>
+                <th style="width: 20%;">품명</th>
+                <th style="width: 20%;">규격</th>
+                <th style="width: 7%;">수량</th>
+                <th style="width: 6%;">단위</th>
+                ${mode === 1 ? '<th style="width: 10%;">단가</th>' : ''}
+                ${mode === 1 ? '<th style="width: 10%;">부가세</th>' : ''}
+                ${mode === 1 ? '<th style="width: 12%;">금액</th>' : ''}
+                ${
+                  mode === 0
+                    ? '<th style="width: 42%;">비고</th>'
+                    : '<th style="width: 20%;">비고</th>'
+                }
+              </tr>
+            </thead>
+            <tbody>
+              ${items
+                .map(
+                  (item, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td class="left">${item.품명 || '-'}</td>
+                  <td class="left">${item.규격 || '-'}</td>
+                  <td class="right">${(item.수량 || 0).toLocaleString()}</td>
+                  <td>${item.단위 || '-'}</td>
+                  ${mode === 1 ? `<td class="right">${(item.단가 || 0).toLocaleString()}</td>` : ''}
+                  ${mode === 1 ? `<td class="right">${(item.부가 || 0).toLocaleString()}</td>` : ''}
+                  ${mode === 1 ? `<td class="right">${(item.금액 || 0).toLocaleString()}</td>` : ''}
+                  <td class="left">${item.적요 || ''}</td>
+                </tr>
+              `,
+                )
+                .join('')}
+            </tbody>
+          </table>
+
+          ${
+            mode === 1
+              ? `
+          <!-- 합계 섹션 -->
+          <div class="total-section">
+            <div class="total-row">
+              <span class="total-label">공급가액:</span>
+              <span class="total-value">${header.총공급가액.toLocaleString()} 원</span>
+            </div>
+            <div class="total-row">
+              <span class="total-label">부가세(10%):</span>
+              <span class="total-value">${header.총부가세.toLocaleString()} 원</span>
+            </div>
+            <div class="total-row grand-total">
+              <span class="total-label">합계금액:</span>
+              <span class="total-value">${header.총합계.toLocaleString()} 원</span>
+            </div>
+          </div>
+          `
+              : ''
+          }
+
+          <!-- 하단 참고사항 -->
+          <div class="notes">
+            <strong>※ 참고사항</strong><br>
+            · 본 발주서는 ${formatDate(header.발주일자)}부터 ${header.유효일수}일간 유효합니다.<br>
+            · 상기 금액으로 견적 드립니다.<br>
+            · 기타 문의사항은 연락 바랍니다.
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(() => {
+              window.print();
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    console.log('✅ 발주서 출력 완료');
+  } catch (error) {
+    console.error('❌ 발주서 출력 실패:', error);
+    alert('발주서 출력 중 오류가 발생했습니다.');
+  }
+}
+
+/**
  * 발주 상세 모달에서 출력 버튼 클릭 시 호출되는 래퍼 함수
  * 현재 저장된 발주 정보를 사용하여 printOrder 함수 호출 (항상 가격 표시)
  */
@@ -3031,10 +3504,11 @@ function printOrderFromDetail() {
   }
 
   const { 발주일자, 발주번호 } = window.currentOrderDetail;
-  printOrder(발주일자, 발주번호, 1); // 항상 가격 표시 모드
+  printOrder(발주일자, 발주번호); // 항상 가격 표시 모드
   console.log('✅ 발주서 출력:', { 발주일자, 발주번호 });
 }
 
 // 전역 함수로 노출 (HTML onclick 핸들러에서 사용)
+window.printOrder = printOrder;
 window.printOrderFromDetail = printOrderFromDetail;
 window.closeOrderDetailModal = closeOrderDetailModal;

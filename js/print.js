@@ -32,7 +32,7 @@ function formatCurrency(amount) {
     return '0';
   }
 
-  return numValue.toLocaleString('ko-KR');
+  // return numValue.toLocaleString('ko-KR');
 }
 
 /**
@@ -322,27 +322,27 @@ function generateQuotationPrintHTML(data) {
 /**
  * 발주서 프린트 함수
  */
-async function printOrder(발주일자, 발주번호, mode = 1) {
-  try {
-    const response = await fetch(`/api/orders/${발주일자}/${발주번호}`);
+// async function printOrder(발주일자, 발주번호, mode = 1) {
+//   try {
+//     const response = await fetch(`/api/orders/${발주일자}/${발주번호}`);
 
-    if (!response.ok) {
-      throw new Error('발주서 데이터를 가져오는데 실패했습니다.');
-    }
+//     if (!response.ok) {
+//       throw new Error('발주서 데이터를 가져오는데 실패했습니다.');
+//     }
 
-    const data = await response.json();
+//     const data = await response.json();
 
-    if (!data.success) {
-      throw new Error(data.message || '발주서 데이터를 가져오는데 실패했습니다.');
-    }
+//     if (!data.success) {
+//       throw new Error(data.message || '발주서 데이터를 가져오는데 실패했습니다.');
+//     }
 
-    const printHTML = generateOrderPrintHTML(data.data, mode);
-    showPrintPreview(printHTML, '발주서');
-  } catch (error) {
-    console.error('발주서 프린트 오류:', error);
-    alert('발주서 출력 중 오류가 발생했습니다: ' + error.message);
-  }
-}
+//     const printHTML = generateOrderPrintHTML(data.data, mode);
+//     showPrintPreview(printHTML, '발주서');
+//   } catch (error) {
+//     console.error('발주서 프린트 오류:', error);
+//     alert('발주서 출력 중 오류가 발생했습니다: ' + error.message);
+//   }
+// }
 
 /**
  * 숫자를 한자로 변환하는 함수
@@ -1059,7 +1059,7 @@ function executePrint() {
 
 // Window 전역 함수로 export
 // window.printQuotation = printQuotation; // ❌ 주석 처리 - quotation.js의 새 인쇄 함수 사용
-window.printOrder = printOrder;
+// window.printOrder = printOrder;
 window.printTransaction = printTransaction;
 window.printPurchaseStatement = printPurchaseStatement;
 window.closePrintPreview = closePrintPreview;

@@ -23,7 +23,7 @@
     <script src="js/order.js?v=1763021369" defer></script>
     <script src="js/postoffice.js?v=1031M" defer></script>
     <!-- print.js를 transaction.js, quotation.js보다 먼저 로드하여 각 모듈의 인쇄 함수를 덮어쓸 수 있도록 함 -->
-    <script src="js/print2.js" defer></script>
+    <script src="js/print.js?v=1114.js" defer></script>
     <script src="js/transaction.js?v=1113_v2" defer></script>
     <script src="js/cash-history.js" defer></script>
     <script src="js/trial-balance.js" defer></script>
@@ -177,21 +177,21 @@
               장부관리
               <span class="arrow">▼</span>
             </a>
-            <!--  
-            매입처장부관리 -> Purchaser's ledger management 
-            매출처장부관리 -> Sales ledger management
-            미수금관리 -> Accounts receivable management
-            미지급금관리 -> Accounts Payable Management
-            현금출납장관리 -> Cash receipt and disbursement management
-            세금계산서관리 -> Tax invoice management
+            <!--
+            매입처장부관리 -> Purchaser's ledger management (TODO: Not implemented)
+            매출처장부관리 -> Sales ledger management (TODO: Not implemented)
+            미수금관리 -> Accounts receivable management (TODO: Not implemented)
+            미지급금관리 -> Accounts Payable Management (TODO: Not implemented)
+            세금계산서관리 -> Tax invoice management (TODO: Not implemented)
+
+            NOTE: 현금출납관리는 회계관리 메뉴의 "현금출납내역관리"로 이동됨
             -->
             <div class="submenu" id="jangbuSubmenu">
-              <a class="submenu-link" onclick="showPage('item-catagory')">매입처장부관리</a>
-              <a class="submenu-link" onclick="showPage('item-history')">매출처장부관리</a>
-              <a class="submenu-link" onclick="showPage('item-stock')">미수금관리</a>
-              <a class="submenu-link" onclick="showPage('item-stock')">미지급금관리</a>
-              <a class="submenu-link" onclick="showPage('item-stock')">현금출납관리</a>
-              <a class="submenu-link" onclick="showPage('taxInvoice')">세금계산서관리</a>
+              <a class="submenu-link" onclick="alert('매입처장부관리 기능은 준비 중입니다.')">매입처장부관리</a>
+              <a class="submenu-link" onclick="alert('매출처장부관리 기능은 준비 중입니다.')">매출처장부관리</a>
+              <a class="submenu-link" onclick="alert('미수금관리 기능은 준비 중입니다.')">미수금관리</a>
+              <a class="submenu-link" onclick="alert('미지급금관리 기능은 준비 중입니다.')">미지급금관리</a>
+              <a class="submenu-link" onclick="alert('세금계산서관리 기능은 준비 중입니다.')">세금계산서관리</a>
             </div>
           </div>
 
@@ -290,13 +290,124 @@
               <span class="arrow">▼</span>
             </a>
             <div class="submenu" id="printSubmenu">
-              <a class="submenu-link" onclick="showPage('account-balnace')">거래명세서출력관리</a>
-              <a class="submenu-link" onclick="showPage('account-balnace')">견적서출력관리</a>
-              <a class="submenu-link" onclick="showPage('account-balnace')">발주서출력관리</a>
-              <a class="submenu-link" onclick="showPage('salesbook-printMenu')">매출처출력관리</a>
-              <a class="submenu-link" onclick="showPage('quotation-printMenu')">매입처출력관리</a>
-              <a class="submenu-link" onclick="showPage('account-balnace')">세금계산서출력관리</a>
-              <a class="submenu-link" onclick="showPage('itembook-printMenu')">자재대장출력관리</a>
+              <!-- 일계표 -->
+              <a class="submenu-link" onclick="showPage('daily-report-print')">일계표</a>
+
+              <!-- 미지급금 -->
+              <div class="submenu-group">
+                <span class="submenu-group-title">미지급금</span>
+                <a class="submenu-link submenu-indent" onclick="showPage('payable-summary-print')"
+                  >업체별 미지급금 현황(집계표)</a
+                >
+                <a class="submenu-link submenu-indent" onclick="showPage('payable-daily-print')"
+                  >업체별 지급 현황(일자별)</a
+                >
+              </div>
+
+              <!-- 매입현황 -->
+              <div class="submenu-group">
+                <span class="submenu-group-title">매입현황</span>
+                <a class="submenu-link submenu-indent" onclick="showPage('purchase-by-item-print')"
+                  >품목별 매입 현황</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('purchase-by-supplier-item-print')"
+                  >업체별 매입 현황(품목별)</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('purchase-by-supplier-daily-print')"
+                  >업체별 매입 현황(일자별)</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('purchase-by-supplier-print')"
+                  >업체별 매입 현황</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('purchase-tax-ledger-print')"
+                  >매입세금계산서 장부 현황</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('purchase-by-supplier-3months-print')"
+                  >업체별 매입 현황(3개월)</a
+                >
+              </div>
+
+              <!-- 미수금 -->
+              <div class="submenu-group">
+                <span class="submenu-group-title">미수금</span>
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('receivable-summary-print')"
+                  >업체별 미수금 현황(집계표)</a
+                >
+                <a class="submenu-link submenu-indent" onclick="showPage('receivable-daily-print')"
+                  >업체별 수금 현황(일자별)</a
+                >
+              </div>
+
+              <!-- 매출현황 -->
+              <div class="submenu-group">
+                <span class="submenu-group-title">매출현황</span>
+                <a class="submenu-link submenu-indent" onclick="showPage('sales-by-item-print')"
+                  >품목별 매출 현황</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('sales-by-customer-item-print')"
+                  >업체별 매출 현황(품목별)</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('sales-by-customer-daily-print')"
+                  >업체별 매출 현황(일자별)</a
+                >
+                <a class="submenu-link submenu-indent" onclick="showPage('sales-by-customer-print')"
+                  >업체별 매출 현황</a
+                >
+                <a class="submenu-link submenu-indent" onclick="showPage('sales-tax-ledger-print')"
+                  >매출세금계산서 장부 현황</a
+                >
+                <a class="submenu-link submenu-indent" onclick="showPage('sales-tax-status-print')"
+                  >매출세금계산서 현황</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('sales-by-customer-3months-print')"
+                  >업체별 매출 현황(3개월간)</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('sales-by-customer-daily-cost-print')"
+                  >업체별 매출 현황(일자별, 매입단가출력)</a
+                >
+                <a
+                  class="submenu-link submenu-indent"
+                  onclick="showPage('sales-by-customer-cost-print')"
+                  >업체별 매출 현황(매입단가출력)</a
+                >
+              </div>
+
+              <!-- 회계관리 -->
+              <div class="submenu-group">
+                <span class="submenu-group-title">회계관리</span>
+                <a class="submenu-link submenu-indent" onclick="showPage('cashbook-daily-print')"
+                  >출납관리(일자별)</a
+                >
+                <a class="submenu-link submenu-indent" onclick="showPage('cashbook-account-print')"
+                  >출납관리(계정과목별)</a
+                >
+                <a class="submenu-link submenu-indent" onclick="showPage('cashbook-summary-print')"
+                  >출납관리(계정별집계)</a
+                >
+                <a class="submenu-link submenu-indent" onclick="showPage('trial-balance-print')"
+                  >합계시산표</a
+                >
+              </div>
             </div>
           </div>
 
@@ -381,7 +492,7 @@
             <button class="btn-logout" onclick="logout()">로그아웃</button>
           </div>
         </div>
-
+        <!-- content-area start -->
         <div class="content-area">
           <!-- 대시보드 페이지 -->
           <div class="page-content active" id="dashboardPage">
@@ -7806,6 +7917,16 @@
                   }
                 },
               },
+              'daily-report-print': {
+                element: 'dailyReportPrintPage',
+                title: '일계표',
+                menu: 'print',
+                loadFunc: () => {
+                  // 오늘 날짜 자동 설정
+                  const today = new Date().toISOString().split('T')[0];
+                  document.getElementById('dailyReportDate').value = today;
+                },
+              },
             };
 
             let currentPage = 'dashboard';
@@ -12506,6 +12627,125 @@
               </div>
             </div>
           </div>
+
+          <!-- 일계표 출력 페이지 -->
+          <div class="page-content hidden" id="dailyReportPrintPage">
+            <div class="page-header">
+              <h1>일계표</h1>
+              <p class="page-description">일별 매입/매출/입출금 현황을 조회합니다</p>
+            </div>
+
+            <!-- 검색 조건 -->
+            <div
+              class="filter-section"
+              style="
+                margin-bottom: 24px;
+                padding: 20px;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+              "
+            >
+              <div style="display: flex; gap: 16px; align-items: center">
+                <div style="flex: 0 0 200px">
+                  <label
+                    style="display: block; margin-bottom: 6px; font-weight: 600; color: #374151"
+                    >조회일자</label
+                  >
+                  <input type="date" id="dailyReportDate" class="form-control" />
+                </div>
+                <div style="flex: 0 0 auto; margin-top: 28px">
+                  <button
+                    onclick="loadDailyReport()"
+                    class="btn-primary"
+                    style="padding: 10px 24px"
+                  >
+                    <svg
+                      style="
+                        width: 16px;
+                        height: 16px;
+                        display: inline-block;
+                        vertical-align: middle;
+                        margin-right: 6px;
+                      "
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      ></path>
+                    </svg>
+                    조회
+                  </button>
+                </div>
+                <div style="flex: 0 0 auto; margin-top: 28px">
+                  <button
+                    onclick="printDailyReport()"
+                    class="btn-secondary"
+                    style="padding: 10px 24px"
+                  >
+                    <svg
+                      style="
+                        width: 16px;
+                        height: 16px;
+                        display: inline-block;
+                        vertical-align: middle;
+                        margin-right: 6px;
+                      "
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                      ></path>
+                    </svg>
+                    출력
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 일계표 테이블 -->
+            <div
+              class="table-container"
+              style="
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                padding: 20px;
+              "
+            >
+              <table id="dailyReportTable" class="display" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>구분</th>
+                    <th>거래처명/계정명</th>
+                    <th>수입(공급가)</th>
+                    <th>수입(부가세포함)</th>
+                    <th>지출(공급가)</th>
+                    <th>지출(부가세포함)</th>
+                    <th>잔액</th>
+                  </tr>
+                </thead>
+                <tbody id="dailyReportTableBody">
+                  <tr>
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #9ca3af">
+                      조회 버튼을 클릭하여 일계표를 조회하세요
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <!-- 일계표 페이지 끝 -->
         </div>
         <!-- content-area End -->
       </main>
@@ -17108,8 +17348,832 @@
           alert('내보내기 중 오류가 발생했습니다: ' + error.message);
         }
       }
+
+      /**
+       * 일계표 조회
+       */
+      async function loadDailyReport() {
+        try {
+          const date = document.getElementById('dailyReportDate').value;
+
+          if (!date) {
+            alert('조회일자를 선택해주세요.');
+            return;
+          }
+
+          // 날짜 포맷 변환 (YYYY-MM-DD → YYYYMMDD)
+          const dateStr = date.replace(/-/g, '');
+
+          console.log('✅ 일계표 조회:', dateStr);
+
+          const response = await fetch(`/api/daily-report?date=${dateStr}`);
+          const result = await response.json();
+
+          if (!result.success) {
+            alert(result.message || '일계표 조회에 실패했습니다.');
+            return;
+          }
+
+          // 테이블 렌더링
+          const tbody = document.getElementById('dailyReportTableBody');
+          tbody.innerHTML = '';
+
+          if (result.data.length === 0) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 40px; color: #9ca3af;">
+                  조회 결과가 없습니다
+                </td>
+              </tr>
+            `;
+            return;
+          }
+
+          // 데이터 렌더링
+          result.data.forEach((row) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td style="text-align: center;">${row.구분 || '-'}</td>
+              <td style="text-align: left;">${row.계정명 || '-'}</td>
+              <td style="text-align: right;">${(row.수입1 || 0).toLocaleString()}</td>
+              <td style="text-align: right;">${(row.수입2 || 0).toLocaleString()}</td>
+              <td style="text-align: right;">${(row.지출1 || 0).toLocaleString()}</td>
+              <td style="text-align: right;">${(row.지출2 || 0).toLocaleString()}</td>
+              <td style="text-align: right;">${(row.잔액 || 0).toLocaleString()}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          console.log('✅ 일계표 렌더링 완료:', result.data.length, '건');
+        } catch (error) {
+          console.error('❌ 일계표 조회 오류:', error);
+          alert('일계표 조회 중 오류가 발생했습니다: ' + error.message);
+        }
+      }
+
+      /**
+       * 일계표 출력
+       */
+      async function printDailyReport() {
+        try {
+          const date = document.getElementById('dailyReportDate').value;
+
+          if (!date) {
+            alert('조회일자를 선택해주세요.');
+            return;
+          }
+
+          // 날짜 포맷 변환
+          const dateStr = date.replace(/-/g, '');
+          const dateDisplay = date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1년 $2월 $3일');
+
+          // 데이터 조회
+          const response = await fetch(`/api/daily-report?date=${dateStr}`);
+          const result = await response.json();
+
+          if (!result.success || result.data.length === 0) {
+            alert('출력할 데이터가 없습니다.');
+            return;
+          }
+
+          // 출력 창 열기
+          const printWindow = window.open('', '_blank', 'width=900,height=900');
+
+          // HTML 생성
+          const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="UTF-8">
+              <title>일계표 - ${dateDisplay}</title>
+              <style>
+                @page {
+                  size: A4;
+                  margin: 15mm;
+                }
+
+                * {
+                  margin: 0;
+                  padding: 0;
+                  box-sizing: border-box;
+                }
+
+                body {
+                  font-family: '맑은 고딕', 'Malgun Gothic', Arial, sans-serif;
+                  font-size: 10pt;
+                  line-height: 1.4;
+                  padding: 10mm;
+                  background: white;
+                }
+
+                .title {
+                  text-align: center;
+                  font-size: 20pt;
+                  font-weight: bold;
+                  margin-bottom: 10mm;
+                }
+
+                .date {
+                  text-align: center;
+                  font-size: 12pt;
+                  margin-bottom: 8mm;
+                  color: #333;
+                }
+
+                table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin-bottom: 10mm;
+                  font-size: 9pt;
+                }
+
+                thead {
+                  display: table-header-group;
+                }
+
+                th {
+                  background-color: #f0f0f0;
+                  border: 1px solid #333;
+                  padding: 6px 4px;
+                  text-align: center;
+                  font-weight: bold;
+                  font-size: 9pt;
+                }
+
+                td {
+                  border: 1px solid #333;
+                  padding: 5px 4px;
+                  font-size: 8.5pt;
+                }
+
+                .text-center {
+                  text-align: center;
+                }
+
+                .text-left {
+                  text-align: left;
+                  padding-left: 6px;
+                }
+
+                .text-right {
+                  text-align: right;
+                  padding-right: 6px;
+                }
+
+                @media print {
+                  body {
+                    padding: 0;
+                  }
+                  @page {
+                    margin: 10mm;
+                  }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="title">일 계 표</div>
+              <div class="date">${dateDisplay}</div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 10%;">구분</th>
+                    <th style="width: 20%;">거래처명/계정명</th>
+                    <th style="width: 14%;">수입(공급가)</th>
+                    <th style="width: 14%;">수입(부가세포함)</th>
+                    <th style="width: 14%;">지출(공급가)</th>
+                    <th style="width: 14%;">지출(부가세포함)</th>
+                    <th style="width: 14%;">잔액</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${result.data
+                    .map(
+                      (row) => `
+                    <tr>
+                      <td class="text-center">${row.구분 || '-'}</td>
+                      <td class="text-left">${row.계정명 || '-'}</td>
+                      <td class="text-right">${(row.수입1 || 0).toLocaleString()}</td>
+                      <td class="text-right">${(row.수입2 || 0).toLocaleString()}</td>
+                      <td class="text-right">${(row.지출1 || 0).toLocaleString()}</td>
+                      <td class="text-right">${(row.지출2 || 0).toLocaleString()}</td>
+                      <td class="text-right">${(row.잔액 || 0).toLocaleString()}</td>
+                    </tr>
+                  `,
+                    )
+                    .join('')}
+                </tbody>
+              </table>
+
+              <script>
+                window.onload = function() {
+                  setTimeout(function() {
+                    window.print();
+                  }, 500);
+                };
+              <\/script>
+            </body>
+            </html>
+          `;
+
+          printWindow.document.write(html);
+          printWindow.document.close();
+
+          console.log('✅ 일계표 출력 완료');
+        } catch (error) {
+          console.error('❌ 일계표 출력 오류:', error);
+          alert('일계표 출력 중 오류가 발생했습니다: ' + error.message);
+        }
+      }
     </script>
 
     <!-- HTML의 </body> 직전에 모달 HTML 추가 -->
+
+    <!-- 현금출납 등록/수정 모달 -->
+    <div id="cashEntryModal" class="modal" style="display: none">
+      <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto">
+        <div
+          class="modal-header"
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px 12px 0 0;
+          "
+        >
+          <h3
+            id="cashEntryModalTitle"
+            style="margin: 0; font-size: 18px; font-weight: 700; color: white"
+          >
+            현금출납 등록
+          </h3>
+          <button
+            onclick="closeCashEntryModal()"
+            style="
+              background: rgba(255, 255, 255, 0.2);
+              border: none;
+              font-size: 24px;
+              cursor: pointer;
+              color: white;
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              transition: all 0.2s ease;
+            "
+            onmouseover="this.style.background='rgba(255, 255, 255, 0.3)';"
+            onmouseout="this.style.background='rgba(255, 255, 255, 0.2)';"
+          >
+            &times;
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <form id="cashEntryForm" onsubmit="saveCashEntry(event)">
+            <!-- 숨겨진 필드: 수정 모드용 -->
+            <input type="hidden" id="cashEntryMode" value="new" />
+            <input type="hidden" id="cashEntryOriginalDate" />
+            <input type="hidden" id="cashEntryOriginalTime" />
+
+            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px">
+              <!-- 작성일자 -->
+              <div class="form-group">
+                <label for="cashEntryDate">작성일자 <span style="color: red">*</span></label>
+                <input type="date" id="cashEntryDate" class="form-control" required />
+              </div>
+
+              <!-- 계정과목 -->
+              <div class="form-group">
+                <label for="cashEntryAccount">계정과목 <span style="color: red">*</span></label>
+                <select id="cashEntryAccount" class="form-control" required>
+                  <option value="">선택하세요</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px">
+              <!-- 입출구분 -->
+              <div class="form-group">
+                <label for="cashEntryType">입출구분 <span style="color: red">*</span></label>
+                <select
+                  id="cashEntryType"
+                  class="form-control"
+                  required
+                  onchange="toggleCashEntryAmounts()"
+                >
+                  <option value="">선택하세요</option>
+                  <option value="1">입금</option>
+                  <option value="2">출금</option>
+                </select>
+              </div>
+
+              <!-- 금액 -->
+              <div class="form-group">
+                <label for="cashEntryAmount">금액 <span style="color: red">*</span></label>
+                <input
+                  type="number"
+                  id="cashEntryAmount"
+                  class="form-control"
+                  placeholder="금액을 입력하세요"
+                  min="0"
+                  step="1"
+                  required
+                />
+              </div>
+            </div>
+
+            <!-- 적요 -->
+            <div class="form-group">
+              <label for="cashEntryRemark">적요</label>
+              <input
+                type="text"
+                id="cashEntryRemark"
+                class="form-control"
+                placeholder="적요를 입력하세요"
+                maxlength="60"
+              />
+            </div>
+
+            <!-- 버튼 영역 -->
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px">
+              <button type="button" class="btn btn-secondary" onclick="closeCashEntryModal()">
+                취소
+              </button>
+              <button type="submit" class="btn btn-primary">저장</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 현금출납 상세보기 모달 -->
+    <div
+      id="cashDetailModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        id="cashDetailModalContent"
+        style="
+          background: white;
+          border-radius: 12px;
+          padding: 0;
+          width: 90%;
+          max-width: 600px;
+          max-height: 80vh;
+          overflow-y: auto;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          position: relative;
+        "
+      >
+        <!-- 헤더 (드래그 가능) -->
+        <div
+          id="cashDetailModalHeader"
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 2px solid #e5e7eb;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px 12px 0 0;
+            cursor: move;
+            user-select: none;
+          "
+        >
+          <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: white">
+            💰 현금출납 상세정보
+          </h3>
+          <button
+            onclick="closeCashDetailModal()"
+            style="
+              background: rgba(255, 255, 255, 0.2);
+              border: none;
+              font-size: 24px;
+              cursor: pointer;
+              color: white;
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              transition: all 0.2s ease;
+            "
+            onmouseover="this.style.background='rgba(255, 255, 255, 0.3)';"
+            onmouseout="this.style.background='rgba(255, 255, 255, 0.2)';"
+          >
+            ×
+          </button>
+        </div>
+
+        <!-- 본문 -->
+        <div style="padding: 20px 24px">
+          <table
+            style="
+              width: 100%;
+              border-collapse: separate;
+              border-spacing: 0;
+              border: 1px solid #e5e7eb;
+              border-radius: 8px;
+              overflow: hidden;
+            "
+          >
+            <tbody>
+              <tr style="background: #f9fafb">
+                <th
+                  style="
+                    width: 35%;
+                    padding: 10px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #374151;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  작성일자
+                </th>
+                <td
+                  id="cashDetailDate"
+                  style="
+                    padding: 10px 16px;
+                    color: #1f2937;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  -
+                </td>
+              </tr>
+              <tr>
+                <th
+                  style="
+                    padding: 10px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #374151;
+                    background: #f9fafb;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  작성시간
+                </th>
+                <td
+                  id="cashDetailTime"
+                  style="
+                    padding: 10px 16px;
+                    color: #1f2937;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  -
+                </td>
+              </tr>
+              <tr style="background: #f9fafb">
+                <th
+                  style="
+                    padding: 10px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #374151;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  계정과목
+                </th>
+                <td
+                  id="cashDetailAccount"
+                  style="
+                    padding: 10px 16px;
+                    color: #1f2937;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                    font-weight: 600;
+                  "
+                >
+                  -
+                </td>
+              </tr>
+              <tr>
+                <th
+                  style="
+                    padding: 10px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #374151;
+                    background: #f9fafb;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  입출구분
+                </th>
+                <td
+                  id="cashDetailType"
+                  style="
+                    padding: 10px 16px;
+                    color: #1f2937;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  -
+                </td>
+              </tr>
+              <tr style="background: #f0fdf4">
+                <th
+                  style="
+                    padding: 10px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #374151;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  💵 입금금액
+                </th>
+                <td
+                  id="cashDetailInAmount"
+                  style="
+                    padding: 10px 16px;
+                    text-align: right;
+                    font-weight: 700;
+                    color: #16a34a;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 16px;
+                  "
+                >
+                  -
+                </td>
+              </tr>
+              <tr style="background: #fef2f2">
+                <th
+                  style="
+                    padding: 10px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #374151;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  💸 출금금액
+                </th>
+                <td
+                  id="cashDetailOutAmount"
+                  style="
+                    padding: 10px 16px;
+                    text-align: right;
+                    font-weight: 700;
+                    color: #dc2626;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 16px;
+                  "
+                >
+                  -
+                </td>
+              </tr>
+              <tr style="background: #f9fafb">
+                <th
+                  style="
+                    padding: 10px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #374151;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  적요
+                </th>
+                <td
+                  id="cashDetailRemark"
+                  style="
+                    padding: 10px 16px;
+                    color: #1f2937;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  -
+                </td>
+              </tr>
+              <tr>
+                <th
+                  style="
+                    padding: 10px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #374151;
+                    background: #f9fafb;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  작성자
+                </th>
+                <td
+                  id="cashDetailCreator"
+                  style="
+                    padding: 10px 16px;
+                    color: #1f2937;
+                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 13px;
+                  "
+                >
+                  -
+                </td>
+              </tr>
+              <tr style="background: #f9fafb">
+                <th
+                  style="
+                    padding: 10px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #374151;
+                    font-size: 13px;
+                  "
+                >
+                  수정일자
+                </th>
+                <td
+                  id="cashDetailModified"
+                  style="padding: 10px 16px; color: #6b7280; font-size: 13px"
+                >
+                  -
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 푸터 -->
+        <div
+          style="
+            display: flex;
+            justify-content: flex-end;
+            padding: 12px 24px;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            border-radius: 0 0 12px 12px;
+          "
+        >
+          <button
+            onclick="closeCashDetailModal()"
+            style="
+              padding: 8px 20px;
+              background: #6b7280;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              font-size: 13px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            "
+            onmouseover="this.style.background='#4b5563';"
+            onmouseout="this.style.background='#6b7280';"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 현금출납 삭제 확인 모달 -->
+    <div
+      id="cashDeleteModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        style="
+          background: white;
+          border-radius: 12px;
+          padding: 32px;
+          width: 90%;
+          max-width: 450px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #fee2e2;
+          "
+        >
+          <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #dc2626">
+            현금출납 삭제
+          </h2>
+          <button
+            onclick="closeCashDeleteModal()"
+            style="
+              background: #f0f0f0;
+              border: none;
+              font-size: 24px;
+              cursor: pointer;
+              color: #666;
+              width: 36px;
+              height: 36px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              transition: all 0.2s ease;
+            "
+            onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
+            onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';"
+          >
+            ×
+          </button>
+        </div>
+
+        <div style="margin-bottom: 24px">
+          <p style="font-size: 16px; color: #1f2937; margin: 0 0 16px 0">
+            다음 현금출납내역을 삭제하시겠습니까?
+          </p>
+          <div
+            id="deleteCashInfo"
+            style="
+              padding: 16px;
+              background: #fef2f2;
+              border: 1px solid #fecaca;
+              border-radius: 8px;
+              font-weight: 500;
+              color: #991b1b;
+            "
+          >
+            작성일자: -
+          </div>
+          <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0">
+            ※ 삭제된 현금출납내역은 복구할 수 없습니다.
+          </p>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px">
+          <button
+            onclick="closeCashDeleteModal()"
+            style="
+              padding: 10px 20px;
+              background: #6c757d;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              font-size: 14px;
+              cursor: pointer;
+            "
+          >
+            취소
+          </button>
+          <button
+            onclick="confirmCashDelete()"
+            style="
+              padding: 10px 20px;
+              background: #dc2626;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              font-size: 14px;
+              cursor: pointer;
+            "
+          >
+            삭제
+          </button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

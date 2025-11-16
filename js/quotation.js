@@ -310,122 +310,122 @@ $(document).ready(function () {
 
 // ✅ 견적 상세 버튼 모달 열기 함수 (견적일자, 견적번호로 조회)
 async function openQuotationDetailModal(quotationDate, quotationNo) {
-    const modal = document.getElementById('quotationDetailModal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.style.display = 'block';
+  const modal = document.getElementById('quotationDetailModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'block';
+  }
+
+  // 드래그 기능 활성화 (최초 1회만 실행)
+  if (typeof makeModalDraggable === 'function' && !window.quotationDetailModalDraggable) {
+    makeModalDraggable('quotationDetailModal', 'quotationDetailModalHeader');
+    window.quotationDetailModalDraggable = true;
+  }
+
+  // ✅ 출력 버튼을 위해 현재 견적 정보 저장
+  window.currentQuotationDetail = {
+    견적일자: quotationDate,
+    견적번호: quotationNo,
+  };
+
+  try {
+    // 견적 마스터+상세 조회 (기존 API 사용)
+    const masterRes = await fetch(`/api/quotations/${quotationDate}/${quotationNo}`);
+    const masterData = await masterRes.json();
+
+    if (!masterData.success || !masterData.data) {
+      throw new Error('견적 정보를 찾을 수 없습니다.');
     }
 
-    // 드래그 기능 활성화 (최초 1회만 실행)
-    if (typeof makeModalDraggable === 'function' && !window.quotationDetailModalDraggable) {
-      makeModalDraggable('quotationDetailModal', 'quotationDetailModalHeader');
-      window.quotationDetailModalDraggable = true;
+    const master = masterData.data.master;
+    const details = masterData.data.detail;
+
+    // 기본 정보 표시
+    $('#q_no').text(`${master.견적일자}-${master.견적번호}`);
+    $('#q_date').text(master.견적일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+    $('#q_customer').text(master.매출처명 || '-');
+    $('#q_remark').text(master.적요 || '-');
+
+    // ✅ DataTable이 이미 초기화되어 있으면 destroy 후 재생성
+    if (window.quotationDetailDataTable) {
+      window.quotationDetailDataTable.destroy();
     }
 
-    // ✅ 출력 버튼을 위해 현재 견적 정보 저장
-    window.currentQuotationDetail = {
-      견적일자: quotationDate,
-      견적번호: quotationNo,
-    };
-
-    try {
-      // 견적 마스터+상세 조회 (기존 API 사용)
-      const masterRes = await fetch(`/api/quotations/${quotationDate}/${quotationNo}`);
-      const masterData = await masterRes.json();
-
-      if (!masterData.success || !masterData.data) {
-        throw new Error('견적 정보를 찾을 수 없습니다.');
-      }
-
-      const master = masterData.data.master;
-      const details = masterData.data.detail;
-
-      // 기본 정보 표시
-      $('#q_no').text(`${master.견적일자}-${master.견적번호}`);
-      $('#q_date').text(master.견적일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
-      $('#q_customer').text(master.매출처명 || '-');
-      $('#q_remark').text(master.적요 || '-');
-
-      // ✅ DataTable이 이미 초기화되어 있으면 destroy 후 재생성
-      if (window.quotationDetailDataTable) {
-        window.quotationDetailDataTable.destroy();
-      }
-
-      // ✅ DataTable 초기화
-      window.quotationDetailDataTable = $('#quotationDetailTable').DataTable({
-        data: details || [],
-        columns: [
-          {
-            data: '자재코드',
-            defaultContent: '-',
-          },
-          {
-            data: '자재명',
-            defaultContent: '-',
-          },
-          {
-            data: '규격',
-            defaultContent: '-',
-          },
-          {
-            data: '수량',
-            defaultContent: 0,
-            render: function (data) {
-              return (data || 0).toLocaleString();
-            },
-            className: 'dt-right',
-          },
-          {
-            data: '출고단가',
-            defaultContent: 0,
-            render: function (data) {
-              return (data || 0).toLocaleString();
-            },
-            className: 'dt-right',
-          },
-          {
-            data: '금액',
-            defaultContent: 0,
-            render: function (data) {
-              return (data || 0).toLocaleString();
-            },
-            className: 'dt-right',
-          },
-        ],
-        language: {
-          lengthMenu: '페이지당 _MENU_ 개씩 보기',
-          zeroRecords: '상세 내역이 없습니다',
-          info: '전체 _TOTAL_개 중 _START_-_END_개 표시',
-          infoEmpty: '데이터 없음',
-          infoFiltered: '(전체 _MAX_개 중 검색결과)',
-          search: '검색:',
-          paginate: {
-            first: '처음',
-            last: '마지막',
-            next: '다음',
-            previous: '이전',
-          },
+    // ✅ DataTable 초기화
+    window.quotationDetailDataTable = $('#quotationDetailTable').DataTable({
+      data: details || [],
+      columns: [
+        {
+          data: '자재코드',
+          defaultContent: '-',
         },
-        order: [[0, 'asc']], // 자재코드 오름차순
-        pageLength: 10,
-        lengthMenu: [5, 10, 25, 50],
-        responsive: true,
-        autoWidth: false,
-        searching: true,
-        paging: true,
-        info: true,
-      });
+        {
+          data: '자재명',
+          defaultContent: '-',
+        },
+        {
+          data: '규격',
+          defaultContent: '-',
+        },
+        {
+          data: '수량',
+          defaultContent: 0,
+          render: function (data) {
+            return (data || 0).toLocaleString();
+          },
+          className: 'dt-right',
+        },
+        {
+          data: '출고단가',
+          defaultContent: 0,
+          render: function (data) {
+            return (data || 0).toLocaleString();
+          },
+          className: 'dt-right',
+        },
+        {
+          data: '금액',
+          defaultContent: 0,
+          render: function (data) {
+            return (data || 0).toLocaleString();
+          },
+          className: 'dt-right',
+        },
+      ],
+      language: {
+        lengthMenu: '페이지당 _MENU_ 개씩 보기',
+        zeroRecords: '상세 내역이 없습니다',
+        info: '전체 _TOTAL_개 중 _START_-_END_개 표시',
+        infoEmpty: '데이터 없음',
+        infoFiltered: '(전체 _MAX_개 중 검색결과)',
+        search: '검색:',
+        paginate: {
+          first: '처음',
+          last: '마지막',
+          next: '다음',
+          previous: '이전',
+        },
+      },
+      order: [[0, 'asc']], // 자재코드 오름차순
+      pageLength: 10,
+      lengthMenu: [5, 10, 25, 50],
+      responsive: true,
+      autoWidth: false,
+      searching: true,
+      paging: true,
+      info: true,
+    });
 
-      console.log(`✅ 견적 상세 DataTable 초기화 완료 (${details ? details.length : 0}건)`);
+    console.log(`✅ 견적 상세 DataTable 초기화 완료 (${details ? details.length : 0}건)`);
 
-      // ✅ 합계 금액 계산
-      const totalAmount = (details || []).reduce((sum, item) => {
-        return sum + (item.금액 || 0);
-      }, 0);
+    // ✅ 합계 금액 계산
+    const totalAmount = (details || []).reduce((sum, item) => {
+      return sum + (item.금액 || 0);
+    }, 0);
 
-      // 합계 표시
-      $('#quotationDetailTotal').text(totalAmount.toLocaleString());
-      console.log(`✅ 견적 합계 금액: ${totalAmount.toLocaleString()}원`);
+    // 합계 표시
+    $('#quotationDetailTotal').text(totalAmount.toLocaleString());
+    console.log(`✅ 견적 합계 금액: ${totalAmount.toLocaleString()}원`);
   } catch (err) {
     console.error('❌ 견적 상세 조회 오류:', err);
     alert('견적 상세 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
@@ -2882,7 +2882,9 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
     console.log('📄 견적서 출력 시작:', { 견적일자: quotationDate, 견적번호: quotationNo, mode });
 
     // 새로운 인쇄 전용 API 호출
-    const response = await fetch(`/api/quotations/${quotationDate}/${quotationNo}/print?mode=${mode}`);
+    const response = await fetch(
+      `/api/quotations/${quotationDate}/${quotationNo}/print?mode=${mode}`,
+    );
     const result = await response.json();
 
     if (!result.success || !result.data) {
@@ -3064,6 +3066,7 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
             text-align: center;
             font-weight: bold;
             font-size: 9pt;
+            border-bottom: 2px solid #999;
           }
 
           /* 페이지 넘김 시 헤더 다시 출력 */
@@ -3213,7 +3216,7 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
             </div>
             <div class="quotation-info-row">
               <span class="info-label">담당자:</span>
-              <span class="info-value">${header.담당자명}</span>
+              <span class="info-value">${header.매출처담당자}</span>
             </div>
             <div class="quotation-info-row">
               <span class="info-label">전화번호:</span>
@@ -3237,7 +3240,9 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
             </div>
             <div class="amount-row">
               <span class="info-label">견적금액:</span>
-              <span class="amount-hanja">${numberToKoreanHanja(header.총합계)} (${header.총합계.toLocaleString()} 원)</span>
+              <span class="amount-hanja">${numberToKoreanHanja(
+                header.총합계,
+              )} (${header.총합계.toLocaleString()} 원)</span>
             </div>
           </div>
 
@@ -3253,11 +3258,17 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
                 ${mode === 1 ? '<th style="width: 10%;">단가</th>' : ''}
                 ${mode === 1 ? '<th style="width: 10%;">부가세</th>' : ''}
                 ${mode === 1 ? '<th style="width: 12%;">금액</th>' : ''}
-                ${mode === 0 ? '<th style="width: 42%;">비고</th>' : '<th style="width: 20%;">비고</th>'}
+                ${
+                  mode === 0
+                    ? '<th style="width: 42%;">비고</th>'
+                    : '<th style="width: 20%;">비고</th>'
+                }
               </tr>
             </thead>
             <tbody>
-              ${items.map((item, index) => `
+              ${items
+                .map(
+                  (item, index) => `
                 <tr>
                   <td>${index + 1}</td>
                   <td class="left">${item.품명 || '-'}</td>
@@ -3269,11 +3280,15 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
                   ${mode === 1 ? `<td class="right">${(item.금액 || 0).toLocaleString()}</td>` : ''}
                   <td class="left">${item.적요 || ''}</td>
                 </tr>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </tbody>
           </table>
 
-          ${mode === 1 ? `
+          ${
+            mode === 1
+              ? `
           <!-- 합계 섹션 -->
           <div class="total-section">
             <div class="total-row">
@@ -3289,7 +3304,9 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
               <span class="total-value">${header.총합계.toLocaleString()} 원</span>
             </div>
           </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <!-- 하단 참고사항 -->
           <div class="notes">

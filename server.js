@@ -137,8 +137,7 @@ function startSessionTimeoutChecker() {
       const cutoffTimestamp = cutoffTime.toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
 
       // 30분 이상 활동이 없는 로그인 사용자 조회
-      const result = await pool.request()
-        .input('cutoffTime', sql.VarChar(17), cutoffTimestamp)
+      const result = await pool.request().input('cutoffTime', sql.VarChar(17), cutoffTimestamp)
         .query(`
           SELECT 사용자코드, 사용자명, 마지막활동시간
           FROM 사용자
@@ -151,10 +150,10 @@ function startSessionTimeoutChecker() {
         const 종료일시 = now.toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
 
         // 비활성 사용자 자동 로그아웃
-        await pool.request()
+        await pool
+          .request()
           .input('cutoffTime', sql.VarChar(17), cutoffTimestamp)
-          .input('종료일시', sql.VarChar(17), 종료일시)
-          .query(`
+          .input('종료일시', sql.VarChar(17), 종료일시).query(`
             UPDATE 사용자
             SET 종료일시 = @종료일시, 로그인여부 = 'N'
             WHERE 로그인여부 = 'Y'
@@ -163,8 +162,10 @@ function startSessionTimeoutChecker() {
           `);
 
         console.log(`⏰ 세션 타임아웃: ${result.recordset.length}명의 사용자 자동 로그아웃`);
-        result.recordset.forEach(user => {
-          console.log(`   - ${user.사용자명} (${user.사용자코드}), 마지막 활동: ${user.마지막활동시간}`);
+        result.recordset.forEach((user) => {
+          console.log(
+            `   - ${user.사용자명} (${user.사용자코드}), 마지막 활동: ${user.마지막활동시간}`,
+          );
         });
       }
     } catch (err) {
@@ -401,8 +402,7 @@ app.post('/api/auth/heartbeat', async (req, res) => {
     await pool
       .request()
       .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .input('마지막활동시간', sql.VarChar(17), 마지막활동시간)
-      .query(`
+      .input('마지막활동시간', sql.VarChar(17), 마지막활동시간).query(`
         UPDATE 사용자
         SET 마지막활동시간 = @마지막활동시간
         WHERE 사용자코드 = @사용자코드
@@ -451,8 +451,7 @@ app.post('/api/auth/force-logout', async (req, res) => {
     await pool
       .request()
       .input('사용자코드', sql.VarChar(4), userId)
-      .input('종료일시', sql.VarChar(17), 종료일시)
-      .query(`
+      .input('종료일시', sql.VarChar(17), 종료일시).query(`
         UPDATE 사용자
         SET 종료일시 = @종료일시, 로그인여부 = 'N'
         WHERE 사용자코드 = @사용자코드
@@ -742,7 +741,8 @@ app.post('/api/customers', requireAuth, async (req, res) => {
           CAST(SUBSTRING(매출처코드, 2, 3) AS INT) DESC
       `;
 
-      const maxResult = await pool.request()
+      const maxResult = await pool
+        .request()
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .query(maxQuery);
 
@@ -757,14 +757,17 @@ app.post('/api/customers', requireAuth, async (req, res) => {
           const nextCharCode = prefix.charCodeAt(0) + 1;
 
           // Z를 넘어가면 A로 돌아감
-          if (nextCharCode > 90) { // 'Z'의 ASCII 코드는 90
+          if (nextCharCode > 90) {
+            // 'Z'의 ASCII 코드는 90
             prefix = 'A';
           } else {
             prefix = String.fromCharCode(nextCharCode);
           }
 
           nextNum = 1;
-          console.log(`  숫자 999 초과 → 영문 변경: ${lastCode.charAt(0)} → ${prefix}, 숫자 리셋: 001`);
+          console.log(
+            `  숫자 999 초과 → 영문 변경: ${lastCode.charAt(0)} → ${prefix}, 숫자 리셋: 001`,
+          );
         }
 
         최종매출처코드 = prefix + String(nextNum).padStart(3, '0');
@@ -815,9 +818,10 @@ app.post('/api/customers', requireAuth, async (req, res) => {
 
     res.json({
       success: true,
-      message: 최종매출처코드 !== 매출처코드
-        ? `매출처가 등록되었습니다. (코드: ${최종매출처코드})`
-        : '매출처가 등록되었습니다.',
+      message:
+        최종매출처코드 !== 매출처코드
+          ? `매출처가 등록되었습니다. (코드: ${최종매출처코드})`
+          : '매출처가 등록되었습니다.',
       data: {
         매출처코드: 최종매출처코드,
       },
@@ -941,8 +945,7 @@ app.delete('/api/customers/:code', requireAuth, async (req, res) => {
       .request()
       .input('매출처코드', sql.VarChar(8), code)
       .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .input('수정일자', sql.VarChar(8), 수정일자)
-      .query(`
+      .input('수정일자', sql.VarChar(8), 수정일자).query(`
         UPDATE 매출처 SET
           사용구분 = 9,
           사용자코드 = @사용자코드,
@@ -1198,7 +1201,8 @@ app.post('/api/suppliers', requireAuth, async (req, res) => {
           CAST(SUBSTRING(매입처코드, 2, 3) AS INT) DESC
       `;
 
-      const maxResult = await pool.request()
+      const maxResult = await pool
+        .request()
         .input('사업장코드', sql.VarChar(2), 최종사업장코드)
         .query(maxQuery);
 
@@ -1213,14 +1217,17 @@ app.post('/api/suppliers', requireAuth, async (req, res) => {
           const nextCharCode = prefix.charCodeAt(0) + 1;
 
           // Z를 넘어가면 A로 돌아감
-          if (nextCharCode > 90) { // 'Z'의 ASCII 코드는 90
+          if (nextCharCode > 90) {
+            // 'Z'의 ASCII 코드는 90
             prefix = 'A';
           } else {
             prefix = String.fromCharCode(nextCharCode);
           }
 
           nextNum = 1;
-          console.log(`  숫자 999 초과 → 영문 변경: ${lastCode.charAt(0)} → ${prefix}, 숫자 리셋: 001`);
+          console.log(
+            `  숫자 999 초과 → 영문 변경: ${lastCode.charAt(0)} → ${prefix}, 숫자 리셋: 001`,
+          );
         }
 
         최종매입처코드 = prefix + String(nextNum).padStart(3, '0');
@@ -1277,9 +1284,10 @@ app.post('/api/suppliers', requireAuth, async (req, res) => {
 
     res.json({
       success: true,
-      message: 최종매입처코드 !== 매입처코드
-        ? `매입처가 등록되었습니다. (코드: ${최종매입처코드})`
-        : '매입처가 등록되었습니다.',
+      message:
+        최종매입처코드 !== 매입처코드
+          ? `매입처가 등록되었습니다. (코드: ${최종매입처코드})`
+          : '매입처가 등록되었습니다.',
       data: {
         매입처코드: 최종매입처코드,
       },
@@ -1606,8 +1614,7 @@ app.delete('/api/suppliers/:code', requireAuth, async (req, res) => {
       .request()
       .input('매입처코드', sql.VarChar(8), code)
       .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .input('수정일자', sql.VarChar(8), 수정일자)
-      .query(`
+      .input('수정일자', sql.VarChar(8), 수정일자).query(`
         UPDATE 매입처 SET
           사용구분 = 9,
           사용자코드 = @사용자코드,
@@ -1645,8 +1652,7 @@ app.delete('/api/suppliers_delete/:code', requireAuth, async (req, res) => {
       .request()
       .input('매입처코드', sql.VarChar(8), code)
       .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .input('수정일자', sql.VarChar(8), 수정일자)
-      .query(`
+      .input('수정일자', sql.VarChar(8), 수정일자).query(`
         UPDATE 매입처 SET
           사용구분 = 9,
           사용자코드 = @사용자코드,
@@ -1772,8 +1778,7 @@ app.post('/api/accounts', requireAuth, async (req, res) => {
       .input('적요', sql.VarChar(60), 적요 || '')
       .input('사용구분', sql.TinyInt, 사용구분 || 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
         INSERT INTO 계정과목 (
           계정코드, 계정명, 합계시산표연결여부, 적요, 사용구분, 수정일자, 사용자코드
         ) VALUES (
@@ -1824,8 +1829,7 @@ app.put('/api/accounts/:code', requireAuth, async (req, res) => {
       .input('적요', sql.VarChar(60), 적요 || '')
       .input('사용구분', sql.TinyInt, 사용구분)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
         UPDATE 계정과목 SET
           계정명 = @계정명,
           합계시산표연결여부 = @합계시산표연결여부,
@@ -1868,8 +1872,7 @@ app.delete('/api/accounts/:code', requireAuth, async (req, res) => {
       .request()
       .input('계정코드', sql.VarChar(4), code)
       .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .input('수정일자', sql.VarChar(8), 수정일자)
-      .query(`
+      .input('수정일자', sql.VarChar(8), 수정일자).query(`
         UPDATE 계정과목 SET
           사용구분 = 9,
           사용자코드 = @사용자코드,
@@ -2135,14 +2138,16 @@ app.post('/api/quotations_add', requireAuth, async (req, res) => {
       .input('사용자코드', sql.VarChar(4), 사용자코드)
       .query(`SELECT 사용자명 FROM 사용자 WHERE 사용자코드 = @사용자코드`);
 
-    const 사용자명 = userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
+    const 사용자명 =
+      userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
 
     // 매출처명 조회
     const customerResult = await new sql.Request(transaction)
       .input('매출처코드', sql.VarChar(8), master.매출처코드)
       .query(`SELECT 매출처명 FROM 매출처 WHERE 매출처코드 = @매출처코드`);
 
-    const 매출처명 = customerResult.recordset.length > 0 ? customerResult.recordset[0].매출처명 : '';
+    const 매출처명 =
+      customerResult.recordset.length > 0 ? customerResult.recordset[0].매출처명 : '';
 
     // 트랜잭션 커밋
     await transaction.commit();
@@ -2625,7 +2630,10 @@ app.get('/api/orders', async (req, res) => {
     let query = `
             SELECT
                 o.사업장코드, o.발주일자, o.발주번호, o.매입처코드,
-                s.매입처명, o.입고희망일자, o.제목, o.적요, o.상태코드,
+                s.매입처명,
+                s.대표자명,
+                s.전화번호,
+                s.팩스번호, o.입고희망일자, o.제목, o.적요, o.상태코드,
                 o.수정일자, u.사용자명,
                 (SELECT SUM(ISNULL(발주량,0) * ISNULL(입고단가,0))
                  FROM 발주내역 od
@@ -2867,14 +2875,16 @@ app.post('/api/orders', async (req, res) => {
       .input('사용자코드', sql.VarChar(4), 사용자코드)
       .query(`SELECT 사용자명 FROM 사용자 WHERE 사용자코드 = @사용자코드`);
 
-    const 사용자명 = userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
+    const 사용자명 =
+      userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
 
     // 매입처명 조회
     const supplierResult = await new sql.Request(transaction)
       .input('매입처코드', sql.VarChar(8), master.매입처코드)
       .query(`SELECT 매입처명 FROM 매입처 WHERE 매입처코드 = @매입처코드`);
 
-    const 매입처명 = supplierResult.recordset.length > 0 ? supplierResult.recordset[0].매입처명 : '';
+    const 매입처명 =
+      supplierResult.recordset.length > 0 ? supplierResult.recordset[0].매입처명 : '';
 
     // 트랜잭션 커밋
     await transaction.commit();
@@ -2923,7 +2933,7 @@ app.put('/api/orders/:date/:no', requireAuth, async (req, res) => {
       적요: 적요,
       적요길이: 적요?.length,
       상태코드,
-      품목수: details?.length
+      품목수: details?.length,
     });
 
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -3131,8 +3141,7 @@ app.get('/api/materials', async (req, res) => {
             WHERE m.사용구분 ${사용구분조건}
         `;
 
-    const request = pool.request()
-      .input('사업장코드', sql.VarChar(2), 사업장코드);
+    const request = pool.request().input('사업장코드', sql.VarChar(2), 사업장코드);
 
     if (분류코드) {
       request.input('분류코드', sql.VarChar(2), 분류코드);
@@ -3234,7 +3243,8 @@ app.get('/api/materials/transaction-history', async (req, res) => {
         AND t.세부코드 = @세부코드
     `;
 
-    const request = pool.request()
+    const request = pool
+      .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('분류코드', sql.VarChar(2), 분류코드)
       .input('세부코드', sql.VarChar(18), 세부코드);
@@ -3275,7 +3285,7 @@ app.get('/api/materials/transaction-history', async (req, res) => {
     res.json({
       success: true,
       data: result.recordset,
-      total: result.recordset.length
+      total: result.recordset.length,
     });
   } catch (err) {
     console.error('❌ ❌ ❌ 자재내역조회 에러 ❌ ❌ ❌');
@@ -3461,8 +3471,7 @@ app.get('/api/materials/:code/detail', async (req, res) => {
     const materialResult = await pool
       .request()
       .input('분류코드', sql.VarChar(2), 분류코드)
-      .input('세부코드', sql.VarChar(16), 세부코드)
-      .query(`
+      .input('세부코드', sql.VarChar(16), 세부코드).query(`
         SELECT
           m.분류코드, m.세부코드,
           (m.분류코드 + m.세부코드) AS 자재코드,
@@ -3486,8 +3495,7 @@ app.get('/api/materials/:code/detail', async (req, res) => {
       .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('분류코드', sql.VarChar(2), 분류코드)
-      .input('세부코드', sql.VarChar(16), 세부코드)
-      .query(`
+      .input('세부코드', sql.VarChar(16), 세부코드).query(`
         SELECT
           s.매입처코드,
           p.매입처명,
@@ -3512,8 +3520,7 @@ app.get('/api/materials/:code/detail', async (req, res) => {
       .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('분류코드', sql.VarChar(2), 분류코드)
-      .input('세부코드', sql.VarChar(16), 세부코드)
-      .query(`
+      .input('세부코드', sql.VarChar(16), 세부코드).query(`
         SELECT
           l.적정재고,
           l.최저재고,
@@ -3542,8 +3549,7 @@ app.get('/api/materials/:code/detail', async (req, res) => {
       .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('분류코드', sql.VarChar(2), 분류코드)
-      .input('세부코드', sql.VarChar(16), 세부코드)
-      .query(`
+      .input('세부코드', sql.VarChar(16), 세부코드).query(`
         SELECT TOP 20
           t.입출고구분,
           CASE t.입출고구분
@@ -3635,9 +3641,7 @@ app.get('/api/material-categories/:code', async (req, res) => {
   try {
     const { code } = req.params;
 
-    const result = await pool.request()
-      .input('분류코드', sql.VarChar(2), code)
-      .query(`
+    const result = await pool.request().input('분류코드', sql.VarChar(2), code).query(`
         SELECT 분류코드, 분류명, 적요, 사용구분, 수정일자, 사용자코드
         FROM 자재분류
         WHERE 분류코드 = @분류코드
@@ -3674,7 +3678,8 @@ app.post('/api/material-categories', requireAuth, async (req, res) => {
     }
 
     // 중복 체크
-    const checkResult = await pool.request()
+    const checkResult = await pool
+      .request()
       .input('분류코드', sql.VarChar(2), 분류코드)
       .query('SELECT 분류코드 FROM 자재분류 WHERE 분류코드 = @분류코드');
 
@@ -3684,14 +3689,14 @@ app.post('/api/material-categories', requireAuth, async (req, res) => {
 
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
-    await pool.request()
+    await pool
+      .request()
       .input('분류코드', sql.VarChar(2), 분류코드)
       .input('분류명', sql.VarChar(50), 분류명)
       .input('적요', sql.VarChar(100), 적요 || '')
       .input('사용구분', sql.TinyInt, 0)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
         INSERT INTO 자재분류 (분류코드, 분류명, 적요, 사용구분, 수정일자, 사용자코드)
         VALUES (@분류코드, @분류명, @적요, @사용구분, @수정일자, @사용자코드)
       `);
@@ -3720,7 +3725,8 @@ app.put('/api/material-categories/:code', requireAuth, async (req, res) => {
     }
 
     // 존재 여부 확인
-    const checkResult = await pool.request()
+    const checkResult = await pool
+      .request()
       .input('분류코드', sql.VarChar(2), code)
       .query('SELECT 분류코드 FROM 자재분류 WHERE 분류코드 = @분류코드');
 
@@ -3730,13 +3736,13 @@ app.put('/api/material-categories/:code', requireAuth, async (req, res) => {
 
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
-    await pool.request()
+    await pool
+      .request()
       .input('분류코드', sql.VarChar(2), code)
       .input('분류명', sql.VarChar(50), 분류명)
       .input('적요', sql.VarChar(100), 적요 || '')
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
         UPDATE 자재분류
         SET 분류명 = @분류명,
             적요 = @적요,
@@ -3763,7 +3769,8 @@ app.delete('/api/material-categories/:code', requireAuth, async (req, res) => {
     const 사용자코드 = req.session?.user?.사용자코드 || '8080';
 
     // 존재 여부 확인
-    const checkResult = await pool.request()
+    const checkResult = await pool
+      .request()
       .input('분류코드', sql.VarChar(2), code)
       .query('SELECT 분류코드 FROM 자재분류 WHERE 분류코드 = @분류코드 AND 사용구분 = 0');
 
@@ -3772,7 +3779,8 @@ app.delete('/api/material-categories/:code', requireAuth, async (req, res) => {
     }
 
     // 해당 분류를 사용하는 자재가 있는지 확인
-    const materialCheck = await pool.request()
+    const materialCheck = await pool
+      .request()
       .input('분류코드', sql.VarChar(2), code)
       .query('SELECT COUNT(*) as cnt FROM 자재 WHERE 분류코드 = @분류코드 AND 사용구분 = 0');
 
@@ -3786,11 +3794,11 @@ app.delete('/api/material-categories/:code', requireAuth, async (req, res) => {
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     // 소프트 삭제
-    await pool.request()
+    await pool
+      .request()
       .input('분류코드', sql.VarChar(2), code)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
         UPDATE 자재분류
         SET 사용구분 = 1,
             수정일자 = @수정일자,
@@ -3874,13 +3882,13 @@ app.get('/api/material-history/:workplace/:category/:detail/:date/:time', async 
   try {
     const { workplace, category, detail, date, time } = req.params;
 
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input('사업장코드', sql.VarChar(2), workplace)
       .input('분류코드', sql.VarChar(2), category)
       .input('세부코드', sql.VarChar(16), detail)
       .input('입출고일자', sql.VarChar(8), date)
-      .input('입출고시간', sql.VarChar(9), time)
-      .query(`
+      .input('입출고시간', sql.VarChar(9), time).query(`
         SELECT
           i.사업장코드, i.분류코드, i.세부코드,
           i.입출고구분, i.입출고일자, i.입출고시간,
@@ -3957,7 +3965,8 @@ app.post('/api/material-history', requireAuth, async (req, res) => {
       });
     }
 
-    await pool.request()
+    await pool
+      .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('분류코드', sql.VarChar(2), 분류코드)
       .input('세부코드', sql.VarChar(16), 세부코드)
@@ -3976,8 +3985,7 @@ app.post('/api/material-history', requireAuth, async (req, res) => {
       .input('매출처코드', sql.VarChar(8), 매출처코드 || '')
       .input('적요', sql.VarChar(50), 적요 || '')
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
         INSERT INTO 자재입출내역 (
           사업장코드, 분류코드, 세부코드,
           입출고구분, 입출고일자, 입출고시간,
@@ -4015,36 +4023,39 @@ app.post('/api/material-history', requireAuth, async (req, res) => {
 });
 
 // 자재내역 수정
-app.put('/api/material-history/:workplace/:category/:detail/:date/:time', requireAuth, async (req, res) => {
-  try {
-    const { workplace, category, detail, date, time } = req.params;
-    const {
-      입출고구분,
-      입출고일자,
-      거래일자,
-      거래번호,
-      입고수량,
-      입고단가,
-      입고부가,
-      출고수량,
-      출고단가,
-      출고부가,
-      매입처코드,
-      매출처코드,
-      적요,
-    } = req.body;
+app.put(
+  '/api/material-history/:workplace/:category/:detail/:date/:time',
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { workplace, category, detail, date, time } = req.params;
+      const {
+        입출고구분,
+        입출고일자,
+        거래일자,
+        거래번호,
+        입고수량,
+        입고단가,
+        입고부가,
+        출고수량,
+        출고단가,
+        출고부가,
+        매입처코드,
+        매출처코드,
+        적요,
+      } = req.body;
 
-    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
-    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+      const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
-    // 존재 여부 확인
-    const checkResult = await pool.request()
-      .input('사업장코드', sql.VarChar(2), workplace)
-      .input('분류코드', sql.VarChar(2), category)
-      .input('세부코드', sql.VarChar(16), detail)
-      .input('입출고일자', sql.VarChar(8), date)
-      .input('입출고시간', sql.VarChar(9), time)
-      .query(`
+      // 존재 여부 확인
+      const checkResult = await pool
+        .request()
+        .input('사업장코드', sql.VarChar(2), workplace)
+        .input('분류코드', sql.VarChar(2), category)
+        .input('세부코드', sql.VarChar(16), detail)
+        .input('입출고일자', sql.VarChar(8), date)
+        .input('입출고시간', sql.VarChar(9), time).query(`
         SELECT 사업장코드 FROM 자재입출내역
         WHERE 사업장코드 = @사업장코드
           AND 분류코드 = @분류코드
@@ -4053,32 +4064,32 @@ app.put('/api/material-history/:workplace/:category/:detail/:date/:time', requir
           AND 입출고시간 = @입출고시간
       `);
 
-    if (checkResult.recordset.length === 0) {
-      return res.status(404).json({ success: false, message: '자재내역을 찾을 수 없습니다.' });
-    }
+      if (checkResult.recordset.length === 0) {
+        return res.status(404).json({ success: false, message: '자재내역을 찾을 수 없습니다.' });
+      }
 
-    await pool.request()
-      .input('사업장코드', sql.VarChar(2), workplace)
-      .input('분류코드', sql.VarChar(2), category)
-      .input('세부코드', sql.VarChar(16), detail)
-      .input('입출고일자_원본', sql.VarChar(8), date)
-      .input('입출고시간', sql.VarChar(9), time)
-      .input('입출고구분', sql.TinyInt, 입출고구분)
-      .input('입출고일자', sql.VarChar(8), 입출고일자)
-      .input('거래일자', sql.VarChar(8), 거래일자 || '')
-      .input('거래번호', sql.Real, 거래번호 || 0)
-      .input('입고수량', sql.Money, 입고수량 || 0)
-      .input('입고단가', sql.Money, 입고단가 || 0)
-      .input('입고부가', sql.Money, 입고부가 || 0)
-      .input('출고수량', sql.Money, 출고수량 || 0)
-      .input('출고단가', sql.Money, 출고단가 || 0)
-      .input('출고부가', sql.Money, 출고부가 || 0)
-      .input('매입처코드', sql.VarChar(8), 매입처코드 || '')
-      .input('매출처코드', sql.VarChar(8), 매출처코드 || '')
-      .input('적요', sql.VarChar(50), 적요 || '')
-      .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
+      await pool
+        .request()
+        .input('사업장코드', sql.VarChar(2), workplace)
+        .input('분류코드', sql.VarChar(2), category)
+        .input('세부코드', sql.VarChar(16), detail)
+        .input('입출고일자_원본', sql.VarChar(8), date)
+        .input('입출고시간', sql.VarChar(9), time)
+        .input('입출고구분', sql.TinyInt, 입출고구분)
+        .input('입출고일자', sql.VarChar(8), 입출고일자)
+        .input('거래일자', sql.VarChar(8), 거래일자 || '')
+        .input('거래번호', sql.Real, 거래번호 || 0)
+        .input('입고수량', sql.Money, 입고수량 || 0)
+        .input('입고단가', sql.Money, 입고단가 || 0)
+        .input('입고부가', sql.Money, 입고부가 || 0)
+        .input('출고수량', sql.Money, 출고수량 || 0)
+        .input('출고단가', sql.Money, 출고단가 || 0)
+        .input('출고부가', sql.Money, 출고부가 || 0)
+        .input('매입처코드', sql.VarChar(8), 매입처코드 || '')
+        .input('매출처코드', sql.VarChar(8), 매출처코드 || '')
+        .input('적요', sql.VarChar(50), 적요 || '')
+        .input('수정일자', sql.VarChar(8), 수정일자)
+        .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
         UPDATE 자재입출내역
         SET 입출고구분 = @입출고구분,
             입출고일자 = @입출고일자,
@@ -4102,29 +4113,33 @@ app.put('/api/material-history/:workplace/:category/:detail/:date/:time', requir
           AND 입출고시간 = @입출고시간
       `);
 
-    res.json({
-      success: true,
-      message: '자재내역이 수정되었습니다.',
-    });
-  } catch (err) {
-    console.error('자재내역 수정 에러:', err);
-    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
-  }
-});
+      res.json({
+        success: true,
+        message: '자재내역이 수정되었습니다.',
+      });
+    } catch (err) {
+      console.error('자재내역 수정 에러:', err);
+      res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+    }
+  },
+);
 
 // 자재내역 삭제 (하드 삭제)
-app.delete('/api/material-history/:workplace/:category/:detail/:date/:time', requireAuth, async (req, res) => {
-  try {
-    const { workplace, category, detail, date, time } = req.params;
+app.delete(
+  '/api/material-history/:workplace/:category/:detail/:date/:time',
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { workplace, category, detail, date, time } = req.params;
 
-    // 존재 여부 확인
-    const checkResult = await pool.request()
-      .input('사업장코드', sql.VarChar(2), workplace)
-      .input('분류코드', sql.VarChar(2), category)
-      .input('세부코드', sql.VarChar(16), detail)
-      .input('입출고일자', sql.VarChar(8), date)
-      .input('입출고시간', sql.VarChar(9), time)
-      .query(`
+      // 존재 여부 확인
+      const checkResult = await pool
+        .request()
+        .input('사업장코드', sql.VarChar(2), workplace)
+        .input('분류코드', sql.VarChar(2), category)
+        .input('세부코드', sql.VarChar(16), detail)
+        .input('입출고일자', sql.VarChar(8), date)
+        .input('입출고시간', sql.VarChar(9), time).query(`
         SELECT 사업장코드 FROM 자재입출내역
         WHERE 사업장코드 = @사업장코드
           AND 분류코드 = @분류코드
@@ -4133,18 +4148,18 @@ app.delete('/api/material-history/:workplace/:category/:detail/:date/:time', req
           AND 입출고시간 = @입출고시간
       `);
 
-    if (checkResult.recordset.length === 0) {
-      return res.status(404).json({ success: false, message: '자재내역을 찾을 수 없습니다.' });
-    }
+      if (checkResult.recordset.length === 0) {
+        return res.status(404).json({ success: false, message: '자재내역을 찾을 수 없습니다.' });
+      }
 
-    // 하드 삭제 (자재입출내역은 사용구분 필드가 있지만 실제 삭제)
-    await pool.request()
-      .input('사업장코드', sql.VarChar(2), workplace)
-      .input('분류코드', sql.VarChar(2), category)
-      .input('세부코드', sql.VarChar(16), detail)
-      .input('입출고일자', sql.VarChar(8), date)
-      .input('입출고시간', sql.VarChar(9), time)
-      .query(`
+      // 하드 삭제 (자재입출내역은 사용구분 필드가 있지만 실제 삭제)
+      await pool
+        .request()
+        .input('사업장코드', sql.VarChar(2), workplace)
+        .input('분류코드', sql.VarChar(2), category)
+        .input('세부코드', sql.VarChar(16), detail)
+        .input('입출고일자', sql.VarChar(8), date)
+        .input('입출고시간', sql.VarChar(9), time).query(`
         DELETE FROM 자재입출내역
         WHERE 사업장코드 = @사업장코드
           AND 분류코드 = @분류코드
@@ -4153,15 +4168,16 @@ app.delete('/api/material-history/:workplace/:category/:detail/:date/:time', req
           AND 입출고시간 = @입출고시간
       `);
 
-    res.json({
-      success: true,
-      message: '자재내역이 삭제되었습니다.',
-    });
-  } catch (err) {
-    console.error('자재내역 삭제 에러:', err);
-    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
-  }
-});
+      res.json({
+        success: true,
+        message: '자재내역이 삭제되었습니다.',
+      });
+    } catch (err) {
+      console.error('자재내역 삭제 에러:', err);
+      res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+    }
+  },
+);
 
 // 재고 현황 조회
 app.get('/api/inventory/:workplace', async (req, res) => {
@@ -4391,8 +4407,7 @@ app.get('/api/transactions/:date/:no/print', async (req, res) => {
       .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('거래일자', sql.VarChar(8), date)
-      .input('거래번호', sql.Real, parseFloat(no))
-      .query(`
+      .input('거래번호', sql.Real, parseFloat(no)).query(`
         SELECT
           T1.사업장코드, T1.거래일자, T1.거래번호,
           T1.매출처코드,
@@ -4481,7 +4496,7 @@ app.get('/api/transactions/:date/:no/print', async (req, res) => {
           총금액: firstRecord.총금액,
           건수: firstRecord.건수,
         },
-        details: result.recordset.map(item => ({
+        details: result.recordset.map((item) => ({
           코드: item.코드,
           품명: item.품명,
           규격: item.규격,
@@ -4514,7 +4529,9 @@ app.get('/api/quotations/:date/:no/print', async (req, res) => {
     console.log('✅ 견적서 인쇄 조회 요청:', { date, no, mode, 사업장코드 });
 
     // 견적서인쇄sp와 동일한 로직
-    const query = mode === 0 ? `
+    const query =
+      mode === 0
+        ? `
       SELECT T1.사업장코드, T1.견적일자, T1.견적번호, T1.출고희망일자,
              T1.매출처코드, T3.매출처명, T3.담당자명 AS 참조, T1.제목 AS 제목, T1.적요 AS 참조란,
              T2.자재코드, ISNULL(T4.자재명,'') AS 품명,
@@ -4523,7 +4540,7 @@ app.get('/api/quotations/:date/:no/print', async (req, res) => {
              T2.적요 AS 적요, T1.유효일수 AS 유효일수,
              DATEDIFF(day, CONVERT(DATETIME, T1.견적일자), CONVERT(DATETIME, T1.출고희망일자)) AS 견적후납기일수,
              T5.사업장명, T5.사업자번호, T5.대표자명, T5.전화번호, T5.팩스번호, T5.주소, T5.번지,
-             T3.전화번호 AS 매출처전화, T3.팩스번호 AS 매출처팩스, T3.주소 AS 매출처주소, T3.번지 AS 매출처번지
+             T3.전화번호 AS 매출처전화, T3.팩스번호 AS 매출처팩스, T3.주소 AS 매출처주소, T3.번지 AS 매출처번지, T3.담당자 AS 매출처담당자
         FROM 견적 T1
        INNER JOIN 견적내역 T2
                ON T2.사업장코드 = T1.사업장코드 AND T2.견적일자 = T1.견적일자 AND T2.견적번호 = T1.견적번호
@@ -4536,7 +4553,8 @@ app.get('/api/quotations/:date/:no/print', async (req, res) => {
          AND (T1.상태코드 = 1 OR T1.상태코드 = 2) AND T1.사용구분 = 0
          AND (T2.상태코드 = 1 OR T2.상태코드 = 2) AND T2.사용구분 = 0
        ORDER BY T1.사업장코드, T1.견적일자, T1.견적번호, T2.견적시간
-    ` : `
+    `
+        : `
       SELECT T1.사업장코드, T1.견적일자, T1.견적번호, T1.출고희망일자,
              T1.매출처코드, T3.매출처명, T3.담당자명 AS 참조, T1.제목 AS 제목, T1.적요 AS 참조란,
              T2.자재코드, ISNULL(T4.자재명,'') AS 품명,
@@ -4545,7 +4563,7 @@ app.get('/api/quotations/:date/:no/print', async (req, res) => {
              T2.적요 AS 적요, T1.유효일수 AS 유효일수,
              DATEDIFF(day, CONVERT(DATETIME, T1.견적일자), CONVERT(DATETIME, T1.출고희망일자)) AS 견적후납기일수,
              T5.사업장명, T5.사업자번호, T5.대표자명, T5.전화번호, T5.팩스번호, T5.주소, T5.번지,
-             T3.전화번호 AS 매출처전화, T3.팩스번호 AS 매출처팩스, T3.주소 AS 매출처주소, T3.번지 AS 매출처번지
+             T3.전화번호 AS 매출처전화, T3.팩스번호 AS 매출처팩스, T3.주소 AS 매출처주소, T3.번지 AS 매출처번지, T3.담당자명 AS 매출처담당자
         FROM 견적 T1
        INNER JOIN 견적내역 T2
                ON T2.사업장코드 = T1.사업장코드 AND T2.견적일자 = T1.견적일자 AND T2.견적번호 = T1.견적번호
@@ -4610,7 +4628,7 @@ app.get('/api/quotations/:date/:no/print', async (req, res) => {
           매출처전화: firstRow.매출처전화 || '',
           매출처팩스: firstRow.매출처팩스 || '',
           매출처주소: (firstRow.매출처주소 || '') + ' ' + (firstRow.매출처번지 || ''),
-          담당자명: firstRow.참조 || '',
+          매출처담당자: firstRow.매출처담당자 || '',
           제목: firstRow.제목 || '',
           적요: firstRow.참조란 || '',
           유효일수: firstRow.유효일수 || 0,
@@ -4626,6 +4644,137 @@ app.get('/api/quotations/:date/:no/print', async (req, res) => {
     console.log('✅ 견적서 인쇄 데이터 반환:', result.recordset.length, '건');
   } catch (err) {
     console.error('❌ 견적서 인쇄 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+// 발주서 인쇄 API - 발주서인쇄sp.txt 기반
+app.get('/api/orders/:date/:no/print', async (req, res) => {
+  try {
+    const { date, no } = req.params;
+    const mode = parseInt(req.query.mode) || 0; // 0=가격숨김, 1=가격표시
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    console.log('✅ 발주서 인쇄 조회 요청:', { date, no, mode, 사업장코드 });
+
+    // 발주인쇄sp와 동일한 로직
+    const query =
+      mode === 0
+        ? `
+      SELECT T1.사업장코드, T1.발주일자, T1.발주번호, T1.입고희망일자,
+             T1.매입처코드, T3.매입처명, T3.담당자명 AS 참조, T1.제목 AS 제목, T1.적요 AS 참조란,
+             T2.자재코드, ISNULL(T4.자재명,'') AS 품명,
+             T4.규격 AS 규격, T2.발주량 AS 수량, T4.단위 AS 단위,
+             0 AS 입고단가, 0 AS 입고부가, (0 * T2.수량) AS 금액,
+             T2.적요 AS 적요, T1.유효일수 AS 유효일수,
+             DATEDIFF(day, CONVERT(DATETIME, T1.발주일자), CONVERT(DATETIME, T1.입고희망일자)) AS 발주후납기일수,
+             T5.사업장명, T5.사업자번호, T5.대표자명, T5.전화번호, T5.팩스번호, T5.주소, T5.번지,
+             T3.전화번호 AS 매입처전화, T3.팩스번호 AS 매입처팩스, T3.주소 AS 매입처주소, T3.번지 AS 매입처번지, T3.담당자명 AS 매입처담당자
+        FROM 발주 T1
+       INNER JOIN 발주내역 T2
+               ON T2.사업장코드 = T1.사업장코드 AND T2.발주일자 = T1.발주일자 AND T2.발주번호 = T1.발주번호
+        LEFT JOIN 매입처 T3 ON T3.사업장코드 = T2.사업장코드 AND T3.매입처코드 = T2.매입처코드
+        LEFT JOIN 자재 T4 ON (T4.분류코드 + T4.세부코드) = T2.자재코드
+        LEFT JOIN 사업장 T5 ON T5.사업장코드 = T1.사업장코드
+       WHERE T1.사업장코드 = @사업장코드
+         AND T1.발주일자 = @발주일자
+         AND T1.발주번호 = @발주번호
+         AND (T1.상태코드 = 1 OR T1.상태코드 = 2) AND T1.사용구분 = 0
+         AND (T2.상태코드 = 1 OR T2.상태코드 = 2) AND T2.사용구분 = 0
+       ORDER BY T1.사업장코드, T1.발주일자, T1.발주번호, T2.발주시간
+    `
+        : `
+      SELECT T1.사업장코드, T1.발주일자, T1.발주번호, T1.입고희망일자,
+             T1.매입처코드, T3.매입처명, T3.담당자명 AS 참조, T1.제목 AS 제목, T1.적요 AS 참조란,
+             T2.자재코드, ISNULL(T4.자재명,'') AS 품명,
+             T4.규격 AS 규격, T2.발주량 AS 수량, T4.단위 AS 단위,T2.입고단가 AS 입고단가, T2.입고부가 AS 입고부가, (T2.입고단가 * T2.발주량) AS 금액,
+             T2.적요 AS 적요, T1.유효일수 AS 유효일수,
+             DATEDIFF(day, CONVERT(DATETIME, T1.발주일자), CONVERT(DATETIME, T1.입고희망일자)) AS 발주후납기일수,
+             T5.사업장명, T5.사업자번호, T5.대표자명, T5.전화번호, T5.팩스번호, T5.주소, T5.번지,
+             T3.전화번호 AS 매입처전화, T3.팩스번호 AS 매입처팩스, T3.주소 AS 매입처주소, T3.번지 AS 매입처번지, T3.담당자명 AS 매입처담당자
+        FROM 발주 T1
+       INNER JOIN 발주내역 T2
+               ON T2.사업장코드 = T1.사업장코드 AND T2.발주일자 = T1.발주일자 AND T2.발주번호 = T1.발주번호
+        LEFT JOIN 매입처 T3 ON T3.사업장코드 = T2.사업장코드 AND T3.매입처코드 = T2.매입처코드
+        LEFT JOIN 자재 T4 ON (T4.분류코드 + T4.세부코드) = T2.자재코드
+        LEFT JOIN 사업장 T5 ON T5.사업장코드 = T1.사업장코드
+       WHERE T1.사업장코드 = @사업장코드
+         AND T1.발주일자 = @발주일자
+         AND T1.발주번호 = @발주번호
+         AND (T1.상태코드 = 1 OR T1.상태코드 = 2) AND T1.사용구분 = 0
+         AND (T2.상태코드 = 1 OR T2.상태코드 = 2) AND T2.사용구분 = 0
+        ORDER BY T1.사업장코드, T1.발주일자, T1.발주번호, T2.발주시간
+    `;
+
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('발주일자', sql.VarChar(8), date)
+      .input('발주번호', sql.Real, parseFloat(no))
+      .query(query);
+
+    if (result.recordset.length === 0) {
+      return res.json({
+        success: false,
+        message: '발주서를 찾을 수 없습니다.',
+      });
+    }
+
+    const firstRow = result.recordset[0];
+
+    // 품목별 합계 계산
+    const items = result.recordset.map((row) => ({
+      품명: row.품명 || '',
+      규격: row.규격 || '',
+      수량: row.수량 || 0,
+      단위: row.단위 || '',
+      단가: row.입고단가 || 0,
+      부가: row.입고부가 || 0,
+      금액: row.금액 || 0,
+      적요: row.적요 || '',
+    }));
+
+    const 총공급가액 = items.reduce((sum, item) => sum + (item.금액 || 0), 0);
+    const 총부가세 = items.reduce((sum, item) => sum + (item.부가 || 0), 0);
+    const 총합계 = 총공급가액 + 총부가세;
+
+    res.json({
+      success: true,
+      data: {
+        header: {
+          사업장명: firstRow.사업장명 || '',
+          사업자번호: firstRow.사업자번호 || '',
+          대표자명: firstRow.대표자명 || '',
+          전화번호: firstRow.전화번호 || '',
+          팩스번호: firstRow.팩스번호 || '',
+          주소: (firstRow.주소 || '') + ' ' + (firstRow.번지 || ''),
+          발주일자: firstRow.발주일자 || '',
+          발주번호: firstRow.발주번호 || '',
+          입고희망일자: firstRow.입고희망일자 || '',
+          매입처코드: firstRow.매입처코드 || '',
+          매입처명: firstRow.매입처명 || '',
+          매입처전화: firstRow.매입처전화 || '',
+          매입처팩스: firstRow.매입처팩스 || '',
+          매입처주소: (firstRow.매입처주소 || '') + ' ' + (firstRow.매입처번지 || ''),
+          매입처담당자: firstRow.매입처담당자 || '',
+          제목: firstRow.제목 || '',
+          적요: firstRow.참조란 || '',
+          유효일수: firstRow.유효일수 || 0,
+          납기일수: firstRow.발주후납기일수 || 0,
+          총공급가액: 총공급가액,
+          총부가세: 총부가세,
+          총합계: 총합계,
+        },
+        items: items,
+      },
+    });
+
+    console.log('✅ 발주서 인쇄 데이터 반환:', result.recordset.length, '건');
+  } catch (err) {
+    console.error('❌ 발주서 인쇄 조회 오류:', err);
     res.status(500).json({
       success: false,
       message: '서버 오류: ' + err.message,
@@ -4793,10 +4942,10 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
     }
 
     // 1. 기존 거래명세서 삭제 (거래일자 + 거래번호)
-    await pool.request()
+    await pool
+      .request()
       .input('거래일자', sql.VarChar(8), 거래일자)
-      .input('거래번호', sql.Real, parseFloat(거래번호))
-      .query(`
+      .input('거래번호', sql.Real, parseFloat(거래번호)).query(`
         DELETE FROM 자재입출내역
         WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
       `);
@@ -4825,7 +4974,8 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
       const 출고단가 = 단가;
       const 출고부가 = Math.round(출고수량 * 출고단가 * 0.1);
 
-      await pool.request()
+      await pool
+        .request()
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('분류코드', sql.VarChar(2), 분류코드)
         .input('세부코드', sql.VarChar(18), 세부코드)
@@ -4840,8 +4990,7 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
         .input('거래번호', sql.Real, parseFloat(거래번호))
         .input('적요', sql.VarChar(50), detail.적요 || '')
         .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
-        .query(`
+        .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
           INSERT INTO 자재입출내역 (
             사업장코드, 분류코드, 세부코드, 입출고구분, 입출고일자, 입출고시간,
             입고수량, 입고단가, 입고부가,
@@ -4908,10 +5057,10 @@ app.post('/api/transactions', async (req, res) => {
     const 테이블명 = '자재입출내역';
 
     // 로그 테이블에서 다음 번호 조회 및 업데이트
-    const logResult = await pool.request()
+    const logResult = await pool
+      .request()
       .input('테이블명', sql.VarChar(20), 테이블명)
-      .input('베이스코드', sql.VarChar(20), 베이스코드)
-      .query(`
+      .input('베이스코드', sql.VarChar(20), 베이스코드).query(`
         SELECT 최종로그 FROM 로그
         WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
       `);
@@ -4919,21 +5068,21 @@ app.post('/api/transactions', async (req, res) => {
     let 거래번호;
     if (logResult.recordset.length > 0) {
       거래번호 = logResult.recordset[0].최종로그 + 1;
-      await pool.request()
+      await pool
+        .request()
         .input('최종로그', sql.Real, 거래번호)
         .input('테이블명', sql.VarChar(20), 테이블명)
-        .input('베이스코드', sql.VarChar(20), 베이스코드)
-        .query(`
+        .input('베이스코드', sql.VarChar(20), 베이스코드).query(`
           UPDATE 로그 SET 최종로그 = @최종로그
           WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
         `);
     } else {
       거래번호 = 1;
-      await pool.request()
+      await pool
+        .request()
         .input('테이블명', sql.VarChar(20), 테이블명)
         .input('베이스코드', sql.VarChar(20), 베이스코드)
-        .input('최종로그', sql.Real, 거래번호)
-        .query(`
+        .input('최종로그', sql.Real, 거래번호).query(`
           INSERT INTO 로그 (테이블명, 베이스코드, 최종로그)
           VALUES (@테이블명, @베이스코드, @최종로그)
         `);
@@ -4961,7 +5110,8 @@ app.post('/api/transactions', async (req, res) => {
       const 출고단가 = 단가;
       const 출고부가 = Math.round(출고수량 * 출고단가 * 0.1); // 부가세 10%
 
-      await pool.request()
+      await pool
+        .request()
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('분류코드', sql.VarChar(2), 분류코드)
         .input('세부코드', sql.VarChar(18), 세부코드)
@@ -4976,8 +5126,7 @@ app.post('/api/transactions', async (req, res) => {
         .input('거래번호', sql.Real, 거래번호)
         .input('적요', sql.VarChar(50), 적요 || '')
         .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
-        .query(`
+        .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
           INSERT INTO 자재입출내역 (
             사업장코드, 분류코드, 세부코드, 입출고구분, 입출고일자, 입출고시간,
             입고수량, 입고단가, 입고부가,
@@ -4999,18 +5148,22 @@ app.post('/api/transactions', async (req, res) => {
     console.log(`✅ 거래명세서 작성 완료: ${거래일자}-${거래번호} (${details.length}건)`);
 
     // 사용자명 조회
-    const userResult = await pool.request()
+    const userResult = await pool
+      .request()
       .input('사용자코드', sql.VarChar(4), 사용자코드)
       .query(`SELECT 사용자명 FROM 사용자 WHERE 사용자코드 = @사용자코드`);
 
-    const 사용자명 = userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
+    const 사용자명 =
+      userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
 
     // 매출처명 조회
-    const customerResult = await pool.request()
+    const customerResult = await pool
+      .request()
       .input('매출처코드', sql.VarChar(8), 매출처코드)
       .query(`SELECT 매출처명 FROM 매출처 WHERE 매출처코드 = @매출처코드`);
 
-    const 매출처명 = customerResult.recordset.length > 0 ? customerResult.recordset[0].매출처명 : '';
+    const 매출처명 =
+      customerResult.recordset.length > 0 ? customerResult.recordset[0].매출처명 : '';
 
     res.json({
       success: true,
@@ -5042,10 +5195,10 @@ app.delete('/api/transactions/:date/:no', requireAuth, async (req, res) => {
     console.log(`✅ 거래명세서 삭제 요청 (소프트 삭제): ${거래일자}-${거래번호}`);
 
     // 소프트 삭제: 사용구분을 9로 설정 (실제 데이터는 삭제하지 않음)
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input('거래일자', sql.VarChar(8), 거래일자)
-      .input('거래번호', sql.Real, parseFloat(거래번호))
-      .query(`
+      .input('거래번호', sql.Real, parseFloat(거래번호)).query(`
         UPDATE 자재입출내역
         SET 사용구분 = 9
         WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호 AND 사용구분 = 0
@@ -5058,7 +5211,9 @@ app.delete('/api/transactions/:date/:no', requireAuth, async (req, res) => {
       });
     }
 
-    console.log(`✅ 거래명세서 소프트 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`);
+    console.log(
+      `✅ 거래명세서 소프트 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`,
+    );
 
     res.json({
       success: true,
@@ -5081,10 +5236,10 @@ app.put('/api/transactions/:date/:no/approve', requireAuth, async (req, res) => 
     console.log(`✅ 거래명세서 확정 요청: ${거래일자}-${거래번호}`);
 
     // 거래명세서 존재 여부 확인
-    const checkResult = await pool.request()
+    const checkResult = await pool
+      .request()
       .input('거래일자', sql.VarChar(8), 거래일자)
-      .input('거래번호', sql.Real, parseFloat(거래번호))
-      .query(`
+      .input('거래번호', sql.Real, parseFloat(거래번호)).query(`
         SELECT TOP 1 입출고구분
         FROM 자재입출내역
         WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
@@ -5098,7 +5253,8 @@ app.put('/api/transactions/:date/:no/approve', requireAuth, async (req, res) => 
     }
 
     // 거래명세서 상태를 확정(2)으로 업데이트
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input('거래일자', sql.VarChar(8), 거래일자)
       .input('거래번호', sql.Real, parseFloat(거래번호))
       .input('입출고구분', sql.Real, 2) // 2 = 확정
@@ -5141,8 +5297,7 @@ app.get('/api/tax-invoices/:작성년도/:책번호/:일련번호/print', async 
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('작성년도', sql.VarChar(4), 작성년도)
       .input('책번호', sql.Real, parseFloat(책번호))
-      .input('일련번호', sql.Real, parseFloat(일련번호))
-      .query(`
+      .input('일련번호', sql.Real, parseFloat(일련번호)).query(`
         SELECT T1.사업장코드, T1.작성년도, T1.책번호, T1.일련번호,
                T1.매출처코드,
                ISNULL(T3.사업자번호, '') AS 좌등록번호,
@@ -5299,7 +5454,6 @@ app.get('/api/tax-invoices', async (req, res) => {
       data: result.recordset,
       total: result.recordset.length,
     });
-
   } catch (error) {
     console.error('세금계산서 목록 조회 실패:', error);
     res.status(500).json({
@@ -5317,7 +5471,9 @@ app.get('/api/tax-invoices/:사업장코드/:작성년도/:책번호/:일련번�
 
     console.log('='.repeat(80));
     console.log(`🔍 [API 호출] 세금계산서 상세 조회`);
-    console.log(`📋 요청 파라미터: 사업장코드=${사업장코드}, 작성년도=${작성년도}, 책번호=${책번호}, 일련번호=${일련번호}`);
+    console.log(
+      `📋 요청 파라미터: 사업장코드=${사업장코드}, 작성년도=${작성년도}, 책번호=${책번호}, 일련번호=${일련번호}`,
+    );
     console.log('='.repeat(80));
 
     // 1. 세금계산서 기본 정보 조회
@@ -5412,7 +5568,9 @@ app.get('/api/tax-invoices/:사업장코드/:작성년도/:책번호/:일련번�
     `;
 
     console.log('📊 [Step 2] 자재입출내역 조회 시작...');
-    console.log(`🔍 검색 조건: 사업장코드=${사업장코드}, 작성년도=${작성년도}, 책번호=${책번호}, 일련번호=${일련번호}`);
+    console.log(
+      `🔍 검색 조건: 사업장코드=${사업장코드}, 작성년도=${작성년도}, 책번호=${책번호}, 일련번호=${일련번호}`,
+    );
 
     const detailResult = await pool
       .request()
@@ -5447,7 +5605,6 @@ app.get('/api/tax-invoices/:사업장코드/:작성년도/:책번호/:일련번�
         details: detailResult.recordset,
       },
     });
-
   } catch (error) {
     console.error('세금계산서 상세 조회 실패:', error);
     res.status(500).json({
@@ -5506,7 +5663,6 @@ app.put('/api/tax-invoices/:사업장코드/:작성년도/:책번호/:일련번�
       success: true,
       message: '세금계산서가 수정되었습니다.',
     });
-
   } catch (error) {
     console.error('세금계산서 수정 실패:', error);
     res.status(500).json({
@@ -5526,7 +5682,9 @@ app.delete('/api/tax-invoices/:사업장코드/:작성년도/:책번호/:일련�
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     console.log('='.repeat(80));
-    console.log(`🗑️ [세금계산서 삭제] 사업장코드=${사업장코드}, 작성년도=${작성년도}, 책번호=${책번호}, 일련번호=${일련번호}`);
+    console.log(
+      `🗑️ [세금계산서 삭제] 사업장코드=${사업장코드}, 작성년도=${작성년도}, 책번호=${책번호}, 일련번호=${일련번호}`,
+    );
     console.log(`👤 삭제 사용자: ${사용자코드}, 수정일자: ${수정일자}`);
     console.log('='.repeat(80));
 
@@ -5579,14 +5737,15 @@ app.delete('/api/tax-invoices/:사업장코드/:작성년도/:책번호/:일련�
       .input('사용자코드', sql.VarChar(4), 사용자코드)
       .query(inventoryQuery);
 
-    console.log(`✅ [Step 2] 자재입출내역 테이블 사용구분 = 9 업데이트 완료 (${inventoryResult.rowsAffected[0]}건)`);
+    console.log(
+      `✅ [Step 2] 자재입출내역 테이블 사용구분 = 9 업데이트 완료 (${inventoryResult.rowsAffected[0]}건)`,
+    );
     console.log('='.repeat(80));
 
     res.json({
       success: true,
       message: '세금계산서가 삭제되었습니다.',
     });
-
   } catch (error) {
     console.error('❌ 세금계산서 삭제 실패:', error);
     res.status(500).json({
@@ -5778,10 +5937,10 @@ app.post('/api/purchase-statements', async (req, res) => {
     const 베이스코드 = 거래일자;
     const 테이블명 = '자재입출내역';
 
-    const logResult = await pool.request()
+    const logResult = await pool
+      .request()
       .input('테이블명', sql.VarChar(20), 테이블명)
-      .input('베이스코드', sql.VarChar(20), 베이스코드)
-      .query(`
+      .input('베이스코드', sql.VarChar(20), 베이스코드).query(`
         SELECT 최종로그 FROM 로그
         WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
       `);
@@ -5789,21 +5948,21 @@ app.post('/api/purchase-statements', async (req, res) => {
     let 거래번호;
     if (logResult.recordset.length > 0) {
       거래번호 = logResult.recordset[0].최종로그 + 1;
-      await pool.request()
+      await pool
+        .request()
         .input('최종로그', sql.Real, 거래번호)
         .input('테이블명', sql.VarChar(20), 테이블명)
-        .input('베이스코드', sql.VarChar(20), 베이스코드)
-        .query(`
+        .input('베이스코드', sql.VarChar(20), 베이스코드).query(`
           UPDATE 로그 SET 최종로그 = @최종로그
           WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
         `);
     } else {
       거래번호 = 1;
-      await pool.request()
+      await pool
+        .request()
         .input('테이블명', sql.VarChar(20), 테이블명)
         .input('베이스코드', sql.VarChar(20), 베이스코드)
-        .input('최종로그', sql.Real, 거래번호)
-        .query(`
+        .input('최종로그', sql.Real, 거래번호).query(`
           INSERT INTO 로그 (테이블명, 베이스코드, 최종로그)
           VALUES (@테이블명, @베이스코드, @최종로그)
         `);
@@ -5838,7 +5997,8 @@ app.post('/api/purchase-statements', async (req, res) => {
       총공급가액 += 입고수량 * 입고단가;
       총부가세 += 입고부가;
 
-      await pool.request()
+      await pool
+        .request()
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('분류코드', sql.VarChar(2), 분류코드)
         .input('세부코드', sql.VarChar(18), 세부코드)
@@ -5853,8 +6013,7 @@ app.post('/api/purchase-statements', async (req, res) => {
         .input('거래번호', sql.Real, 거래번호)
         .input('적요', sql.VarChar(50), 적요 || '')
         .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
-        .query(`
+        .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
           INSERT INTO 자재입출내역 (
             사업장코드, 분류코드, 세부코드, 입출고구분, 입출고일자, 입출고시간,
             입고수량, 입고단가, 입고부가,
@@ -5878,7 +6037,8 @@ app.post('/api/purchase-statements', async (req, res) => {
     // 2️⃣ 미지급금내역 자동 생성 (거래일자 기준)
     const 미지급금지급금액 = 총공급가액 + 총부가세;
 
-    await pool.request()
+    await pool
+      .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('매입처코드', sql.VarChar(8), 매입처코드)
       .input('미지급금지급일자', sql.VarChar(8), 거래일자)
@@ -5889,8 +6049,7 @@ app.post('/api/purchase-statements', async (req, res) => {
       .input('어음번호', sql.VarChar(20), '')
       .input('적요', sql.VarChar(50), `매입전표 ${거래일자}-${거래번호}`)
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
         INSERT INTO 미지급금내역 (
           사업장코드, 매입처코드, 미지급금지급일자, 미지급금지급시간,
           미지급금지급금액, 결제방법, 만기일자, 어음번호, 적요,
@@ -5902,22 +6061,28 @@ app.post('/api/purchase-statements', async (req, res) => {
         )
       `);
 
-    console.log(`✅ 미지급금내역 자동 생성: ${매입처코드} - ${미지급금지급금액.toLocaleString()}원`);
+    console.log(
+      `✅ 미지급금내역 자동 생성: ${매입처코드} - ${미지급금지급금액.toLocaleString()}원`,
+    );
     console.log(`✅ 매입전표 작성 완료: ${거래일자}-${거래번호}`);
 
     // 사용자명 조회
-    const userResult = await pool.request()
+    const userResult = await pool
+      .request()
       .input('사용자코드', sql.VarChar(4), 사용자코드)
       .query(`SELECT 사용자명 FROM 사용자 WHERE 사용자코드 = @사용자코드`);
 
-    const 사용자명 = userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
+    const 사용자명 =
+      userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
 
     // 매입처명 조회
-    const supplierResult = await pool.request()
+    const supplierResult = await pool
+      .request()
       .input('매입처코드', sql.VarChar(8), 매입처코드)
       .query(`SELECT 매입처명 FROM 매입처 WHERE 매입처코드 = @매입처코드`);
 
-    const 매입처명 = supplierResult.recordset.length > 0 ? supplierResult.recordset[0].매입처명 : '';
+    const 매입처명 =
+      supplierResult.recordset.length > 0 ? supplierResult.recordset[0].매입처명 : '';
 
     res.json({
       success: true,
@@ -5961,10 +6126,10 @@ app.put('/api/purchase-statements/:date/:no', requireAuth, async (req, res) => {
     }
 
     // 1. 기존 매입전표 삭제
-    await pool.request()
+    await pool
+      .request()
       .input('거래일자', sql.VarChar(8), 거래일자)
-      .input('거래번호', sql.Real, parseFloat(거래번호))
-      .query(`
+      .input('거래번호', sql.Real, parseFloat(거래번호)).query(`
         DELETE FROM 자재입출내역
         WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호
       `);
@@ -5992,7 +6157,8 @@ app.put('/api/purchase-statements/:date/:no', requireAuth, async (req, res) => {
       const 입고단가 = 단가;
       const 입고부가 = Math.round(입고수량 * 입고단가 * 0.1);
 
-      await pool.request()
+      await pool
+        .request()
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('분류코드', sql.VarChar(2), 분류코드)
         .input('세부코드', sql.VarChar(18), 세부코드)
@@ -6007,8 +6173,7 @@ app.put('/api/purchase-statements/:date/:no', requireAuth, async (req, res) => {
         .input('거래번호', sql.Real, parseFloat(거래번호))
         .input('적요', sql.VarChar(50), detail.적요 || '')
         .input('수정일자', sql.VarChar(8), 수정일자)
-        .input('사용자코드', sql.VarChar(4), 사용자코드)
-        .query(`
+        .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
           INSERT INTO 자재입출내역 (
             사업장코드, 분류코드, 세부코드, 입출고구분, 입출고일자, 입출고시간,
             입고수량, 입고단가, 입고부가,
@@ -6054,10 +6219,10 @@ app.delete('/api/purchase-statements/:date/:no', requireAuth, async (req, res) =
     console.log(`✅ 매입전표 삭제 요청 (소프트 삭제): ${거래일자}-${거래번호}`);
 
     // 소프트 삭제: 사용구분을 9로 설정 (실제 데이터는 삭제하지 않음)
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input('거래일자', sql.VarChar(8), 거래일자)
-      .input('거래번호', sql.Real, parseFloat(거래번호))
-      .query(`
+      .input('거래번호', sql.Real, parseFloat(거래번호)).query(`
         UPDATE 자재입출내역
         SET 사용구분 = 9
         WHERE 거래일자 = @거래일자 AND 거래번호 = @거래번호 AND 사용구분 = 0
@@ -6070,7 +6235,9 @@ app.delete('/api/purchase-statements/:date/:no', requireAuth, async (req, res) =
       });
     }
 
-    console.log(`✅ 매입전표 소프트 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`);
+    console.log(
+      `✅ 매입전표 소프트 삭제 완료: ${거래일자}-${거래번호} (${result.rowsAffected[0]}건)`,
+    );
 
     res.json({
       success: true,
@@ -6114,7 +6281,10 @@ app.get('/api/accounts-payable', async (req, res) => {
     }
 
     if (startDate && endDate) {
-      query += ` AND 미지급금지급일자 BETWEEN '${startDate.replace(/-/g, '')}' AND '${endDate.replace(/-/g, '')}'`;
+      query += ` AND 미지급금지급일자 BETWEEN '${startDate.replace(
+        /-/g,
+        '',
+      )}' AND '${endDate.replace(/-/g, '')}'`;
     }
 
     query += ` ORDER BY 미지급금지급일자 DESC, 미지급금지급시간 DESC`;
@@ -6130,7 +6300,8 @@ app.get('/api/accounts-payable', async (req, res) => {
 // ✅ 미지급금 등록
 app.post('/api/accounts-payable', requireAuth, async (req, res) => {
   try {
-    const { 매입처코드, 미지급금지급일자, 미지급금지급금액, 결제방법, 만기일자, 어음번호, 적요 } = req.body;
+    const { 매입처코드, 미지급금지급일자, 미지급금지급금액, 결제방법, 만기일자, 어음번호, 적요 } =
+      req.body;
     const 사업장코드 = '01';
     const 사용자코드 = req.session?.user?.사용자코드 || '8080';
 
@@ -6152,7 +6323,8 @@ app.post('/api/accounts-payable', requireAuth, async (req, res) => {
 
     const 수정일자 = 미지급금지급일자;
 
-    await pool.request()
+    await pool
+      .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('매입처코드', sql.VarChar(8), 매입처코드)
       .input('미지급금지급일자', sql.VarChar(8), 미지급금지급일자)
@@ -6163,8 +6335,7 @@ app.post('/api/accounts-payable', requireAuth, async (req, res) => {
       .input('어음번호', sql.VarChar(20), 어음번호 || '')
       .input('적요', sql.VarChar(50), 적요 || '')
       .input('수정일자', sql.VarChar(8), 수정일자)
-      .input('사용자코드', sql.VarChar(4), 사용자코드)
-      .query(`
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
         INSERT INTO 미지급금내역 (
           사업장코드, 매입처코드, 미지급금지급일자, 미지급금지급시간,
           미지급금지급금액, 결제방법, 만기일자, 어음번호, 적요,
@@ -6202,8 +6373,7 @@ app.get('/api/accounts-payable/balance/:supplierCode', async (req, res) => {
     const { supplierCode } = req.params;
 
     // 1. 총 매입액 계산 (자재입출내역에서 입고 금액)
-    const purchaseResult = await pool.request()
-      .input('매입처코드', sql.VarChar(8), supplierCode)
+    const purchaseResult = await pool.request().input('매입처코드', sql.VarChar(8), supplierCode)
       .query(`
         SELECT
           ISNULL(SUM(입고수량 * 입고단가 * 1.1), 0) AS 총매입액
@@ -6214,8 +6384,7 @@ app.get('/api/accounts-payable/balance/:supplierCode', async (req, res) => {
       `);
 
     // 2. 총 지급액 계산 (미지급금내역에서 지급 금액)
-    const paymentResult = await pool.request()
-      .input('매입처코드', sql.VarChar(8), supplierCode)
+    const paymentResult = await pool.request().input('매입처코드', sql.VarChar(8), supplierCode)
       .query(`
         SELECT
           ISNULL(SUM(미지급금지급금액), 0) AS 총지급액
@@ -6364,6 +6533,546 @@ app.get('/', (req, res) => {
       dashboard: 'GET /api/dashboard/stats',
     },
   });
+});
+
+/*
+ * ========================================
+ * 출력물관리 - 일계표 API
+ * ========================================
+ */
+app.get('/api/daily-report', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: '조회일자를 입력해주세요.',
+      });
+    }
+
+    console.log('✅ 일계표 조회 요청:', { date, 사업장코드 });
+
+    // sp일계표인쇄 저장 프로시저 로직을 쿼리로 구현
+    const query = `
+      -- 1. 전일이월 (회계전표내역마감)
+      SELECT T1.사업장코드, T2.사업장명, '1' AS 그룹1, '1' AS 그룹2, '' AS 작성시간,
+             '경   비' AS 구분,
+             '' AS 계정코드, '전일이월' AS 계정명,
+             0 AS 수입1, 0 AS 수입2,
+             0 AS 지출1, 0 AS 지출2,
+             SUM(T1.입금누계금액 - T1.출금누계금액) AS 잔액
+        FROM 회계전표내역마감 T1
+        LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드
+       WHERE T1.사업장코드 = @사업장코드
+         AND T1.마감년월 >= (SUBSTRING(@date, 1, 4) + '00')
+         AND T1.마감년월 < SUBSTRING(@date, 1, 6)
+       GROUP BY T1.사업장코드, T2.사업장명
+
+      UNION ALL
+
+      -- 2. 전일이월 (회계전표내역)
+      SELECT T1.사업장코드, T2.사업장명, '1' AS 그룹1, '1' AS 그룹2, '' AS 작성시간,
+             '경   비' AS 구분,
+             '' AS 계정코드, '전일이월' AS 계정명,
+             0 AS 수입1, 0 AS 수입2,
+             0 AS 지출1, 0 AS 지출2,
+             SUM(T1.입금금액 - T1.출금금액) AS 잔액
+        FROM 회계전표내역 T1
+        LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드
+       WHERE T1.사업장코드 = @사업장코드 AND T1.사용구분 = 0
+         AND (T1.작성일자 >= (SUBSTRING(@date, 1, 6) + '01') AND T1.작성일자 < @date)
+       GROUP BY T1.사업장코드, T2.사업장명
+
+      UNION ALL
+
+      -- 3. 경비 (회계전표내역 - 당일)
+      SELECT T1.사업장코드, T2.사업장명, '1' AS 그룹1, '1' AS 그룹2, T1.작성시간 AS 작성시간,
+             '경   비' AS 구분,
+             T1.계정코드 AS 계정코드, T1.적요 AS 계정명,
+             SUM(T1.입금금액) AS 수입1, 0 AS 수입2,
+             SUM(T1.출금금액) AS 지출1, 0 AS 지출2,
+             0 AS 잔액
+        FROM 회계전표내역 T1
+        LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드
+        LEFT JOIN 계정과목 T3 ON T3.계정코드 = T1.계정코드
+       WHERE T1.사업장코드 = @사업장코드 AND T1.사용구분 = 0
+         AND T1.작성일자 = @date
+       GROUP BY T1.사업장코드, T2.사업장명, T1.작성시간, T1.계정코드, T1.적요
+
+      UNION ALL
+
+      -- 4. 매입 (자재입출내역 - 입고)
+      SELECT T1.사업장코드, T2.사업장명, '2' AS 그룹1, '1' AS 그룹2, '' AS 작성시간,
+             '매   입' AS 구분,
+             T1.매입처코드 AS 계정코드, T3.매입처명 AS 계정명,
+             SUM(T1.입고수량 * T1.입고단가) AS 수입1,
+             (SUM(T1.입고수량 * T1.입고단가) * 1.1) AS 수입2,
+             0 AS 지출1, 0 AS 지출2,
+             0 AS 잔액
+        FROM 자재입출내역 T1
+        LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드
+        LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+       WHERE T1.사업장코드 = @사업장코드 AND T1.사용구분 = 0
+         AND T1.입출고일자 = @date
+         AND T1.입출고구분 = 1
+       GROUP BY T1.사업장코드, T2.사업장명, T3.매입처명, T1.매입처코드
+
+      UNION ALL
+
+      -- 5. 매출 (자재입출내역 - 출고)
+      SELECT T1.사업장코드, T2.사업장명, '2' AS 그룹1, '2' AS 그룹2, '' AS 작성시간,
+             '매   출' AS 구분,
+             T1.매출처코드 AS 계정코드, T3.매출처명 AS 계정명,
+             0 AS 수입1, 0 AS 수입2,
+             SUM(T1.출고수량 * T1.출고단가) AS 지출1,
+             (SUM(T1.출고수량 * T1.출고단가) * 1.1) AS 지출2,
+             0 AS 잔액
+        FROM 자재입출내역 T1
+        LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드
+        LEFT JOIN 매출처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매출처코드 = T1.매출처코드
+       WHERE T1.사업장코드 = @사업장코드 AND T1.사용구분 = 0
+         AND T1.입출고일자 = @date
+         AND (T1.입출고구분 = 2 OR T1.입출고구분 = 8)
+       GROUP BY T1.사업장코드, T2.사업장명, T3.매출처명, T1.매출처코드
+
+      UNION ALL
+
+      -- 6. 입금 (미수금내역)
+      SELECT T1.사업장코드, T2.사업장명, '3' AS 그룹1, '1' AS 그룹2, '' AS 작성시간,
+             '입   금' AS 구분,
+             T1.매출처코드 AS 계정코드, T3.매출처명 AS 계정명,
+             SUM(ISNULL(T1.미수금입금금액,0)) AS 수입1,
+             SUM(ISNULL(T1.미수금입금금액,0)) AS 수입2,
+             0 AS 지출1, 0 AS 지출2,
+             0 AS 잔액
+        FROM 미수금내역 T1
+        LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드
+        LEFT JOIN 매출처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매출처코드 = T1.매출처코드
+       WHERE T1.사업장코드 = @사업장코드
+         AND T1.미수금입금일자 = @date
+       GROUP BY T1.사업장코드, T2.사업장명, T3.매출처명, T1.매출처코드
+
+      UNION ALL
+
+      -- 7. 출금 (미지급금내역)
+      SELECT T1.사업장코드, T2.사업장명, '3' AS 그룹1, '2' AS 그룹2, '' AS 작성시간,
+             '출   금' AS 구분,
+             T1.매입처코드 AS 계정코드, T3.매입처명 AS 계정명,
+             0 AS 수입1, 0 AS 수입2,
+             SUM(ISNULL(T1.미지급금지급금액,0)) AS 지출1,
+             SUM(ISNULL(T1.미지급금지급금액,0)) AS 지출2,
+             0 AS 잔액
+        FROM 미지급금내역 T1
+        LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드
+        LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+       WHERE T1.사업장코드 = @사업장코드
+         AND T1.미지급금지급일자 = @date
+       GROUP BY T1.사업장코드, T2.사업장명, T3.매입처명, T1.매입처코드
+
+      ORDER BY 그룹1, 그룹2, 작성시간
+    `;
+
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('date', sql.VarChar(8), date)
+      .query(query);
+
+    console.log('✅ 일계표 조회 결과:', result.recordset.length, '건');
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error('❌ 일계표 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+// ===================================
+// 현금출납내역 관리 API (Cash Book Management)
+// ===================================
+
+/**
+ * 계정과목 목록 조회
+ * GET /api/account-categories
+ */
+app.get('/api/account-categories', async (_req, res) => {
+  try {
+    const result = await pool.request().query(`
+      SELECT 계정코드, 계정명, 적요
+      FROM 계정과목
+      WHERE 사용구분 = 0
+      ORDER BY 계정코드
+    `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error('❌ 계정과목 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+/**
+ * 현금출납내역 목록 조회
+ * GET /api/cash-history?startDate=20251101&endDate=20251130&입출구분=1
+ */
+app.get('/api/cash-history', async (req, res) => {
+  try {
+    const { startDate, endDate, 입출구분 } = req.query;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    let query = `
+      SELECT
+        h.사업장코드,
+        h.작성일자,
+        h.작성시간,
+        h.계정코드,
+        a.계정명,
+        h.입출구분,
+        h.입금금액,
+        h.출금금액,
+        h.적요,
+        h.작성자코드,
+        u.사용자명 AS 작성자명,
+        h.수정일자,
+        h.사용자코드
+      FROM 회계전표내역 h
+        LEFT JOIN 계정과목 a ON h.계정코드 = a.계정코드
+        LEFT JOIN 사용자 u ON h.작성자코드 = u.사용자코드
+      WHERE h.사업장코드 = @사업장코드
+        AND h.사용구분 = 0
+    `;
+
+    const request = pool.request().input('사업장코드', sql.VarChar(2), 사업장코드);
+
+    // 날짜 필터
+    if (startDate) {
+      query += ` AND h.작성일자 >= @startDate`;
+      request.input('startDate', sql.VarChar(8), startDate);
+    }
+    if (endDate) {
+      query += ` AND h.작성일자 <= @endDate`;
+      request.input('endDate', sql.VarChar(8), endDate);
+    }
+
+    // 입출구분 필터
+    if (입출구분) {
+      query += ` AND h.입출구분 = @입출구분`;
+      request.input('입출구분', sql.TinyInt, parseInt(입출구분));
+    }
+
+    query += ` ORDER BY h.작성일자 DESC, h.작성시간 DESC`;
+
+    const result = await request.query(query);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('❌ 현금출납내역 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+/**
+ * 현금출납내역 상세 조회
+ * GET /api/cash-history/:date/:time
+ */
+app.get('/api/cash-history/:date/:time', async (req, res) => {
+  try {
+    const { date, time } = req.params;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성일자', sql.VarChar(8), date)
+      .input('작성시간', sql.VarChar(9), time).query(`
+        SELECT
+          h.사업장코드,
+          h.작성일자,
+          h.작성시간,
+          h.계정코드,
+          a.계정명,
+          h.입출구분,
+          h.입금금액,
+          h.출금금액,
+          h.적요,
+          h.작성자코드,
+          u.사용자명 AS 작성자명,
+          h.수정일자,
+          h.사용자코드
+        FROM 회계전표내역 h
+          LEFT JOIN 계정과목 a ON h.계정코드 = a.계정코드
+          LEFT JOIN 사용자 u ON h.작성자코드 = u.사용자코드
+        WHERE h.사업장코드 = @사업장코드
+          AND h.작성일자 = @작성일자
+          AND h.작성시간 = @작성시간
+          AND h.사용구분 = 0
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '해당 현금출납내역을 찾을 수 없습니다.',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.recordset[0],
+    });
+  } catch (err) {
+    console.error('❌ 현금출납내역 상세 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+/**
+ * 현금출납내역 등록
+ * POST /api/cash-history
+ */
+app.post('/api/cash-history', async (req, res) => {
+  try {
+    const { 작성일자, 계정코드, 입출구분, 입금금액, 출금금액, 적요 } = req.body;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+    const 사용자명 = req.session?.user?.사용자명 || '관리자';
+
+    // 필수 필드 검증
+    if (!작성일자 || !계정코드 || !입출구분) {
+      return res.status(400).json({
+        success: false,
+        message: '필수 항목을 모두 입력해주세요.',
+      });
+    }
+
+    // 작성시간 생성 (HHMMSSMMM 형식 - VARCHAR(9))
+    const now = new Date();
+    const 작성시간 =
+      now.getHours().toString().padStart(2, '0') +
+      now.getMinutes().toString().padStart(2, '0') +
+      now.getSeconds().toString().padStart(2, '0') +
+      now.getMilliseconds().toString().padStart(3, '0');
+
+    const 수정일자 = now.toISOString().slice(0, 10).replace(/-/g, '');
+
+    // INSERT
+    await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성일자', sql.VarChar(8), 작성일자)
+      .input('작성시간', sql.VarChar(9), 작성시간)
+      .input('계정코드', sql.VarChar(4), 계정코드)
+      .input('입출구분', sql.TinyInt, parseInt(입출구분))
+      .input('입금금액', sql.Money, parseFloat(입금금액) || 0)
+      .input('출금금액', sql.Money, parseFloat(출금금액) || 0)
+      .input('적요', sql.VarChar(60), 적요 || '')
+      .input('작성자코드', sql.VarChar(4), 사용자코드)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+        INSERT INTO 회계전표내역 (
+          사업장코드, 작성일자, 작성시간, 계정코드, 입출구분,
+          입금금액, 출금금액, 적요, 사용구분, 작성자코드, 수정일자, 사용자코드
+        ) VALUES (
+          @사업장코드, @작성일자, @작성시간, @계정코드, @입출구분,
+          @입금금액, @출금금액, @적요, 0, @작성자코드, @수정일자, @사용자코드
+        )
+      `);
+
+    // 계정명 조회
+    const accountResult = await pool
+      .request()
+      .input('계정코드', sql.VarChar(4), 계정코드)
+      .query('SELECT 계정명 FROM 계정과목 WHERE 계정코드 = @계정코드');
+
+    const 계정명 = accountResult.recordset[0]?.계정명 || '';
+
+    res.json({
+      success: true,
+      message: '현금출납내역이 등록되었습니다.',
+      data: {
+        사업장코드,
+        작성일자,
+        작성시간,
+        계정코드,
+        계정명,
+        사용자코드,
+        사용자명,
+      },
+    });
+  } catch (err) {
+    console.error('❌ 현금출납내역 등록 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+/**
+ * 현금출납내역 수정
+ * PUT /api/cash-history/:date/:time
+ */
+app.put('/api/cash-history/:date/:time', async (req, res) => {
+  try {
+    const { date, time } = req.params;
+    const { 작성일자, 계정코드, 입출구분, 입금금액, 출금금액, 적요 } = req.body;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+
+    // 필수 필드 검증
+    if (!작성일자 || !계정코드 || !입출구분) {
+      return res.status(400).json({
+        success: false,
+        message: '필수 항목을 모두 입력해주세요.',
+      });
+    }
+
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    // 기존 레코드 존재 확인
+    const checkResult = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성일자', sql.VarChar(8), date)
+      .input('작성시간', sql.VarChar(9), time).query(`
+        SELECT * FROM 회계전표내역
+        WHERE 사업장코드 = @사업장코드
+          AND 작성일자 = @작성일자
+          AND 작성시간 = @작성시간
+          AND 사용구분 = 0
+      `);
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '해당 현금출납내역을 찾을 수 없습니다.',
+      });
+    }
+
+    // UPDATE
+    await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('원작성일자', sql.VarChar(8), date)
+      .input('원작성시간', sql.VarChar(9), time)
+      .input('작성일자', sql.VarChar(8), 작성일자)
+      .input('계정코드', sql.VarChar(4), 계정코드)
+      .input('입출구분', sql.TinyInt, parseInt(입출구분))
+      .input('입금금액', sql.Money, parseFloat(입금금액) || 0)
+      .input('출금금액', sql.Money, parseFloat(출금금액) || 0)
+      .input('적요', sql.VarChar(60), 적요 || '')
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+        UPDATE 회계전표내역
+        SET 작성일자 = @작성일자,
+            계정코드 = @계정코드,
+            입출구분 = @입출구분,
+            입금금액 = @입금금액,
+            출금금액 = @출금금액,
+            적요 = @적요,
+            수정일자 = @수정일자,
+            사용자코드 = @사용자코드
+        WHERE 사업장코드 = @사업장코드
+          AND 작성일자 = @원작성일자
+          AND 작성시간 = @원작성시간
+          AND 사용구분 = 0
+      `);
+
+    res.json({
+      success: true,
+      message: '현금출납내역이 수정되었습니다.',
+    });
+  } catch (err) {
+    console.error('❌ 현금출납내역 수정 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+/**
+ * 현금출납내역 삭제 (Soft Delete)
+ * DELETE /api/cash-history/:date/:time
+ */
+app.delete('/api/cash-history/:date/:time', async (req, res) => {
+  try {
+    const { date, time } = req.params;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+    const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    // 기존 레코드 존재 확인
+    const checkResult = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성일자', sql.VarChar(8), date)
+      .input('작성시간', sql.VarChar(9), time).query(`
+        SELECT * FROM 회계전표내역
+        WHERE 사업장코드 = @사업장코드
+          AND 작성일자 = @작성일자
+          AND 작성시간 = @작성시간
+          AND 사용구분 = 0
+      `);
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '해당 현금출납내역을 찾을 수 없습니다.',
+      });
+    }
+
+    // Soft delete (사용구분 = 9)
+    await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성일자', sql.VarChar(8), date)
+      .input('작성시간', sql.VarChar(9), time)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+        UPDATE 회계전표내역
+        SET 사용구분 = 9,
+            수정일자 = @수정일자,
+            사용자코드 = @사용자코드
+        WHERE 사업장코드 = @사업장코드
+          AND 작성일자 = @작성일자
+          AND 작성시간 = @작성시간
+      `);
+
+    res.json({
+      success: true,
+      message: '현금출납내역이 삭제되었습니다.',
+    });
+  } catch (err) {
+    console.error('❌ 현금출납내역 삭제 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
 });
 
 // 서버 시작 - connectDB()에서 직접 처리하므로 별도 함수 불필요

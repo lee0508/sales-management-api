@@ -32,7 +32,7 @@ function formatCurrency(amount) {
     return '0';
   }
 
-  return numValue.toLocaleString('ko-KR');
+  // return numValue.toLocaleString('ko-KR');
 }
 
 /**
