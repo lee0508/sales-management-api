@@ -7075,6 +7075,186 @@ app.delete('/api/cash-history/:date/:time', async (req, res) => {
   }
 });
 
+/**
+ * 회계전표 월마감 처리
+ * POST /api/accounting/close-month
+ */
+app.post('/api/accounting/close-month', async (req, res) => {
+  try {
+    const { 마감년월, 계정코드 } = req.body;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+    const 사용자코드 = req.session?.user?.사용자코드 || '8080';
+
+    // 필수 필드 검증
+    if (!마감년월) {
+      return res.status(400).json({
+        success: false,
+        message: '마감년월을 입력해주세요.',
+      });
+    }
+
+    // 마감년월 형식 검증 (YYYYMM)
+    if (!/^\d{6}$/.test(마감년월)) {
+      return res.status(400).json({
+        success: false,
+        message: '마감년월 형식이 올바르지 않습니다. (YYYYMM)',
+      });
+    }
+
+    // 마감일자 = 해당 월의 마지막 날 계산
+    const year = parseInt(마감년월.substring(0, 4));
+    const month = parseInt(마감년월.substring(4, 6));
+    const lastDay = new Date(year, month, 0).getDate();
+    const 마감일자 = 마감년월 + lastDay.toString().padStart(2, '0');
+
+    console.log('✅ 월마감 처리 시작:', { 사업장코드, 마감년월, 마감일자, 계정코드 });
+
+    // 계정코드가 지정된 경우 해당 계정만 마감, 없으면 전체 계정 마감
+    if (계정코드) {
+      // 특정 계정만 마감
+      await pool
+        .request()
+        .input('ParBranchCode', sql.VarChar(2), 사업장코드)
+        .input('ParDate', sql.VarChar(8), 마감일자)
+        .input('ParMagamGbn', sql.TinyInt, 4) // 회계전표내역 마감
+        .input('ParKindCode', sql.VarChar(2), '')
+        .input('ParMtCode', sql.VarChar(20), '')
+        .input('ParIOGbn', sql.TinyInt, 1)
+        .input('ParSupplierCode', sql.VarChar(8), '')
+        .input('ParAccountCode', sql.VarChar(4), 계정코드)
+        .execute('sp자동마감작업갱신');
+
+      console.log('✅ 월마감 완료 (단일 계정):', 계정코드);
+
+      res.json({
+        success: true,
+        message: `${마감년월} 월마감이 완료되었습니다. (계정코드: ${계정코드})`,
+        data: {
+          마감년월,
+          마감일자,
+          계정코드,
+        },
+      });
+    } else {
+      // 전체 계정 마감
+      // 1. 활성화된 모든 계정과목 조회
+      const accountsResult = await pool.request().query(`
+        SELECT 계정코드, 계정명
+        FROM 계정과목
+        WHERE 사용구분 = 0
+        ORDER BY 계정코드
+      `);
+
+      const accounts = accountsResult.recordset;
+
+      if (accounts.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '마감할 계정과목이 없습니다.',
+        });
+      }
+
+      // 2. 각 계정별로 마감 프로시저 실행
+      for (const account of accounts) {
+        await pool
+          .request()
+          .input('ParBranchCode', sql.VarChar(2), 사업장코드)
+          .input('ParDate', sql.VarChar(8), 마감일자)
+          .input('ParMagamGbn', sql.TinyInt, 4) // 회계전표내역 마감
+          .input('ParKindCode', sql.VarChar(2), '')
+          .input('ParMtCode', sql.VarChar(20), '')
+          .input('ParIOGbn', sql.TinyInt, 1)
+          .input('ParSupplierCode', sql.VarChar(8), '')
+          .input('ParAccountCode', sql.VarChar(4), account.계정코드)
+          .execute('sp자동마감작업갱신');
+
+        console.log('  ✓ 계정마감 완료:', account.계정코드, account.계정명);
+      }
+
+      console.log('✅ 월마감 완료 (전체 계정):', accounts.length, '개');
+
+      res.json({
+        success: true,
+        message: `${마감년월} 월마감이 완료되었습니다. (${accounts.length}개 계정)`,
+        data: {
+          마감년월,
+          마감일자,
+          계정수: accounts.length,
+        },
+      });
+    }
+  } catch (err) {
+    console.error('❌ 월마감 처리 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '월마감 처리 중 오류가 발생했습니다: ' + err.message,
+    });
+  }
+});
+
+// ====================================
+// 합계잔액시산표 API
+// ====================================
+
+/**
+ * 합계잔액시산표 조회
+ * GET /api/trial-balance
+ * Query params: date (YYYYMMDD)
+ */
+app.get('/api/trial-balance', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    // 날짜 형식 검증
+    if (!date || !/^\d{8}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        message: '올바른 날짜 형식이 아닙니다 (YYYYMMDD)',
+      });
+    }
+
+    // sp합계시산표 저장 프로시저 호출
+    const result = await pool
+      .request()
+      .input('ParBranchCode', sql.VarChar(2), 사업장코드)
+      .input('ParDate', sql.VarChar(8), date)
+      .execute('sp합계시산표');
+
+    // 결과 가공
+    const data = result.recordset.map((row) => {
+      // 차변잔액 = 차변누계 - 대변누계
+      // 대변잔액 = 대변누계 - 차변누계 (차변잔액이 음수일 때)
+      const 차변합계 = row.차변누계 || 0;
+      const 대변합계 = row.대변누계 || 0;
+      const 잔액 = 차변합계 - 대변합계;
+
+      return {
+        계정코드: row.계정코드 || '',
+        계정명: row.계정명 || '',
+        차변당월: row.차변당월 || 0,
+        차변누계: row.차변누계 || 0,
+        대변당월: row.대변당월 || 0,
+        대변누계: row.대변누계 || 0,
+        차변잔액: 잔액 >= 0 ? 잔액 : 0,
+        대변잔액: 잔액 < 0 ? Math.abs(잔액) : 0,
+      };
+    });
+
+    res.json({
+      success: true,
+      data,
+      total: data.length,
+    });
+  } catch (err) {
+    console.error('❌ 합계잔액시산표 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '합계잔액시산표 조회 중 오류가 발생했습니다: ' + err.message,
+    });
+  }
+});
+
 // 서버 시작 - connectDB()에서 직접 처리하므로 별도 함수 불필요
 // (이미 53~63줄에서 connectDB().then(() => app.listen(...))으로 서버 시작)
 

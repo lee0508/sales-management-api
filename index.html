@@ -187,11 +187,21 @@
             NOTE: 현금출납관리는 회계관리 메뉴의 "현금출납내역관리"로 이동됨
             -->
             <div class="submenu" id="jangbuSubmenu">
-              <a class="submenu-link" onclick="alert('매입처장부관리 기능은 준비 중입니다.')">매입처장부관리</a>
-              <a class="submenu-link" onclick="alert('매출처장부관리 기능은 준비 중입니다.')">매출처장부관리</a>
-              <a class="submenu-link" onclick="alert('미수금관리 기능은 준비 중입니다.')">미수금관리</a>
-              <a class="submenu-link" onclick="alert('미지급금관리 기능은 준비 중입니다.')">미지급금관리</a>
-              <a class="submenu-link" onclick="alert('세금계산서관리 기능은 준비 중입니다.')">세금계산서관리</a>
+              <a class="submenu-link" onclick="alert('매입처장부관리 기능은 준비 중입니다.')"
+                >매입처장부관리</a
+              >
+              <a class="submenu-link" onclick="alert('매출처장부관리 기능은 준비 중입니다.')"
+                >매출처장부관리</a
+              >
+              <a class="submenu-link" onclick="alert('미수금관리 기능은 준비 중입니다.')"
+                >미수금관리</a
+              >
+              <a class="submenu-link" onclick="alert('미지급금관리 기능은 준비 중입니다.')"
+                >미지급금관리</a
+              >
+              <a class="submenu-link" onclick="alert('세금계산서관리 기능은 준비 중입니다.')"
+                >세금계산서관리</a
+              >
             </div>
           </div>
 
@@ -1682,12 +1692,20 @@
             <h2 style="display: none">현금출납내역관리</h2>
 
             <!-- 🔹 상단 툴바 -->
-            <div class="toolbar" style="justify-content: space-between">
+            <div
+              class="toolbar"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: nowrap;
+              "
+            >
               <div class="toolbar-left" style="display: flex; gap: 12px; align-items: center">
                 <select
                   id="cashStatusFilter"
                   class="form-control"
-                  style="width: 150px"
+                  style="width: 120px"
                   onchange="filterCashHistory()"
                 >
                   <option value="">전체 상태</option>
@@ -1700,7 +1718,7 @@
                 <button class="btn btn-secondary" onclick="filterCashHistory()">조회</button>
               </div>
 
-              <div class="toolbar-right">
+              <div class="toolbar-right" style="display: flex; gap: 12px; align-items: center">
                 <button
                   class="btn btn-success"
                   onclick="openNewCashModal()"
@@ -1716,6 +1734,22 @@
                   "
                 >
                   <span style="font-size: 18px; margin-right: 4px">+</span> 현금출납 등록
+                </button>
+                <button
+                  class="btn btn-warning"
+                  onclick="openMonthCloseModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #ffc107;
+                    color: #000;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  <span>📅</span> 월마감 처리
                 </button>
                 <button
                   class="btn btn-secondary"
@@ -1797,7 +1831,23 @@
                 <button class="btn btn-secondary" onclick="filterTrialBalance()">조회</button>
               </div>
 
-              <div class="toolbar-right">
+              <div class="toolbar-right" style="display: flex; gap: 12px; align-items: center">
+                <button
+                  class="btn btn-secondary"
+                  onclick="printTrialBalance()"
+                  style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                  "
+                >
+                  <span>🖨️</span> 출력
+                </button>
                 <button
                   class="btn btn-secondary"
                   onclick="exportTrialBalanceToExcel()"
@@ -1828,10 +1878,12 @@
                 <tr>
                   <th style="width: 40px"><input type="checkbox" id="selectAllTrialBalance" /></th>
                   <th>순번</th>
-                  <th>계정과목코드</th>
-                  <th>계정과목명</th>
-                  <th>차변합계</th>
-                  <th>대변합계</th>
+                  <th>계정코드</th>
+                  <th>계정명</th>
+                  <th>차변당월</th>
+                  <th>차변누계</th>
+                  <th>대변당월</th>
+                  <th>대변누계</th>
                   <th>차변잔액</th>
                   <th>대변잔액</th>
                   <th>관리</th>
@@ -7924,7 +7976,8 @@
                 loadFunc: () => {
                   // 오늘 날짜 자동 설정
                   const today = new Date().toISOString().split('T')[0];
-                  document.getElementById('dailyReportDate').value = today;
+                  document.getElementById('dailyReportStartDate').value = today;
+                  document.getElementById('dailyReportEndDate').value = today;
                 },
               },
             };
@@ -12630,10 +12683,11 @@
 
           <!-- 일계표 출력 페이지 -->
           <div class="page-content hidden" id="dailyReportPrintPage">
-            <div class="page-header">
+            <!-- 페이지에 대한 제목 표시 코드 주석 처리 
+             <div class="page-header">
               <h1>일계표</h1>
               <p class="page-description">일별 매입/매출/입출금 현황을 조회합니다</p>
-            </div>
+            </div> -->
 
             <!-- 검색 조건 -->
             <div
@@ -12650,63 +12704,51 @@
                 <div style="flex: 0 0 200px">
                   <label
                     style="display: block; margin-bottom: 6px; font-weight: 600; color: #374151"
-                    >조회일자</label
+                    >시작일자</label
                   >
-                  <input type="date" id="dailyReportDate" class="form-control" />
+                  <input type="date" id="dailyReportStartDate" class="form-control" />
+                </div>
+                <div style="flex: 0 0 auto; margin-top: 28px">
+                  <span style="font-weight: 600; color: #374151">~</span>
+                </div>
+                <div style="flex: 0 0 200px">
+                  <label
+                    style="display: block; margin-bottom: 6px; font-weight: 600; color: #374151"
+                    >종료일자</label
+                  >
+                  <input type="date" id="dailyReportEndDate" class="form-control" />
                 </div>
                 <div style="flex: 0 0 auto; margin-top: 28px">
                   <button
+                    class="btn btn-primary"
                     onclick="loadDailyReport()"
-                    class="btn-primary"
-                    style="padding: 10px 24px"
+                    style="
+                      padding: 10px 20px;
+                      background: #007bff;
+                      color: white;
+                      border: none;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      cursor: pointer;
+                    "
                   >
-                    <svg
-                      style="
-                        width: 16px;
-                        height: 16px;
-                        display: inline-block;
-                        vertical-align: middle;
-                        margin-right: 6px;
-                      "
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      ></path>
-                    </svg>
                     조회
                   </button>
                 </div>
                 <div style="flex: 0 0 auto; margin-top: 28px">
                   <button
+                    class="btn btn-secondary"
                     onclick="printDailyReport()"
-                    class="btn-secondary"
-                    style="padding: 10px 24px"
+                    style="
+                      padding: 10px 20px;
+                      border: 1px solid #ddd;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      cursor: pointer;
+                    "
                   >
-                    <svg
-                      style="
-                        width: 16px;
-                        height: 16px;
-                        display: inline-block;
-                        vertical-align: middle;
-                        margin-right: 6px;
-                      "
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                      ></path>
-                    </svg>
                     출력
                   </button>
                 </div>
@@ -17354,31 +17396,106 @@
        */
       async function loadDailyReport() {
         try {
-          const date = document.getElementById('dailyReportDate').value;
+          const startDate = document.getElementById('dailyReportStartDate').value;
+          const endDate = document.getElementById('dailyReportEndDate').value;
 
-          if (!date) {
-            alert('조회일자를 선택해주세요.');
+          if (!startDate || !endDate) {
+            alert('시작일자와 종료일자를 모두 선택해주세요.');
             return;
           }
 
           // 날짜 포맷 변환 (YYYY-MM-DD → YYYYMMDD)
-          const dateStr = date.replace(/-/g, '');
+          const startDateStr = startDate.replace(/-/g, '');
+          const endDateStr = endDate.replace(/-/g, '');
 
-          console.log('✅ 일계표 조회:', dateStr);
-
-          const response = await fetch(`/api/daily-report?date=${dateStr}`);
-          const result = await response.json();
-
-          if (!result.success) {
-            alert(result.message || '일계표 조회에 실패했습니다.');
-            return;
-          }
+          console.log('✅ 일계표 조회:', startDateStr, '~', endDateStr);
 
           // 테이블 렌더링
           const tbody = document.getElementById('dailyReportTableBody');
           tbody.innerHTML = '';
 
-          if (result.data.length === 0) {
+          // 날짜 범위 생성
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          const dateList = [];
+
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            dateList.push(new Date(d));
+          }
+
+          let totalCount = 0;
+
+          // 각 날짜별로 데이터 조회 및 렌더링
+          for (const date of dateList) {
+            const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
+            const dateDisplay = date.toISOString().split('T')[0];
+
+            const response = await fetch(`/api/daily-report?date=${dateStr}`);
+            const result = await response.json();
+
+            if (result.success && result.data.length > 0) {
+              // 날짜 구분 헤더 행 추가
+              const headerTr = document.createElement('tr');
+              headerTr.style.backgroundColor = '#f8f9fa';
+              headerTr.innerHTML = `
+                <td colspan="7" style="text-align: left; font-weight: bold; padding: 10px; background-color: #e9ecef;">
+                  ${dateDisplay} (${date.toLocaleDateString('ko-KR', { weekday: 'short' })})
+                </td>
+              `;
+              tbody.appendChild(headerTr);
+
+              // 항목별 합계 계산용 객체
+              const subtotals = {};
+
+              // 데이터 렌더링
+              result.data.forEach((row) => {
+                const 구분 = row.구분 || '-';
+
+                // 합계 계산
+                if (!subtotals[구분]) {
+                  subtotals[구분] = { 수입1: 0, 수입2: 0, 지출1: 0, 지출2: 0, 잔액: 0 };
+                }
+                subtotals[구분].수입1 += row.수입1 || 0;
+                subtotals[구분].수입2 += row.수입2 || 0;
+                subtotals[구분].지출1 += row.지출1 || 0;
+                subtotals[구분].지출2 += row.지출2 || 0;
+                subtotals[구분].잔액 += row.잔액 || 0;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td style="text-align: center;">${구분}</td>
+                  <td style="text-align: left;">${row.계정명 || '-'}</td>
+                  <td style="text-align: right;">${(row.수입1 || 0).toLocaleString()}</td>
+                  <td style="text-align: right;">${(row.수입2 || 0).toLocaleString()}</td>
+                  <td style="text-align: right;">${(row.지출1 || 0).toLocaleString()}</td>
+                  <td style="text-align: right;">${(row.지출2 || 0).toLocaleString()}</td>
+                  <td style="text-align: right;">${(row.잔액 || 0).toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+                totalCount++;
+              });
+
+              // 항목별 소계 행 추가
+              Object.keys(subtotals).forEach((구분) => {
+                const subtotal = subtotals[구분];
+                const subtotalTr = document.createElement('tr');
+                subtotalTr.style.backgroundColor = '#fff3cd';
+                subtotalTr.style.fontWeight = 'bold';
+                subtotalTr.innerHTML = `
+                  <td style="text-align: center;">${구분}</td>
+                  <td style="text-align: left;">[ 소계 ]</td>
+                  <td style="text-align: right;">${subtotal.수입1.toLocaleString()}</td>
+                  <td style="text-align: right;">${subtotal.수입2.toLocaleString()}</td>
+                  <td style="text-align: right;">${subtotal.지출1.toLocaleString()}</td>
+                  <td style="text-align: right;">${subtotal.지출2.toLocaleString()}</td>
+                  <td style="text-align: right;">${subtotal.잔액.toLocaleString()}</td>
+                `;
+                tbody.appendChild(subtotalTr);
+              });
+            }
+          }
+
+          if (totalCount === 0) {
             tbody.innerHTML = `
               <tr>
                 <td colspan="7" style="text-align: center; padding: 40px; color: #9ca3af;">
@@ -17386,25 +17503,9 @@
                 </td>
               </tr>
             `;
-            return;
           }
 
-          // 데이터 렌더링
-          result.data.forEach((row) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td style="text-align: center;">${row.구분 || '-'}</td>
-              <td style="text-align: left;">${row.계정명 || '-'}</td>
-              <td style="text-align: right;">${(row.수입1 || 0).toLocaleString()}</td>
-              <td style="text-align: right;">${(row.수입2 || 0).toLocaleString()}</td>
-              <td style="text-align: right;">${(row.지출1 || 0).toLocaleString()}</td>
-              <td style="text-align: right;">${(row.지출2 || 0).toLocaleString()}</td>
-              <td style="text-align: right;">${(row.잔액 || 0).toLocaleString()}</td>
-            `;
-            tbody.appendChild(tr);
-          });
-
-          console.log('✅ 일계표 렌더링 완료:', result.data.length, '건');
+          console.log('✅ 일계표 렌더링 완료:', totalCount, '건');
         } catch (error) {
           console.error('❌ 일계표 조회 오류:', error);
           alert('일계표 조회 중 오류가 발생했습니다: ' + error.message);
@@ -17412,26 +17513,50 @@
       }
 
       /**
-       * 일계표 출력
+       * 일계표 출력 (일자별로 A4 페이지 구분)
        */
       async function printDailyReport() {
         try {
-          const date = document.getElementById('dailyReportDate').value;
+          const startDate = document.getElementById('dailyReportStartDate').value;
+          const endDate = document.getElementById('dailyReportEndDate').value;
 
-          if (!date) {
-            alert('조회일자를 선택해주세요.');
+          if (!startDate || !endDate) {
+            alert('시작일자와 종료일자를 모두 선택해주세요.');
             return;
           }
 
-          // 날짜 포맷 변환
-          const dateStr = date.replace(/-/g, '');
-          const dateDisplay = date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1년 $2월 $3일');
+          // 날짜 범위 생성
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          const dateList = [];
 
-          // 데이터 조회
-          const response = await fetch(`/api/daily-report?date=${dateStr}`);
-          const result = await response.json();
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            dateList.push(new Date(d));
+          }
 
-          if (!result.success || result.data.length === 0) {
+          // 각 날짜별로 데이터 수집
+          const dailyReports = [];
+
+          for (const date of dateList) {
+            const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
+            const response = await fetch(`/api/daily-report?date=${dateStr}`);
+            const result = await response.json();
+
+            if (result.success && result.data.length > 0) {
+              dailyReports.push({
+                date: date,
+                dateStr: date.toISOString().split('T')[0],
+                dateDisplay: date
+                  .toISOString()
+                  .split('T')[0]
+                  .replace(/(\d{4})-(\d{2})-(\d{2})/, '$1년 $2월 $3일'),
+                weekday: date.toLocaleDateString('ko-KR', { weekday: 'long' }),
+                data: result.data,
+              });
+            }
+          }
+
+          if (dailyReports.length === 0) {
             alert('출력할 데이터가 없습니다.');
             return;
           }
@@ -17439,13 +17564,92 @@
           // 출력 창 열기
           const printWindow = window.open('', '_blank', 'width=900,height=900');
 
+          // 일자별 페이지 HTML 생성
+          const pagesHtml = dailyReports
+            .map((report) => {
+              // 항목별 합계 계산
+              const subtotals = {};
+              report.data.forEach((row) => {
+                const 구분 = row.구분 || '-';
+                if (!subtotals[구분]) {
+                  subtotals[구분] = { 수입1: 0, 수입2: 0, 지출1: 0, 지출2: 0, 잔액: 0 };
+                }
+                subtotals[구분].수입1 += row.수입1 || 0;
+                subtotals[구분].수입2 += row.수입2 || 0;
+                subtotals[구분].지출1 += row.지출1 || 0;
+                subtotals[구분].지출2 += row.지출2 || 0;
+                subtotals[구분].잔액 += row.잔액 || 0;
+              });
+
+              // 데이터 행 생성
+              const dataRows = report.data
+                .map(
+                  (row) => `
+                <tr>
+                  <td class="text-center">${row.구분 || '-'}</td>
+                  <td class="text-left">${row.계정명 || '-'}</td>
+                  <td class="text-right">${(row.수입1 || 0).toLocaleString()}</td>
+                  <td class="text-right">${(row.수입2 || 0).toLocaleString()}</td>
+                  <td class="text-right">${(row.지출1 || 0).toLocaleString()}</td>
+                  <td class="text-right">${(row.지출2 || 0).toLocaleString()}</td>
+                  <td class="text-right">${(row.잔액 || 0).toLocaleString()}</td>
+                </tr>
+              `,
+                )
+                .join('');
+
+              // 소계 행 생성
+              const subtotalRows = Object.keys(subtotals)
+                .map((구분) => {
+                  const subtotal = subtotals[구분];
+                  return `
+                <tr style="background-color: #fff3cd; font-weight: bold;">
+                  <td class="text-center">${구분}</td>
+                  <td class="text-left">[ 소계 ]</td>
+                  <td class="text-right">${subtotal.수입1.toLocaleString()}</td>
+                  <td class="text-right">${subtotal.수입2.toLocaleString()}</td>
+                  <td class="text-right">${subtotal.지출1.toLocaleString()}</td>
+                  <td class="text-right">${subtotal.지출2.toLocaleString()}</td>
+                  <td class="text-right">${subtotal.잔액.toLocaleString()}</td>
+                </tr>
+              `;
+                })
+                .join('');
+
+              return `
+            <div class="page-break">
+              <div class="title">일 계 표</div>
+              <div class="date">${report.dateDisplay} (${report.weekday})</div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 10%;">구분</th>
+                    <th style="width: 20%;">거래처명/계정명</th>
+                    <th style="width: 14%;">수입(공급가)</th>
+                    <th style="width: 14%;">수입(부가세포함)</th>
+                    <th style="width: 14%;">지출(공급가)</th>
+                    <th style="width: 14%;">지출(부가세포함)</th>
+                    <th style="width: 14%;">잔액</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${dataRows}
+                  ${subtotalRows}
+                </tbody>
+              </table>
+            </div>
+          `;
+            })
+            .join('');
+
           // HTML 생성
           const html = `
             <!DOCTYPE html>
             <html>
             <head>
               <meta charset="UTF-8">
-              <title>일계표 - ${dateDisplay}</title>
+              <title>일계표 - ${startDate} ~ ${endDate}</title>
               <style>
                 @page {
                   size: A4;
@@ -17462,8 +17666,16 @@
                   font-family: '맑은 고딕', 'Malgun Gothic', Arial, sans-serif;
                   font-size: 10pt;
                   line-height: 1.4;
-                  padding: 10mm;
                   background: white;
+                }
+
+                .page-break {
+                  page-break-after: always;
+                  padding: 10mm;
+                }
+
+                .page-break:last-child {
+                  page-break-after: auto;
                 }
 
                 .title {
@@ -17527,43 +17739,14 @@
                   @page {
                     margin: 10mm;
                   }
+                  .page-break {
+                    padding: 0;
+                  }
                 }
               </style>
             </head>
             <body>
-              <div class="title">일 계 표</div>
-              <div class="date">${dateDisplay}</div>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 10%;">구분</th>
-                    <th style="width: 20%;">거래처명/계정명</th>
-                    <th style="width: 14%;">수입(공급가)</th>
-                    <th style="width: 14%;">수입(부가세포함)</th>
-                    <th style="width: 14%;">지출(공급가)</th>
-                    <th style="width: 14%;">지출(부가세포함)</th>
-                    <th style="width: 14%;">잔액</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${result.data
-                    .map(
-                      (row) => `
-                    <tr>
-                      <td class="text-center">${row.구분 || '-'}</td>
-                      <td class="text-left">${row.계정명 || '-'}</td>
-                      <td class="text-right">${(row.수입1 || 0).toLocaleString()}</td>
-                      <td class="text-right">${(row.수입2 || 0).toLocaleString()}</td>
-                      <td class="text-right">${(row.지출1 || 0).toLocaleString()}</td>
-                      <td class="text-right">${(row.지출2 || 0).toLocaleString()}</td>
-                      <td class="text-right">${(row.잔액 || 0).toLocaleString()}</td>
-                    </tr>
-                  `,
-                    )
-                    .join('')}
-                </tbody>
-              </table>
+              ${pagesHtml}
 
               <script>
                 window.onload = function() {
@@ -17579,7 +17762,7 @@
           printWindow.document.write(html);
           printWindow.document.close();
 
-          console.log('✅ 일계표 출력 완료');
+          console.log('✅ 일계표 출력 완료:', dailyReports.length, '일');
         } catch (error) {
           console.error('❌ 일계표 출력 오류:', error);
           alert('일계표 출력 중 오류가 발생했습니다: ' + error.message);
@@ -18171,6 +18354,141 @@
             "
           >
             삭제
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 월마감 처리 모달 -->
+    <div
+      id="monthCloseModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        style="
+          background: white;
+          border-radius: 12px;
+          padding: 32px;
+          width: 90%;
+          max-width: 500px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #fef3c7;
+          "
+        >
+          <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #f59e0b">
+            📅 월마감 처리
+          </h2>
+          <button
+            onclick="closeMonthCloseModal()"
+            style="
+              background: #f0f0f0;
+              border: none;
+              font-size: 24px;
+              cursor: pointer;
+              color: #666;
+              width: 36px;
+              height: 36px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              transition: all 0.2s ease;
+            "
+            onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
+            onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';"
+          >
+            ×
+          </button>
+        </div>
+
+        <div style="margin-bottom: 24px">
+          <p style="font-size: 16px; color: #1f2937; margin: 0 0 16px 0">
+            회계전표내역을 월별로 마감 처리합니다.
+          </p>
+
+          <div style="margin-bottom: 16px">
+            <label
+              for="closeMonth"
+              style="display: block; margin-bottom: 6px; font-weight: 600; color: #374151"
+            >
+              마감년월 <span style="color: #dc2626">*</span>
+            </label>
+            <input
+              type="month"
+              id="closeMonth"
+              class="form-control"
+              style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px"
+            />
+          </div>
+
+          <div
+            style="
+              padding: 16px;
+              background: #fef3c7;
+              border: 1px solid #fde68a;
+              border-radius: 8px;
+              font-size: 14px;
+              color: #92400e;
+            "
+          >
+            <p style="margin: 0 0 8px 0; font-weight: 600">⚠️ 주의사항</p>
+            <ul style="margin: 0; padding-left: 20px">
+              <li>모든 계정과목의 해당 월 데이터가 마감됩니다.</li>
+              <li>마감 후에는 해당 월 데이터가 집계되어 조회 속도가 향상됩니다.</li>
+              <li>이미 마감된 월은 재마감됩니다.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px">
+          <button
+            onclick="closeMonthCloseModal()"
+            style="
+              padding: 10px 20px;
+              background: #6c757d;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              font-size: 14px;
+              cursor: pointer;
+            "
+          >
+            취소
+          </button>
+          <button
+            onclick="confirmMonthClose()"
+            style="
+              padding: 10px 20px;
+              background: #f59e0b;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              font-size: 14px;
+              cursor: pointer;
+              font-weight: 500;
+            "
+          >
+            월마감 실행
           </button>
         </div>
       </div>

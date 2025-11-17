@@ -1,0 +1,56 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp합계시산표]    Script Date: 25-11-16 일요일 오후 3:25:52 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER OFF
+GO
+
+ALTER PROCEDURE [dbo].[sp합계시산표] 
+      (@ParBranchCode VarChar(02) ='01', @ParDate VarChar(8) = '')
+
+AS
+
+   SELECT 0 AS 차변누계, 0 AS 차변당월,
+          '' AS 계정코드, '매     입' AS 계정명,
+          (SELECT ISNULL(SUM(입고단가 * 입고수량), 0) 
+             FROM 자재입출내역 
+            WHERE 사업장코드 = @ParBranchCode AND 사용구분 = 0 AND 입출고구분 = 1
+              AND 입출고일자 BETWEEN (SUBSTRING(@ParDate, 1, 6) + '01') AND @ParDate) AS 대변당월,          
+          (SELECT ISNULL(SUM(입고단가 * 입고수량), 0) 
+             FROM 자재입출내역 
+            WHERE 사업장코드 = @ParBranchCode AND 사용구분 = 0 AND 입출고구분 = 1
+              AND 입출고일자 BETWEEN (SUBSTRING(@ParDate, 1, 4) + '0101') AND @ParDate) AS 대변누계
+    UNION ALL
+   SELECT (SELECT ISNULL(SUM(출고단가 * 출고수량), 0) 
+             FROM 자재입출내역
+            WHERE 사업장코드 = @ParBranchCode AND 사용구분 = 0 AND (입출고구분 = 2 OR 입출고구분 = 8)
+              AND 입출고일자 BETWEEN (SUBSTRING(@ParDate, 1, 4) + '0101') AND @ParDate) AS 차변누계,
+          (SELECT ISNULL(SUM(출고단가 * 출고수량), 0) 
+             FROM 자재입출내역 
+            WHERE 사업장코드 = @ParBranchCode AND 사용구분 = 0 AND (입출고구분 = 2 OR 입출고구분 = 8)
+              AND 입출고일자 BETWEEN (SUBSTRING(@ParDate, 1, 6) + '01') AND @ParDate) AS 차변당월,
+          '' AS 계정코드, '매     출' AS 계정명,
+          0 AS 대변당월, 0 AS 대변누계 
+    UNION ALL
+   SELECT (SELECT ISNULL(SUM(입금금액), 0) 
+             FROM 회계전표내역
+            WHERE 계정코드 = T1.계정코드 AND 사업장코드 = @ParBranchCode AND 사용구분 = 0
+              AND 작성일자 BETWEEN (SUBSTRING(@ParDate, 1, 4) + '0101') AND @ParDate) AS 차변누계,
+          (SELECT ISNULL(SUM(입금금액), 0) 
+             FROM 회계전표내역 
+            WHERE 계정코드 = T1.계정코드 AND 사업장코드 = @ParBranchCode AND 사용구분 = 0
+              AND 작성일자 BETWEEN (SUBSTRING(@ParDate, 1, 6) + '01') AND @ParDate) AS 차변당월,
+          T1.계정코드 AS 계정코드, T1.계정명 AS 계정명,
+          (SELECT ISNULL(SUM(출금금액), 0) 
+             FROM 회계전표내역 
+            WHERE 계정코드 = T1.계정코드 AND 사업장코드 = @ParBranchCode AND 사용구분 = 0
+              AND 작성일자 BETWEEN (SUBSTRING(@ParDate, 1, 6) + '01') AND @ParDate) AS 대변당월,
+          (SELECT ISNULL(SUM(출금금액), 0) 
+             FROM 회계전표내역
+            WHERE 계정코드 = T1.계정코드 AND 사업장코드 = @ParBranchCode AND 사용구분 = 0
+              AND 작성일자 BETWEEN (SUBSTRING(@ParDate, 1, 4) + '0101') AND @ParDate) AS 대변누계
+     FROM 계정과목 AS T1
+    WHERE T1.합계시산표연결여부 = 'Y'
+    ORDER BY 계정코드
+

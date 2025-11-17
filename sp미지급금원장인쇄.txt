@@ -1,0 +1,136 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp미지급금원장인쇄]    Script Date: 25-11-16 일요일 오후 3:29:54 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER OFF
+GO
+
+ALTER PROCEDURE [dbo].[sp미지급금원장인쇄] 
+      (@ParAppBranchCode VarChar(2) = '01', @ParAppPgDate VarChar(8) = '', 
+       @ParAppFDate VarChar(8) = '', @ParAppTDate VarChar(8) = '', 
+       @ParSupplierCode VarChar(8) = '', @ParMJGbn int = 2)
+AS
+IF @ParMJGbn = 1
+   BEGIN
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+           T1.매입처코드 AS 매입처코드, T3.매입처명 AS 매입처명, 
+           (T1.마감년월 + '00') AS 일자, '(년 이 월)' AS 적요, 
+           0 AS 구분, (T1.미지급금누계금액) AS 입고금액,
+           (T1.미지급금지급누계금액) AS 지급금액,
+           '' AS 결제방법, '' AS 만기일자, '' AS 어음번호, '' AS 비고, '' AS 시간
+      FROM 미지급금원장마감 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+     WHERE T1.사업장코드 = @ParAppBranchCode AND T1.매입처코드 LIKE '%' + LTRIM(@ParSupplierCode) + '%'
+       AND SUBSTRING(T1.마감년월,5,2) = '00' AND (T1.미지급금누계금액 <> 0 OR T1.미지급금지급누계금액 <> 0)     
+       AND T1.마감년월 BETWEEN (SUBSTRING(@ParAppFDate, 1, 4) + '00') AND (SUBSTRING(@ParAppTDate, 1, 4) + '00')                              
+     UNION ALL
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+           T1.매입처코드 AS 매입처코드, T3.매입처명 AS 매입처명, 
+           (T1.마감년월 + '00') AS 일자, '(월    계)' AS 적요, 
+           0 AS 구분, (T1.미지급금누계금액) AS 입고금액,
+           (T1.미지급금지급누계금액) AS 지급금액,
+           '' AS 결제방법, '' AS 만기일자, '' AS 어음번호, '' AS 비고, '' AS 시간
+      FROM 미지급금원장마감 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+     WHERE T1.사업장코드 = @ParAppBranchCode AND T1.매입처코드 LIKE '%' + LTRIM(@ParSupplierCode) + '%'
+       AND SUBSTRING(T1.마감년월,5,2) <> '00' AND (T1.미지급금누계금액 <> 0 OR T1.미지급금지급누계금액 <> 0)
+       AND T1.마감년월 > (SUBSTRING(@ParAppFDate, 1, 4) + '00') AND T1.마감년월 < SUBSTRING(@ParAppFDate, 1, 6)
+     UNION ALL 
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+           T1.매입처코드 AS 매입처코드, T3.매입처명 AS 매입처명, 
+           (T1.입출고일자) AS 일자, '' AS 적요, 
+           T1.입출고구분 AS 구분, (SUM(T1.입고수량 * T1.입고단가) * 1.1) AS 입고금액,
+           0 AS 지급금액, 
+           결제방법 = CASE WHEN T1.현금구분 = 1 THEN '현금' ELSE '외상' END, '' AS 만기일자, '' AS 어음번호, 
+           T1.적요 AS 비고, T1.입출고시간 AS 시간
+      FROM 자재입출내역 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+     WHERE T1.사업장코드 = @ParAppBranchCode AND T1.매입처코드 LIKE '%' + LTRIM(@ParSupplierCode) + '%'
+       AND (T1.입출고구분 = 1) AND T1.사용구분 = 0
+       AND T1.입출고일자 BETWEEN (SUBSTRING(@ParAppFDate, 1, 6) + '01') AND @ParAppTDate
+     GROUP BY T1.사업장코드, T2.사업장명, T1.매입처코드, T3.매입처명,
+              T1.입출고일자, T1.입출고시간, T1.현금구분, T1.입출고구분, T1.적요
+     UNION ALL
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+           T1.매입처코드 AS 매입처코드, T3.매입처명 AS 매입처명, 
+           (T1.미지급금지급일자) AS 일자, '' AS 적요, 
+           0 AS 구분, 0 AS 입고금액,
+           ISNULL(SUM(T1.미지급금지급금액),0) AS 지급금액 ,
+           결제방법 = CASE WHEN T1.결제방법 = 0 THEN '현금' WHEN T1.결제방법 = 1 THEN '수표'
+                           WHEN T1.결제방법 = 2 THEN '어음' ELSE '기타' END, T1.만기일자, T1.어음번호,
+           T1.적요 AS 비고, T1.미지급금지급시간 AS 시간
+      FROM 미지급금내역 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+     WHERE T1.사업장코드 = @ParAppBranchCode AND T1.매입처코드 LIKE '%' + LTRIM(@ParSupplierCode) + '%'
+       AND T1.미지급금지급일자 BETWEEN (SUBSTRING(@ParAppFDate, 1, 6) + '01') AND @ParAppTDate
+     GROUP BY T1.사업장코드, T2.사업장명, T1.매입처코드, T3.매입처명,
+              T1.미지급금지급일자, T1.미지급금지급시간, T1.결제방법, T1.만기일자, T1.어음번호, T1.적요
+     ORDER BY T1.사업장코드, T3.매입처명, T1.매입처코드, 일자, 시간, 구분  
+   END
+ELSE
+   BEGIN
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+           T1.매입처코드 AS 매입처코드, T3.매입처명 AS 매입처명, 
+           (T1.마감년월 + '00') AS 일자, '(년 이 월)' AS 적요, 
+           0 AS 구분, (T1.미지급금누계금액) AS 입고금액,
+           (T1.미지급금지급누계금액) AS 지급금액,
+           '' AS 결제방법, '' AS 만기일자, '' AS 어음번호, '' AS 비고, '' AS 시간
+      FROM 미지급금원장마감 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+     WHERE T1.사업장코드 = @ParAppBranchCode AND T1.매입처코드 LIKE '%' + LTRIM(@ParSupplierCode) + '%'
+       AND SUBSTRING(T1.마감년월,5,2) = '00' AND (T1.미지급금누계금액 <> 0 OR T1.미지급금지급누계금액 <> 0)     
+       AND T1.마감년월 BETWEEN (SUBSTRING(@ParAppFDate, 1, 4) + '00') AND (SUBSTRING(@ParAppTDate, 1, 4) + '00')                              
+     UNION ALL
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+           T1.매입처코드 AS 매입처코드, T3.매입처명 AS 매입처명, 
+           (T1.마감년월 + '00') AS 일자, '(월    계)' AS 적요, 
+           0 AS 구분, (T1.미지급금누계금액) AS 입고금액,
+           (T1.미지급금지급누계금액) AS 지급금액,
+           '' AS 결제방법, '' AS 만기일자, '' AS 어음번호, '' AS 비고, '' AS 시간
+      FROM 미지급금원장마감 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+     WHERE T1.사업장코드 = @ParAppBranchCode AND T1.매입처코드 LIKE '%' + LTRIM(@ParSupplierCode) + '%'
+       AND SUBSTRING(T1.마감년월,5,2) <> '00' AND (T1.미지급금누계금액 <> 0 OR T1.미지급금지급누계금액 <> 0)
+       AND T1.마감년월 > (SUBSTRING(@ParAppFDate, 1, 4) + '00') AND T1.마감년월 < SUBSTRING(@ParAppFDate, 1, 6)
+     UNION ALL 
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+           T1.매입처코드 AS 매입처코드, T3.매입처명 AS 매입처명, 
+           (T1.작성일자) AS 일자, '' AS 적요, 
+           1 AS 구분, (SUM(T1.공급가액 + T1.세액)) AS 입고금액,
+           0 AS 지급금액, 
+           결제방법 = CASE WHEN T1.금액구분 = 0 THEN '현금' WHEN T1.금액구분 = 1 THEN '수표' 
+                           WHEN T1.금액구분 = 2 THEN '어음' ELSE '외상' END,  '' AS 만기일자, '' AS 어음번호 , 
+           T1.적요 AS 비고, T1.작성시간 AS 시간
+      FROM 매입세금계산서장부 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+     WHERE T1.사업장코드 = @ParAppBranchCode AND T1.매입처코드 LIKE '%' + LTRIM(@ParSupplierCode) + '%'
+       AND T1.사용구분 = 0 AND T1.미지급구분 = 1
+       AND T1.작성일자 BETWEEN (SUBSTRING(@ParAppFDate, 1, 6) + '01') AND @ParAppTDate
+     GROUP BY T1.사업장코드, T2.사업장명, T1.매입처코드, T3.매입처명,
+              T1.작성일자, T1.작성시간, T1.금액구분, T1.적요
+     UNION ALL
+    SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+           T1.매입처코드 AS 매입처코드, T3.매입처명 AS 매입처명, 
+           (T1.미지급금지급일자) AS 일자, '' AS 적요, 
+           0 AS 구분, 0 AS 입고금액,
+           ISNULL(SUM(T1.미지급금지급금액),0) AS 지급금액 ,
+           결제방법 = CASE WHEN T1.결제방법 = 0 THEN '현금' WHEN T1.결제방법 = 1 THEN '수표'
+                           WHEN T1.결제방법 = 2 THEN '어음' ELSE '기타' END, T1.만기일자, T1.어음번호,
+           T1.적요 AS 비고, T1.미지급금지급시간 AS 시간
+      FROM 미지급금내역 T1 
+      LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+      LEFT JOIN 매입처 T3 ON T3.사업장코드 = T1.사업장코드 AND T3.매입처코드 = T1.매입처코드
+     WHERE T1.사업장코드 = @ParAppBranchCode AND T1.매입처코드 LIKE '%' + LTRIM(@ParSupplierCode) + '%'
+       AND T1.미지급금지급일자 BETWEEN (SUBSTRING(@ParAppFDate, 1, 6) + '01') AND @ParAppTDate
+     GROUP BY T1.사업장코드, T2.사업장명, T1.매입처코드, T3.매입처명,
+              T1.미지급금지급일자, T1.미지급금지급시간, T1.결제방법, T1.만기일자, T1.어음번호, T1.적요
+     ORDER BY T1.사업장코드, T3.매입처명, T1.매입처코드, 일자, 시간, 구분  
+   END

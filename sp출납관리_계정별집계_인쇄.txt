@@ -1,0 +1,48 @@
+USE [YmhDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp출납관리_계정별집계_인쇄]    Script Date: 25-11-16 일요일 오후 3:24:21 ******/
+SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER OFF
+GO
+
+ALTER PROCEDURE [dbo].[sp출납관리_계정별집계_인쇄] 
+      (@ParBranchCode VarChar(2) ='01', @ParFDate VarChar(8) = '', @ParTDate VarChar(8) = '')
+
+AS
+
+   SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+          '' AS 계정코드, '전일이월' AS 계정명,
+          0 AS 수입1, 0 AS 수입2,
+          0 AS 지출1, 0 AS 지출2,
+          SUM(T1.입금누계금액 - T1.출금누계금액) AS 잔액        
+     FROM 회계전표내역마감 T1 
+     LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+    WHERE T1.사업장코드 = @ParBranchCode
+      AND T1.마감년월 >= (SUBSTRING(@ParFDate, 1, 4) + '00') AND T1.마감년월 < SUBSTRING(@ParFDate, 1, 6) 
+    GROUP BY T1.사업장코드, T2.사업장명
+    UNION ALL
+   SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명, 
+          '' AS 계정코드, '전일이월' AS 계정명, 
+          0 AS 수입1, 0 AS 수입2,
+          0 AS 지출1, 0 AS 지출2,
+          SUM(T1.입금금액 - T1.출금금액) AS 잔액        
+     FROM 회계전표내역 T1 
+     LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+    WHERE T1.사업장코드 = @ParBranchCode AND T1.사용구분 = 0
+      AND (T1.작성일자 >= (SUBSTRING(@ParFDate, 1, 6) + '01') AND T1.작성일자 < @ParFDate)
+    GROUP BY T1.사업장코드, T2.사업장명
+    UNION ALL
+   SELECT T1.사업장코드 AS 사업장코드, T2.사업장명 AS 사업장명,
+          T1.계정코드 AS 계정코드, T3.계정명 AS 계정명,
+          SUM(T1.입금금액) AS 수입1, 0 AS 수입2,
+          SUM(T1.출금금액) AS 지출1, 0 AS 지출2,
+          0 AS 잔액
+     FROM 회계전표내역 T1
+     LEFT JOIN 사업장 T2 ON T2.사업장코드 = T1.사업장코드 
+     LEFT JOIN 계정과목 T3 ON T3.계정코드 = T1.계정코드
+    WHERE T1.사업장코드 = @ParBranchCode AND T1.사용구분 = 0
+      AND (T1.작성일자 BETWEEN @ParFDate AND @ParTDate)
+    GROUP BY T1.사업장코드, T2.사업장명, T1.계정코드, T3.계정명
+    ORDER BY 사업장코드, 계정코드
+

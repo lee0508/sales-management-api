@@ -563,4 +563,96 @@ $(document).on('change', '.cashCheckbox', function () {
   }
 });
 
+// ===================================
+// 월마감 처리 함수
+// ===================================
+
+/**
+ * 월마감 모달 열기
+ */
+function openMonthCloseModal() {
+  const modal = document.getElementById('monthCloseModal');
+  const closeMonthInput = document.getElementById('closeMonth');
+
+  // 이번 달로 기본값 설정
+  const today = new Date();
+  const currentMonth = today.toISOString().slice(0, 7); // YYYY-MM
+  closeMonthInput.value = currentMonth;
+
+  modal.style.display = 'flex';
+}
+
+/**
+ * 월마감 모달 닫기
+ */
+function closeMonthCloseModal() {
+  const modal = document.getElementById('monthCloseModal');
+  modal.style.display = 'none';
+}
+
+/**
+ * 월마감 실행
+ */
+async function confirmMonthClose() {
+  try {
+    const closeMonthInput = document.getElementById('closeMonth').value;
+
+    if (!closeMonthInput) {
+      alert('마감년월을 선택해주세요.');
+      return;
+    }
+
+    // YYYY-MM → YYYYMM 형식으로 변환
+    const 마감년월 = closeMonthInput.replace(/-/g, '');
+
+    // 확인 다이얼로그
+    const yearMonth = closeMonthInput.split('-');
+    const confirmMessage = `${yearMonth[0]}년 ${yearMonth[1]}월 회계전표내역을 마감 처리하시겠습니까?\n\n모든 계정과목의 해당 월 데이터가 집계됩니다.`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    console.log('✅ 월마감 처리 시작:', 마감년월);
+
+    // API 호출
+    const response = await fetch('/api/accounting/close-month', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ 마감년월 }),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      alert(result.message || '월마감 처리에 실패했습니다.');
+      return;
+    }
+
+    console.log('✅ 월마감 완료:', result);
+
+    // 성공 메시지
+    alert(result.message || '월마감이 완료되었습니다.');
+
+    // 모달 닫기
+    closeMonthCloseModal();
+
+    // 현금출납내역 새로고침
+    if (typeof filterCashHistory === 'function') {
+      await filterCashHistory();
+    }
+  } catch (error) {
+    console.error('❌ 월마감 처리 오류:', error);
+    alert('월마감 처리 중 오류가 발생했습니다: ' + error.message);
+  }
+}
+
+// 전역 함수로 노출
+window.openMonthCloseModal = openMonthCloseModal;
+window.closeMonthCloseModal = closeMonthCloseModal;
+window.confirmMonthClose = confirmMonthClose;
+
 console.log('✅ cash-history.js 로드 완료');
