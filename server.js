@@ -6731,8 +6731,16 @@ app.get('/api/account-categories', async (_req, res) => {
  */
 app.get('/api/cash-history', async (req, res) => {
   try {
-    const { startDate, endDate, 입출구분 } = req.query;
+    const { startDate, endDate, 입출구분, 계정코드 } = req.query;
     const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    console.log('📞 현금출납내역 조회 요청:', {
+      사업장코드,
+      startDate,
+      endDate,
+      입출구분,
+      계정코드,
+    });
 
     let query = `
       SELECT
@@ -6747,6 +6755,7 @@ app.get('/api/cash-history', async (req, res) => {
         h.적요,
         h.작성자코드,
         u.사용자명 AS 작성자명,
+        u.사용자명,
         h.수정일자,
         h.사용자코드
       FROM 회계전표내역 h
@@ -6774,9 +6783,22 @@ app.get('/api/cash-history', async (req, res) => {
       request.input('입출구분', sql.TinyInt, parseInt(입출구분));
     }
 
+    // 계정코드 필터 (합계잔액시산표 상세보기에서 사용)
+    if (계정코드) {
+      query += ` AND h.계정코드 = @계정코드`;
+      request.input('계정코드', sql.VarChar(4), 계정코드);
+    }
+
     query += ` ORDER BY h.작성일자 DESC, h.작성시간 DESC`;
 
+    console.log('📝 실행 쿼리:', query);
+
     const result = await request.query(query);
+
+    console.log('✅ 현금출납내역 조회 결과:', {
+      total: result.recordset.length,
+      sample: result.recordset.length > 0 ? result.recordset[0] : null,
+    });
 
     res.json({
       success: true,
@@ -7074,6 +7096,140 @@ app.delete('/api/cash-history/:date/:time', async (req, res) => {
     });
   }
 });
+
+// ====================================
+// 자재입출내역 조회 API (합계잔액시산표 상세보기용)
+// ====================================
+
+/**
+ * 자재입출내역 조회 (매입/매출)
+ * GET /api/material-transactions?startDate=20251101&endDate=20251130&입출구분=1
+ */
+app.get('/api/material-transactions', async (req, res) => {
+  try {
+    const { startDate, endDate, 입출구분 } = req.query;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    console.log('📞 자재입출내역 조회 요청:', {
+      사업장코드,
+      startDate,
+      endDate,
+      입출구분,
+    });
+
+    let query = `
+      SELECT
+        i.사업장코드,
+        i.거래일자,
+        i.거래번호,
+        i.분류코드,
+        i.세부코드,
+        i.입출고구분,
+        i.매입처코드,
+        i.매출처코드,
+        i.입고수량,
+        i.입고단가,
+        i.입고부가,
+        i.출고수량,
+        i.출고단가,
+        i.출고부가,
+        m.자재명,
+        CASE
+          WHEN i.입출고구분 = 1 THEN sup.매입처명
+          WHEN i.입출고구분 = 2 THEN cus.매출처명
+        END AS 거래처명,
+        CASE
+          WHEN i.입출고구분 = 1 THEN sup.매입처명
+        END AS 매입처명,
+        CASE
+          WHEN i.입출고구분 = 2 THEN cus.매출처명
+        END AS 매출처명
+      FROM 자재입출내역 i
+        LEFT JOIN 자재 m
+          ON i.분류코드 = m.분류코드
+          AND i.세부코드 = SUBSTRING(m.세부코드, 3, 16)
+        LEFT JOIN 매입처 sup
+          ON i.매입처코드 = sup.매입처코드
+          AND i.사업장코드 = sup.사업장코드
+        LEFT JOIN 매출처 cus
+          ON i.매출처코드 = cus.매출처코드
+          AND i.사업장코드 = cus.사업장코드
+      WHERE i.사업장코드 = @사업장코드
+        AND i.사용구분 = 0
+    `;
+
+    const request = pool.request().input('사업장코드', sql.VarChar(2), 사업장코드);
+
+    // 날짜 필터
+    if (startDate) {
+      query += ` AND i.거래일자 >= @startDate`;
+      request.input('startDate', sql.VarChar(8), startDate);
+    }
+    if (endDate) {
+      query += ` AND i.거래일자 <= @endDate`;
+      request.input('endDate', sql.VarChar(8), endDate);
+    }
+
+    // 입출고구분 필터 (1=매입, 2=매출)
+    if (입출구분) {
+      query += ` AND i.입출고구분 = @입출고구분`;
+      request.input('입출고구분', sql.TinyInt, parseInt(입출구분));
+    }
+
+    query += ` ORDER BY i.거래일자 DESC, i.거래번호 DESC`;
+
+    console.log('📝 실행 쿼리:', query);
+
+    const result = await request.query(query);
+
+    console.log('✅ 자재입출내역 조회 결과:', {
+      total: result.recordset.length,
+      sample: result.recordset.length > 0 ? result.recordset[0] : null,
+    });
+
+    // 모달창 표시 데이터 상세 로그
+    if (result.recordset.length > 0) {
+      console.log('📊 모달창 표시 데이터 (첫 3건):');
+      result.recordset.slice(0, 3).forEach((row, idx) => {
+        console.log(`  [${idx + 1}]`, {
+          거래일자: row.거래일자,
+          거래번호: row.거래번호,
+          입출고구분: row.입출고구분 === 1 ? '매입(입고)' : '매출(출고)',
+          거래처명: row.거래처명 || row.매입처명 || row.매출처명,
+          자재명: row.자재명,
+          수량: row.입출고구분 === 1 ? row.입고수량 : row.출고수량,
+          단가: row.입출고구분 === 1 ? row.입고단가 : row.출고단가,
+          금액:
+            row.입출고구분 === 1
+              ? (row.입고수량 || 0) * (row.입고단가 || 0)
+              : (row.출고수량 || 0) * (row.출고단가 || 0),
+        });
+      });
+
+      // 전체 데이터 구조 확인
+      console.log('📋 전체 데이터 구조 (모든 필드):');
+      console.log(Object.keys(result.recordset[0]));
+    } else {
+      console.log('⚠️ 조회된 데이터가 없습니다.');
+    }
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('❌ 자재입출내역 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류: ' + err.message,
+    });
+  }
+});
+
+// ====================================
+// 월마감 API
+// ====================================
 
 /**
  * 회계전표 월마감 처리

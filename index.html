@@ -1893,6 +1893,142 @@
             </table>
           </div>
 
+          <!-- 합계잔액시산표 상세보기 모달 -->
+          <div
+            id="trialBalanceDetailModal"
+            style="
+              display: none;
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 1000;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <div
+              style="
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                width: 95%;
+                max-width: 1400px;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              "
+            >
+              <!-- 제목 영역 -->
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                "
+              >
+                <div>
+                  <h2 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #1f2937">
+                    💰 계정과목별 거래내역
+                  </h2>
+                  <div style="font-size: 14px; color: #6b7280">
+                    <span id="trialBalanceDetailAccountCode" style="font-weight: 600">-</span>
+                    <span style="margin: 0 8px">|</span>
+                    <span id="trialBalanceDetailAccountName" style="font-weight: 600">-</span>
+                    <span style="margin: 0 8px">|</span>
+                    <span id="trialBalanceDetailPeriod">-</span>
+                  </div>
+                </div>
+                <button
+                  onclick="closeTrialBalanceDetailModal()"
+                  style="
+                    background: #f0f0f0;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                  "
+                  onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
+                  onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';"
+                >
+                  ×
+                </button>
+              </div>
+
+              <!-- 요약 정보 -->
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: repeat(4, 1fr);
+                  gap: 16px;
+                  margin-bottom: 24px;
+                  padding: 20px;
+                  background: #f9fafb;
+                  border-radius: 8px;
+                "
+              >
+                <div>
+                  <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px">차변당월</div>
+                  <div id="detailDebitMonth" style="font-size: 18px; font-weight: 600; color: #1f2937">
+                    0원
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px">차변누계</div>
+                  <div id="detailDebitTotal" style="font-size: 18px; font-weight: 600; color: #1f2937">
+                    0원
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px">대변당월</div>
+                  <div id="detailCreditMonth" style="font-size: 18px; font-weight: 600; color: #1f2937">
+                    0원
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px">대변누계</div>
+                  <div id="detailCreditTotal" style="font-size: 18px; font-weight: 600; color: #1f2937">
+                    0원
+                  </div>
+                </div>
+              </div>
+
+              <!-- 거래내역 테이블 -->
+              <div style="margin-bottom: 20px">
+                <h3 id="trialBalanceDetailTableTitle" style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937">
+                  📋 거래내역
+                </h3>
+                <table id="trialBalanceDetailTable" class="display" style="width: 100%">
+                  <thead id="trialBalanceDetailTableHead">
+                    <tr>
+                      <th>순번</th>
+                      <th>작성일자</th>
+                      <th>입출구분</th>
+                      <th>계정명</th>
+                      <th>입금금액</th>
+                      <th>출금금액</th>
+                      <th>적요</th>
+                      <th>작성자</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <!-- 대차대조표 페이지 -->
           <div class="page-content hidden" id="accountBalancePage">
             <h2 style="display: none">대차대조표</h2>
