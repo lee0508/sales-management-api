@@ -199,7 +199,7 @@
               <a class="submenu-link" onclick="alert('미지급금관리 기능은 준비 중입니다.')"
                 >미지급금관리</a
               >
-              <a class="submenu-link" onclick="alert('세금계산서관리 기능은 준비 중입니다.')"
+              <a class="submenu-link" onclick="showPage('taxInvoice')"
                 >세금계산서관리</a
               >
             </div>
@@ -280,7 +280,8 @@
             </a>
             <div class="submenu" id="accountSubmenu">
               <a class="submenu-link" onclick="showPage('account-catagory')">계정과목관리</a>
-              <a class="submenu-link" onclick="showPage('account-history')">현금출납내역관리</a>
+              <a class="submenu-link" onclick="showPage('account-history')">현금출납관리</a>
+              <a class="submenu-link" onclick="showPage('accounting-voucher')">회계전표관리</a>
               <a class="submenu-link" onclick="showPage('total-balnace')">합계잔액시산표</a>
               <a class="submenu-link" onclick="showPage('account-balnace')">대차대조표</a>
             </div>
@@ -1797,6 +1798,145 @@
             </table>
           </div>
 
+          <!-- 회계전표관리 페이지 -->
+          <div class="page-content hidden" id="accountingVoucherPage">
+            <h2 style="display: none">회계전표관리</h2>
+
+            <!-- 🔹 상단 툴바 -->
+            <div class="toolbar" style="display: flex; justify-content: space-between; align-items: center;">
+              <div class="toolbar-left" style="display: flex; gap: 12px; align-items: center">
+                <select id="voucherTypeFilter" class="form-control" style="width: 150px" onchange="filterVouchers()">
+                  <option value="">전체 유형</option>
+                  <option value="매입">매입전표</option>
+                  <option value="출고">거래명세서</option>
+                  <option value="세금">세금계산서</option>
+                  <option value="현금">현금출납</option>
+                </select>
+                <input type="date" id="voucherStartDate" class="form-control" style="width: 150px" />
+                <span>~</span>
+                <input type="date" id="voucherEndDate" class="form-control" style="width: 150px" />
+                <button class="btn btn-secondary" onclick="filterVouchers()">조회</button>
+              </div>
+
+              <div class="toolbar-right" style="display: flex; gap: 12px; align-items: center">
+                <button id="voucherEditBtn" class="btn btn-primary" onclick="editSelectedVouchers()" style="display: none; padding: 10px 20px;">
+                  <span>&#9998;</span> 수정
+                </button>
+                <button id="voucherDeleteBtn" class="btn btn-danger" onclick="deleteSelectedVouchers()" style="display: none; padding: 10px 20px;">
+                  <span>&#128465;</span> 삭제
+                </button>
+                <button class="btn btn-secondary" onclick="exportVouchersToExcel()" style="padding: 10px 20px;">
+                  <span>&#128196;</span> Google Sheets로 내보내기
+                </button>
+              </div>
+            </div>
+
+            <!-- ✅ 회계전표 요약 정보 -->
+            <div class="summary-bar" style="margin: 10px 0; font-size: 14px">
+              총 전표 건수: <span id="voucherCount" style="font-weight: bold">0</span> 건 |
+              차변 합계: <span id="debitTotal" style="font-weight: bold; color: #007bff">0</span> 원 |
+              대변 합계: <span id="creditTotal" style="font-weight: bold; color: #28a745">0</span> 원
+            </div>
+
+            <!-- ✅ 회계전표 목록 DataTable -->
+            <table id="accountingVoucherTable" class="display" style="width: 100%">
+              <thead>
+                <tr>
+                  <th style="width: 40px"><input type="checkbox" id="selectAllVouchers" /></th>
+                  <th>작성일자</th>
+                  <th>전표번호</th>
+                  <th>순번</th>
+                  <th>계정코드</th>
+                  <th>계정명</th>
+                  <th>차대</th>
+                  <th>금액</th>
+                  <th>적요</th>
+                  <th>참조전표</th>
+                  <th>작성자</th>
+                  <th style="width: 80px">관리</th>
+                </tr>
+              </thead>
+              <tbody id="accountingVoucherTableBody"></tbody>
+            </table>
+
+            <!-- 회계전표 상세보기 모달 -->
+            <div id="voucherDetailModal" class="modal" style="display: none">
+              <div class="modal-content" style="width: 900px; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column; position: relative">
+                <button class="close-btn" onclick="closeVoucherDetailModal()" style="position: absolute; top: 15px; right: 15px; width: 35px; height: 35px; border-radius: 50%; background: #e0e0e0; border: none; font-size: 24px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s">&times;</button>
+                <div class="modal-header" style="padding-right: 50px">
+                  <h3>회계전표 상세</h3>
+                </div>
+                <div class="modal-body" style="overflow-y: auto; flex: 1; max-height: calc(90vh - 140px)">
+                  <div id="voucherDetailContent" style="padding: 20px"></div>
+                </div>
+                <div class="modal-footer" style="text-align: right; padding: 10px 20px">
+                  <button class="btn btn-primary" onclick="printVoucherDetail()">
+                    <span>&#128438;</span> 출력
+                  </button>
+                  <button class="btn btn-secondary" onclick="closeVoucherDetailModal()">닫기</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 회계전표 수정 모달 -->
+            <div id="voucherEditModal" class="modal" style="display: none">
+              <div class="modal-content" style="width: 800px; max-width: 95%">
+                <div class="modal-header">
+                  <h3>회계전표 수정</h3>
+                  <button class="close-btn" onclick="closeVoucherEditModal()">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 20px">
+                  <table id="voucherEditTable" class="display" style="width: 100%">
+                    <thead>
+                      <tr>
+                        <th>전표번호</th>
+                        <th>전표일자</th>
+                        <th>순번</th>
+                        <th>계정코드</th>
+                        <th>계정명</th>
+                        <th>차대</th>
+                        <th>금액</th>
+                        <th>적요</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+                <div class="modal-footer">
+                  <button class="btn btn-primary" onclick="saveVoucherEdit()">
+                    <span>&#128190;</span> 저장
+                  </button>
+                  <button class="btn btn-secondary" onclick="closeVoucherEditModal()">취소</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 회계전표 삭제 모달 -->
+            <div id="voucherDeleteModal" class="modal" style="display: none">
+              <div class="modal-content" style="width: 500px; max-width: 95%">
+                <div class="modal-header">
+                  <h3>회계전표 삭제</h3>
+                  <button class="close-btn" onclick="closeVoucherDeleteModal()">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 30px; text-align: center">
+                  <p style="font-size: 16px; margin-bottom: 20px">
+                    선택한 <span id="deleteVoucherCount" style="font-weight: bold; color: #dc3545">0</span>건의 회계전표를 삭제하시겠습니까?
+                  </p>
+                  <p style="color: #dc3545; font-size: 14px">
+                    ⚠️ 삭제된 전표는 복구할 수 없습니다.<br />
+                    원천 거래(매입/매출)와의 연동 정보도 함께 제거됩니다.
+                  </p>
+                </div>
+                <div class="modal-footer">
+                  <button class="btn btn-danger" onclick="confirmVoucherDelete()">
+                    <span>&#128465;</span> 삭제
+                  </button>
+                  <button class="btn btn-secondary" onclick="closeVoucherDeleteModal()">취소</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- 합계잔액시산표 페이지 -->
           <div class="page-content hidden" id="totalBalancePage">
             <h2 style="display: none">합계잔액시산표</h2>
@@ -1981,25 +2121,37 @@
               >
                 <div>
                   <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px">차변당월</div>
-                  <div id="detailDebitMonth" style="font-size: 18px; font-weight: 600; color: #1f2937">
+                  <div
+                    id="detailDebitMonth"
+                    style="font-size: 18px; font-weight: 600; color: #1f2937"
+                  >
                     0원
                   </div>
                 </div>
                 <div>
                   <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px">차변누계</div>
-                  <div id="detailDebitTotal" style="font-size: 18px; font-weight: 600; color: #1f2937">
+                  <div
+                    id="detailDebitTotal"
+                    style="font-size: 18px; font-weight: 600; color: #1f2937"
+                  >
                     0원
                   </div>
                 </div>
                 <div>
                   <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px">대변당월</div>
-                  <div id="detailCreditMonth" style="font-size: 18px; font-weight: 600; color: #1f2937">
+                  <div
+                    id="detailCreditMonth"
+                    style="font-size: 18px; font-weight: 600; color: #1f2937"
+                  >
                     0원
                   </div>
                 </div>
                 <div>
                   <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px">대변누계</div>
-                  <div id="detailCreditTotal" style="font-size: 18px; font-weight: 600; color: #1f2937">
+                  <div
+                    id="detailCreditTotal"
+                    style="font-size: 18px; font-weight: 600; color: #1f2937"
+                  >
                     0원
                   </div>
                 </div>
@@ -2007,7 +2159,10 @@
 
               <!-- 거래내역 테이블 -->
               <div style="margin-bottom: 20px">
-                <h3 id="trialBalanceDetailTableTitle" style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937">
+                <h3
+                  id="trialBalanceDetailTableTitle"
+                  style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937"
+                >
                   📋 거래내역
                 </h3>
                 <table id="trialBalanceDetailTable" class="display" style="width: 100%">
@@ -8069,6 +8224,16 @@
                   }
                 },
               },
+              'accounting-voucher': {
+                element: 'accountingVoucherPage',
+                title: '회계전표관리',
+                menu: 'accounting',
+                loadFunc: () => {
+                  if (typeof loadAccountingVouchers === 'function') {
+                    loadAccountingVouchers();
+                  }
+                },
+              },
               'total-balnace': {
                 element: 'totalBalancePage',
                 title: '합계잔액시산표',
@@ -8664,7 +8829,8 @@
                 <button class="btn btn-secondary" onclick="filterTaxInvoices()">조회</button>
               </div>
 
-              <div class="toolbar-right">
+              <div class="toolbar-right" style="display: flex; gap: 12px; align-items: center">
+                <!-- 임의 발행 버튼 -->
                 <button
                   class="btn btn-success"
                   onclick="openNewTaxInvoiceModal()"
@@ -8677,10 +8843,36 @@
                     font-size: 14px;
                     font-weight: 500;
                     cursor: pointer;
+                    transition: all 0.2s;
                   "
+                  onmouseover="this.style.background='#218838'"
+                  onmouseout="this.style.background='#28a745'"
                 >
-                  <span style="font-size: 18px; margin-right: 4px">+</span> 세금계산서 발행
+                  <span style="font-size: 18px; margin-right: 4px">📝</span> 임의 발행
                 </button>
+
+                <!-- 거래 발행 버튼 -->
+                <button
+                  class="btn btn-primary"
+                  onclick="openTransactionTaxInvoiceModal()"
+                  style="
+                    padding: 10px 20px;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#0056b3'"
+                  onmouseout="this.style.background='#007bff'"
+                >
+                  <span style="font-size: 18px; margin-right: 4px">📋</span> 거래 발행
+                </button>
+
+                <!-- Google Sheets 내보내기 버튼 -->
                 <button
                   class="btn btn-secondary"
                   onclick="exportTaxInvoicesToCSV()"
@@ -8690,7 +8882,13 @@
                     color: white;
                     border: none;
                     border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
                   "
+                  onmouseover="this.style.background='#5a6268'"
+                  onmouseout="this.style.background='#6c757d'"
                 >
                   📊 Google Sheets로 내보내기
                 </button>
@@ -9144,6 +9342,679 @@
                     "
                   >
                     저장
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- ✅ 세금계산서 신규 발행 모달 -->
+          <div id="newTaxInvoiceModal" class="modal" style="display: none">
+            <div
+              id="newTaxInvoiceModalContent"
+              class="modal-content large"
+              style="max-width: 1200px; max-height: 90vh; overflow-y: auto; padding: 32px"
+            >
+              <!-- ✅ 헤더 영역 -->
+              <div
+                id="newTaxInvoiceModalHeader"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                  cursor: move;
+                  user-select: none;
+                "
+              >
+                <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
+                  세금계산서 신규 발행
+                </h2>
+                <button
+                  onclick="closeNewTaxInvoiceModal()"
+                  style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                  onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <!-- ✅ 기본 정보 폼 -->
+              <form id="newTaxInvoiceForm" onsubmit="saveTaxInvoice(event)">
+                <div
+                  style="
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 20px;
+                    margin-bottom: 32px;
+                    padding: 24px;
+                    background: #f9fafb;
+                    border-radius: 12px;
+                    border: 1px solid #e5e7eb;
+                  "
+                >
+                  <h3
+                    style="
+                      grid-column: span 2;
+                      margin: 0 0 16px 0;
+                      font-size: 16px;
+                      font-weight: 600;
+                      color: #374151;
+                    "
+                  >
+                    기본 정보
+                  </h3>
+
+                  <div>
+                    <label
+                      style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
+                    >
+                      작성일자 <span style="color: #ef4444">*</span>
+                    </label>
+                    <input type="date" id="newTaxDate" class="form-control" required />
+                  </div>
+
+                  <div style="grid-column: span 2">
+                    <label
+                      style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
+                    >
+                      매출처 <span style="color: #ef4444">*</span>
+                    </label>
+                    <div style="display: flex; gap: 8px">
+                      <input
+                        type="text"
+                        id="newTaxCustomerSearch"
+                        class="form-control"
+                        placeholder="매출처코드 또는 매출처명으로 검색"
+                        style="flex: 1"
+                      />
+                      <button
+                        type="button"
+                        onclick="searchCustomerForTax()"
+                        style="
+                          padding: 0 20px;
+                          background: #3b82f6;
+                          color: white;
+                          border: none;
+                          border-radius: 6px;
+                          cursor: pointer;
+                          white-space: nowrap;
+                          font-weight: 500;
+                        "
+                      >
+                        🔍 검색
+                      </button>
+                    </div>
+                    <!-- 선택된 매출처 표시 -->
+                    <div id="selectedCustomerDisplay" style="margin-top: 12px; display: none">
+                      <div style="
+                        padding: 12px 16px;
+                        background: #eff6ff;
+                        border: 1px solid #3b82f6;
+                        border-radius: 8px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                      ">
+                        <div>
+                          <span style="font-weight: 600; color: #1e40af; margin-right: 12px" id="selectedCustomerCode"></span>
+                          <span style="color: #374151" id="selectedCustomerName"></span>
+                        </div>
+                        <button
+                          type="button"
+                          onclick="clearSelectedCustomer()"
+                          style="
+                            padding: 4px 12px;
+                            background: #ef4444;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 12px;
+                          "
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                    <!-- 검색 결과 목록 -->
+                    <div id="customerSearchResults" style="
+                      margin-top: 8px;
+                      max-height: 200px;
+                      overflow-y: auto;
+                      border: 1px solid #e5e7eb;
+                      border-radius: 6px;
+                      background: white;
+                      display: none;
+                    "></div>
+                  </div>
+
+                  <div style="grid-column: span 2">
+                    <label
+                      style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151"
+                    >
+                      적요
+                    </label>
+                    <input
+                      type="text"
+                      id="newTaxRemark"
+                      class="form-control"
+                      placeholder="적요를 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <!-- ✅ 품목 추가 영역 -->
+                <div style="
+                  margin-bottom: 24px;
+                  padding: 24px;
+                  background: #f9fafb;
+                  border-radius: 12px;
+                  border: 1px solid #e5e7eb;
+                ">
+                  <div style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 16px;
+                  ">
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #374151">
+                      품목 추가
+                    </h3>
+                    <button
+                      type="button"
+                      onclick="addTaxInvoiceItem()"
+                      style="
+                        padding: 8px 16px;
+                        background: #10b981;
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-weight: 500;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                      "
+                    >
+                      <span style="font-size: 18px">+</span> 품목 추가
+                    </button>
+                  </div>
+
+                  <!-- 품목 입력 폼 -->
+                  <div style="
+                    display: grid;
+                    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+                    gap: 12px;
+                    margin-bottom: 16px;
+                    align-items: end;
+                  ">
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #374151">
+                        품목명
+                      </label>
+                      <input
+                        type="text"
+                        id="itemName"
+                        class="form-control"
+                        placeholder="품목명 입력"
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #374151">
+                        수량
+                      </label>
+                      <input
+                        type="number"
+                        id="itemQuantity"
+                        class="form-control"
+                        step="0.01"
+                        value="1"
+                        oninput="calculateItemSupplyAmount()"
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #374151">
+                        단가
+                      </label>
+                      <input
+                        type="number"
+                        id="itemUnitPrice"
+                        class="form-control"
+                        step="1"
+                        placeholder="0"
+                        oninput="calculateItemSupplyAmount()"
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #374151">
+                        공급가액
+                      </label>
+                      <input
+                        type="number"
+                        id="itemSupplyAmount"
+                        class="form-control"
+                        step="1"
+                        placeholder="0"
+                        readonly
+                        style="background: #e5e7eb"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- 품목 목록 테이블 -->
+                  <div style="overflow-x: auto">
+                    <table id="taxInvoiceItemsTable" style="width: 100%; border-collapse: collapse">
+                      <thead>
+                        <tr style="background: #f3f4f6">
+                          <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb; font-weight: 600; color: #374151">품목명</th>
+                          <th style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; font-weight: 600; color: #374151; width: 100px">수량</th>
+                          <th style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; font-weight: 600; color: #374151; width: 120px">단가</th>
+                          <th style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; font-weight: 600; color: #374151; width: 140px">공급가액</th>
+                          <th style="padding: 12px; text-align: center; border: 1px solid #e5e7eb; font-weight: 600; color: #374151; width: 80px">삭제</th>
+                        </tr>
+                      </thead>
+                      <tbody id="taxInvoiceItemsList">
+                        <!-- 품목 목록이 여기에 동적으로 추가됩니다 -->
+                      </tbody>
+                      <tfoot>
+                        <tr style="background: #f9fafb; font-weight: 600">
+                          <td colspan="3" style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; color: #374151">
+                            합계
+                          </td>
+                          <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; color: #2563eb" id="totalSupplyAmount">
+                            0
+                          </td>
+                          <td style="border: 1px solid #e5e7eb"></td>
+                        </tr>
+                        <tr style="background: #f9fafb">
+                          <td colspan="3" style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; color: #374151">
+                            부가세 (10%)
+                          </td>
+                          <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; color: #374151" id="totalTaxAmount">
+                            0
+                          </td>
+                          <td style="border: 1px solid #e5e7eb"></td>
+                        </tr>
+                        <tr style="background: #eff6ff; font-weight: 700">
+                          <td colspan="3" style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; color: #1e40af">
+                            총 합계
+                          </td>
+                          <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb; color: #1e40af; font-size: 16px" id="grandTotal">
+                            0
+                          </td>
+                          <td style="border: 1px solid #e5e7eb"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- ✅ 버튼 영역 -->
+                <div style="display: flex; gap: 12px; justify-content: flex-end">
+                  <button
+                    type="button"
+                    onclick="closeNewTaxInvoiceModal()"
+                    style="
+                      padding: 12px 24px;
+                      background: #6c757d;
+                      color: white;
+                      border: none;
+                      border-radius: 8px;
+                      cursor: pointer;
+                      font-weight: 500;
+                    "
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    style="
+                      padding: 12px 24px;
+                      background: #28a745;
+                      color: white;
+                      border: none;
+                      border-radius: 8px;
+                      cursor: pointer;
+                      font-weight: 500;
+                    "
+                  >
+                    발행
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- ✅ 세금계산서 거래 발행 모달 (거래명세서 기준) -->
+          <div id="transactionTaxInvoiceModal" class="modal" style="display: none">
+            <div
+              id="transactionTaxInvoiceModalContent"
+              class="modal-content large"
+              style="max-width: 1200px; max-height: 90vh; overflow-y: auto; padding: 32px"
+            >
+              <form id="transactionTaxInvoiceForm" onsubmit="saveTransactionTaxInvoice(event)">
+                <!-- 헤더 -->
+                <div
+                  class="draggable-header"
+                  style="
+                    cursor: move;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 24px;
+                    padding-bottom: 16px;
+                    border-bottom: 2px solid #e5e7eb;
+                  "
+                >
+                  <h2 style="margin: 0; font-size: 24px; font-weight: 600; color: #1f2937">
+                    세금계산서 거래 발행
+                  </h2>
+                  <button
+                    type="button"
+                    onclick="closeTransactionTaxInvoiceModal()"
+                    style="
+                      width: 32px;
+                      height: 32px;
+                      border: none;
+                      background: #f3f4f6;
+                      border-radius: 8px;
+                      cursor: pointer;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      transition: all 0.2s;
+                    "
+                    onmouseover="this.style.background='#e5e7eb'"
+                    onmouseout="this.style.background='#f3f4f6'"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- 거래 조회 섹션 -->
+                <div style="margin-bottom: 24px; padding: 20px; background: #f9fafb; border-radius: 8px">
+                  <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
+                    거래명세서 조회
+                  </h3>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; align-items: end">
+                    <!-- 거래일자 -->
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #374151">
+                        거래일자 <span style="color: #ef4444">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        id="txTaxTransactionDate"
+                        required
+                        style="
+                          width: 100%;
+                          padding: 10px 12px;
+                          border: 1px solid #d1d5db;
+                          border-radius: 6px;
+                          font-size: 14px;
+                        "
+                      />
+                    </div>
+
+                    <!-- 거래번호 -->
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #374151">
+                        거래번호 <span style="color: #ef4444">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        id="txTaxTransactionNo"
+                        required
+                        min="1"
+                        placeholder="거래번호"
+                        style="
+                          width: 100%;
+                          padding: 10px 12px;
+                          border: 1px solid #d1d5db;
+                          border-radius: 6px;
+                          font-size: 14px;
+                        "
+                      />
+                    </div>
+
+                    <!-- 매출처코드 (readonly, 자동입력) -->
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #374151">
+                        매출처코드
+                      </label>
+                      <input
+                        type="text"
+                        id="txTaxCustomerCode"
+                        readonly
+                        style="
+                          width: 100%;
+                          padding: 10px 12px;
+                          border: 1px solid #d1d5db;
+                          border-radius: 6px;
+                          font-size: 14px;
+                          background: #f9fafb;
+                        "
+                      />
+                    </div>
+
+                    <!-- 조회 버튼 -->
+                    <div>
+                      <button
+                        type="button"
+                        onclick="loadTransactionForTax()"
+                        style="
+                          padding: 10px 24px;
+                          background: #3b82f6;
+                          color: white;
+                          border: none;
+                          border-radius: 6px;
+                          font-size: 14px;
+                          font-weight: 500;
+                          cursor: pointer;
+                          transition: all 0.2s;
+                        "
+                        onmouseover="this.style.background='#2563eb'"
+                        onmouseout="this.style.background='#3b82f6'"
+                      >
+                        조회
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 매출처명 (readonly, 자동입력) -->
+                  <div style="margin-top: 12px">
+                    <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #374151">
+                      매출처명
+                    </label>
+                    <input
+                      type="text"
+                      id="txTaxCustomerName"
+                      readonly
+                      style="
+                        width: 100%;
+                        padding: 10px 12px;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
+                        font-size: 14px;
+                        background: #f9fafb;
+                      "
+                    />
+                  </div>
+                </div>
+
+                <!-- 거래 품목 리스트 (DataTable) -->
+                <div style="margin-bottom: 24px">
+                  <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #374151">
+                    거래 품목 내역
+                  </h3>
+                  <div style="overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px">
+                    <table id="transactionTaxItemsTable" class="display" style="width: 100%">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>자재코드</th>
+                          <th>자재명</th>
+                          <th>규격</th>
+                          <th>단위</th>
+                          <th>출고수량</th>
+                          <th>출고단가</th>
+                          <th>공급가액</th>
+                          <th>부가세</th>
+                          <th>합계</th>
+                        </tr>
+                      </thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- 합계 정보 -->
+                <div style="margin-bottom: 24px; padding: 20px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bfdbfe">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px">
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #1e40af">
+                        공급가액 합계
+                      </label>
+                      <input
+                        type="text"
+                        id="txTaxTotalSupply"
+                        readonly
+                        style="
+                          width: 100%;
+                          padding: 12px;
+                          border: 1px solid #bfdbfe;
+                          border-radius: 6px;
+                          font-size: 16px;
+                          font-weight: 600;
+                          text-align: right;
+                          background: white;
+                          color: #1e40af;
+                        "
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #1e40af">
+                        세액 합계
+                      </label>
+                      <input
+                        type="text"
+                        id="txTaxTotalTax"
+                        readonly
+                        style="
+                          width: 100%;
+                          padding: 12px;
+                          border: 1px solid #bfdbfe;
+                          border-radius: 6px;
+                          font-size: 16px;
+                          font-weight: 600;
+                          text-align: right;
+                          background: white;
+                          color: #1e40af;
+                        "
+                      />
+                    </div>
+                    <div>
+                      <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #1e40af">
+                        합계 금액
+                      </label>
+                      <input
+                        type="text"
+                        id="txTaxTotalAmount"
+                        readonly
+                        style="
+                          width: 100%;
+                          padding: 12px;
+                          border: 1px solid #bfdbfe;
+                          border-radius: 6px;
+                          font-size: 16px;
+                          font-weight: 600;
+                          text-align: right;
+                          background: white;
+                          color: #1e40af;
+                        "
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 적요 -->
+                <div style="margin-bottom: 24px">
+                  <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #374151">
+                    적요
+                  </label>
+                  <textarea
+                    id="txTaxRemarks"
+                    rows="2"
+                    placeholder="적요 입력 (선택사항)"
+                    style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 1px solid #d1d5db;
+                      border-radius: 6px;
+                      font-size: 14px;
+                      resize: vertical;
+                    "
+                  ></textarea>
+                </div>
+
+                <!-- 버튼 -->
+                <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 16px; border-top: 1px solid #e5e7eb">
+                  <button
+                    type="button"
+                    onclick="closeTransactionTaxInvoiceModal()"
+                    style="
+                      padding: 10px 24px;
+                      background: white;
+                      color: #374151;
+                      border: 1px solid #d1d5db;
+                      border-radius: 6px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      cursor: pointer;
+                      transition: all 0.2s;
+                    "
+                    onmouseover="this.style.background='#f9fafb'"
+                    onmouseout="this.style.background='white'"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    style="
+                      padding: 10px 24px;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white;
+                      border: none;
+                      border-radius: 6px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      cursor: pointer;
+                      transition: all 0.2s;
+                      box-shadow: 0 4px 6px rgba(102, 126, 234, 0.25);
+                    "
+                    onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 12px rgba(102, 126, 234, 0.35)'"
+                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(102, 126, 234, 0.25)'"
+                  >
+                    발행
                   </button>
                 </div>
               </form>
@@ -17902,6 +18773,768 @@
         } catch (error) {
           console.error('❌ 일계표 출력 오류:', error);
           alert('일계표 출력 중 오류가 발생했습니다: ' + error.message);
+        }
+      }
+
+      // =============================================
+      // 📊 회계전표관리 함수
+      // =============================================
+      let accountingVoucherTable = null;
+
+      // 회계전표 목록 조회
+      async function loadAccountingVouchers() {
+        try {
+          // 날짜 필드가 비어있으면 오늘 날짜로 설정
+          const today = new Date().toISOString().split('T')[0];
+          const startDateInput = document.getElementById('voucherStartDate');
+          const endDateInput = document.getElementById('voucherEndDate');
+
+          if (!startDateInput.value) {
+            startDateInput.value = today;
+          }
+          if (!endDateInput.value) {
+            endDateInput.value = today;
+          }
+
+          const startDate = startDateInput.value || '';
+          const endDate = endDateInput.value || '';
+          const voucherType = document.getElementById('voucherTypeFilter')?.value || '';
+
+          const params = new URLSearchParams();
+          if (startDate) params.append('startDate', startDate);
+          if (endDate) params.append('endDate', endDate);
+          if (voucherType) params.append('voucherType', voucherType);
+
+          const response = await fetch(`/api/accounting-vouchers?${params.toString()}`);
+          const result = await response.json();
+
+          if (!result.success) {
+            throw new Error(result.message);
+          }
+
+          const vouchers = result.data || [];
+
+          // DataTable 초기화
+          if (accountingVoucherTable) {
+            accountingVoucherTable.clear().destroy();
+          }
+
+          accountingVoucherTable = $('#accountingVoucherTable').DataTable({
+            data: vouchers,
+            order: [[1, 'desc'], [2, 'desc'], [3, 'asc']], // 작성일자, 전표번호, 순번 순
+            columns: [
+              {
+                // 체크박스
+                data: null,
+                orderable: false,
+                className: 'text-center',
+                render: (data, type, row) => {
+                  return `<input type="checkbox" class="voucher-checkbox" data-voucher-no="${row.전표번호}" data-voucher-date="${row.전표일자}" data-voucher-seq="${row.전표순번}" />`;
+                }
+              },
+              {
+                data: '전표일자',
+                render: (data) => {
+                  if (!data) return '';
+                  return `${data.substring(0, 4)}-${data.substring(4, 6)}-${data.substring(6, 8)}`;
+                }
+              },
+              {
+                data: '전표번호',
+                render: (data) => {
+                  if (!data) return '';
+                  // 전표번호 형식: "20251122-4" → "0004" 추출
+                  const parts = data.split('-');
+                  const num = parts[parts.length - 1];
+                  return num.padStart(4, '0');
+                }
+              },
+              { data: '전표순번' },
+              { data: '계정코드' },
+              { data: '계정명' },
+              {
+                data: '차대구분',
+                render: (data) => {
+                  if (data === 'D') return '<span class="status-badge status-active">차변</span>';
+                  if (data === 'C') return '<span class="status-badge status-pending">대변</span>';
+                  return data;
+                }
+              },
+              {
+                data: '금액',
+                render: (data) => (data || 0).toLocaleString() + ' 원',
+                className: 'text-right'
+              },
+              { data: '적요' },
+              { data: '참조전표' },
+              { data: '사용자명' },
+              {
+                // 관리 버튼
+                data: null,
+                orderable: false,
+                className: 'text-center',
+                render: (data, type, row) => {
+                  return `<button class="btn-icon btn-view" onclick="openVoucherDetailModal('${row.전표번호}', '${row.전표일자}')" title="상세보기">상세</button>`;
+                }
+              }
+            ],
+            language: {
+              emptyTable: '조회된 전표가 없습니다',
+              info: '총 _TOTAL_건',
+              infoEmpty: '',
+              infoFiltered: '(전체 _MAX_건 중 검색)',
+              lengthMenu: '_MENU_ 건씩 보기',
+              search: '검색:',
+              zeroRecords: '검색 결과가 없습니다',
+              paginate: {
+                first: '처음',
+                last: '마지막',
+                next: '다음',
+                previous: '이전'
+              }
+            },
+            pageLength: 25,
+            lengthMenu: [[25, 50, 100, -1], [25, 50, 100, '전체']],
+            ordering: true,
+            searching: true
+          });
+
+          // 전체 선택 체크박스 이벤트
+          $('#selectAllVouchers').off('change').on('change', function () {
+            const checked = $(this).prop('checked');
+            $('.voucher-checkbox').prop('checked', checked);
+            toggleVoucherActionButtons();
+          });
+
+          // 개별 체크박스 이벤트
+          $(document).off('change', '.voucher-checkbox').on('change', '.voucher-checkbox', function () {
+            const totalCheckboxes = $('.voucher-checkbox').length;
+            const checkedCheckboxes = $('.voucher-checkbox:checked').length;
+            $('#selectAllVouchers').prop('checked', totalCheckboxes === checkedCheckboxes);
+            toggleVoucherActionButtons();
+          });
+
+          // 요약 정보 업데이트
+          const voucherCount = vouchers.length;
+          const debitTotal = vouchers
+            .filter(v => v.차대구분 === 'D')
+            .reduce((sum, v) => sum + (v.금액 || 0), 0);
+          const creditTotal = vouchers
+            .filter(v => v.차대구분 === 'C')
+            .reduce((sum, v) => sum + (v.금액 || 0), 0);
+
+          document.getElementById('voucherCount').textContent = voucherCount.toLocaleString();
+          document.getElementById('debitTotal').textContent = debitTotal.toLocaleString();
+          document.getElementById('creditTotal').textContent = creditTotal.toLocaleString();
+
+          console.log('✅ 회계전표 조회 완료:', voucherCount, '건');
+        } catch (error) {
+          console.error('❌ 회계전표 조회 오류:', error);
+          alert('회계전표 조회 중 오류가 발생했습니다: ' + error.message);
+        }
+      }
+
+      // 필터 조회
+      function filterVouchers() {
+        loadAccountingVouchers();
+      }
+
+      // Google Sheets로 내보내기
+      function exportVouchersToExcel() {
+        if (!accountingVoucherTable) {
+          alert('조회된 데이터가 없습니다.');
+          return;
+        }
+
+        const data = accountingVoucherTable.rows().data().toArray();
+        if (data.length === 0) {
+          alert('내보낼 데이터가 없습니다.');
+          return;
+        }
+
+        // CSV 생성
+        let csv = '전표번호,전표일자,순번,계정코드,계정명,차대구분,금액,적요,참조전표,작성자\n';
+        data.forEach(row => {
+          const 전표일자 = row.전표일자 ? `${row.전표일자.substring(0, 4)}-${row.전표일자.substring(4, 6)}-${row.전표일자.substring(6, 8)}` : '';
+          const 차대구분 = row.차대구분 === 'D' ? '차변' : '대변';
+          csv += `${row.전표번호 || ''},${전표일자},${row.전표순번 || ''},${row.계정코드 || ''},${row.계정명 || ''},${차대구분},${row.금액 || 0},"${(row.적요 || '').replace(/"/g, '""')}",${row.참조전표 || ''},${row.사용자명 || ''}\n`;
+        });
+
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `회계전표_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        console.log('✅ 회계전표 CSV 내보내기 완료:', data.length, '건');
+      }
+
+      // 수정/삭제 버튼 토글
+      function toggleVoucherActionButtons() {
+        const checkedCount = $('.voucher-checkbox:checked').length;
+        if (checkedCount > 0) {
+          $('#voucherEditBtn').show();
+          $('#voucherDeleteBtn').show();
+        } else {
+          $('#voucherEditBtn').hide();
+          $('#voucherDeleteBtn').hide();
+        }
+      }
+
+      // 상세보기 모달 열기
+      async function openVoucherDetailModal(voucherNo, voucherDate) {
+        try {
+          // 해당 전표번호의 모든 항목 조회
+          const params = new URLSearchParams({ startDate: voucherDate, endDate: voucherDate });
+          const response = await fetch(`/api/accounting-vouchers?${params.toString()}`);
+          const result = await response.json();
+
+          if (!result.success) {
+            throw new Error(result.message);
+          }
+
+          // 해당 전표번호와 일자의 데이터만 필터링
+          const voucherDetails = (result.data || []).filter(
+            v => v.전표번호 === voucherNo && v.전표일자 === voucherDate
+          );
+
+          if (voucherDetails.length === 0) {
+            alert('전표 정보를 찾을 수 없습니다.');
+            return;
+          }
+
+          // 상세 정보 HTML 생성
+          const firstRow = voucherDetails[0];
+          const 전표일자_formatted = `${voucherDate.substring(0, 4)}-${voucherDate.substring(4, 6)}-${voucherDate.substring(6, 8)}`;
+          const 참조전표 = firstRow.참조전표 || '';
+
+          let detailHtml = `
+            <div style="margin-bottom: 20px">
+              <h4 style="margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 10px">전표 정보</h4>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px">
+                <div><strong>전표번호:</strong> ${voucherNo}</div>
+                <div><strong>전표일자:</strong> ${전표일자_formatted}</div>
+                <div><strong>참조전표:</strong> ${참조전표}</div>
+                <div><strong>작성자:</strong> ${firstRow.사용자명 || ''}</div>
+              </div>
+            </div>
+
+            <h4 style="margin-bottom: 10px">전표 내역</h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px">
+              <thead>
+                <tr style="background-color: #f5f5f5">
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: center">순번</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left">계정코드</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left">계정명</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: center">차대</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: right">금액</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left">적요</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+
+          voucherDetails.forEach(row => {
+            const 차대구분 = row.차대구분 === 'D'
+              ? '<span style="color: #007bff; font-weight: 600">차변</span>'
+              : '<span style="color: #28a745; font-weight: 600">대변</span>';
+
+            detailHtml += `
+              <tr>
+                <td style="border: 1px solid #ddd; padding: 8px; text-align: center">${row.전표순번}</td>
+                <td style="border: 1px solid #ddd; padding: 8px">${row.계정코드}</td>
+                <td style="border: 1px solid #ddd; padding: 8px">${row.계정명}</td>
+                <td style="border: 1px solid #ddd; padding: 8px; text-align: center">${차대구분}</td>
+                <td style="border: 1px solid #ddd; padding: 8px; text-align: right">${(row.금액 || 0).toLocaleString()} 원</td>
+                <td style="border: 1px solid #ddd; padding: 8px">${row.적요 || ''}</td>
+              </tr>
+            `;
+          });
+
+          // 합계 계산
+          const 차변합계 = voucherDetails.filter(v => v.차대구분 === 'D').reduce((sum, v) => sum + (v.금액 || 0), 0);
+          const 대변합계 = voucherDetails.filter(v => v.차대구분 === 'C').reduce((sum, v) => sum + (v.금액 || 0), 0);
+
+          detailHtml += `
+              </tbody>
+              <tfoot>
+                <tr style="background-color: #f9f9f9; font-weight: bold">
+                  <td colspan="3" style="border: 1px solid #ddd; padding: 10px; text-align: right">합계</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: center">차변</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right; color: #007bff">${차변합계.toLocaleString()} 원</td>
+                  <td style="border: 1px solid #ddd; padding: 10px"></td>
+                </tr>
+                <tr style="background-color: #f9f9f9; font-weight: bold">
+                  <td colspan="3" style="border: 1px solid #ddd; padding: 10px; text-align: right"></td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: center">대변</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right; color: #28a745">${대변합계.toLocaleString()} 원</td>
+                  <td style="border: 1px solid #ddd; padding: 10px"></td>
+                </tr>
+              </tfoot>
+            </table>
+          `;
+
+          // 참조전표 상세 내역 조회 및 표시
+          if (참조전표) {
+            try {
+              // 참조전표에서 거래일자와 거래번호 추출 (형식: "20251122-999")
+              const parts = 참조전표.split('-');
+              if (parts.length === 2) {
+                const 거래일자 = parts[0];
+                const 거래번호 = parts[1];
+
+                // 자재입출내역 조회 API 호출
+                const inventoryResponse = await fetch(`/api/inventory-transactions/${거래일자}/${거래번호}`);
+                const inventoryResult = await inventoryResponse.json();
+
+                if (inventoryResult.success && inventoryResult.data && inventoryResult.data.length > 0) {
+                  const items = inventoryResult.data;
+                  const firstItem = items[0];
+                  const 입출고구분 = firstItem.입출고구분;
+                  const 거래처명 = 입출고구분 === 1 ? firstItem.매입처명 : firstItem.매출처명;
+                  const 거래구분명 = 입출고구분 === 1 ? '매입전표' : '거래명세서';
+
+                  detailHtml += `
+                    <div style="margin-top: 30px">
+                      <h4 style="margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 10px">참조전표 상세 (${거래구분명})</h4>
+                      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px">
+                        <div><strong>거래일자:</strong> ${거래일자.substring(0, 4)}-${거래일자.substring(4, 6)}-${거래일자.substring(6, 8)}</div>
+                        <div><strong>거래번호:</strong> ${거래번호}</div>
+                        <div><strong>거래처:</strong> ${거래처명 || ''}</div>
+                        <div><strong>구분:</strong> ${거래구분명}</div>
+                      </div>
+
+                      <table style="width: 100%; border-collapse: collapse">
+                        <thead>
+                          <tr style="background-color: #f5f5f5">
+                            <th style="border: 1px solid #ddd; padding: 10px; text-align: center">No</th>
+                            <th style="border: 1px solid #ddd; padding: 10px; text-align: left">자재명</th>
+                            <th style="border: 1px solid #ddd; padding: 10px; text-align: left">규격</th>
+                            <th style="border: 1px solid #ddd; padding: 10px; text-align: center">단위</th>
+                            <th style="border: 1px solid #ddd; padding: 10px; text-align: right">수량</th>
+                            <th style="border: 1px solid #ddd; padding: 10px; text-align: right">단가</th>
+                            <th style="border: 1px solid #ddd; padding: 10px; text-align: right">공급가액</th>
+                            <th style="border: 1px solid #ddd; padding: 10px; text-align: right">부가세</th>
+                            <th style="border: 1px solid #ddd; padding: 10px; text-align: right">합계</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                  `;
+
+                  let 총공급가액 = 0;
+                  let 총부가세 = 0;
+
+                  items.forEach((item, index) => {
+                    const 수량 = 입출고구분 === 1 ? item.입고수량 : item.출고수량;
+                    const 단가 = 입출고구분 === 1 ? item.입고단가 : item.출고단가;
+                    const 부가세 = 입출고구분 === 1 ? item.입고부가 : item.출고부가;
+                    const 공급가액 = 수량 * 단가;
+                    const 합계 = 공급가액 + 부가세;
+
+                    총공급가액 += 공급가액;
+                    총부가세 += 부가세;
+
+                    detailHtml += `
+                      <tr>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: center">${index + 1}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px">${item.자재명 || ''}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px">${item.규격 || ''}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: center">${item.단위 || ''}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: right">${수량.toLocaleString()}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: right">${단가.toLocaleString()}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: right">${공급가액.toLocaleString()}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: right">${부가세.toLocaleString()}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: right">${합계.toLocaleString()}</td>
+                      </tr>
+                    `;
+                  });
+
+                  const 총합계 = 총공급가액 + 총부가세;
+
+                  detailHtml += `
+                        </tbody>
+                        <tfoot>
+                          <tr style="background-color: #f9f9f9; font-weight: bold">
+                            <td colspan="6" style="border: 1px solid #ddd; padding: 10px; text-align: right">합계</td>
+                            <td style="border: 1px solid #ddd; padding: 10px; text-align: right">${총공급가액.toLocaleString()} 원</td>
+                            <td style="border: 1px solid #ddd; padding: 10px; text-align: right">${총부가세.toLocaleString()} 원</td>
+                            <td style="border: 1px solid #ddd; padding: 10px; text-align: right">${총합계.toLocaleString()} 원</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  `;
+                }
+              }
+            } catch (error) {
+              console.error('❌ 참조전표 상세 조회 오류:', error);
+              // 참조전표 조회 실패 시 에러를 무시하고 전표 내역만 표시
+            }
+          }
+
+          document.getElementById('voucherDetailContent').innerHTML = detailHtml;
+          document.getElementById('voucherDetailModal').style.display = 'flex';
+
+          // 모달에 데이터 저장 (출력용)
+          window.currentVoucherDetail = { voucherNo, voucherDate, details: voucherDetails };
+        } catch (error) {
+          console.error('❌ 전표 상세 조회 오류:', error);
+          alert('전표 상세 정보를 불러오는 중 오류가 발생했습니다: ' + error.message);
+        }
+      }
+
+      // 상세보기 모달 닫기
+      function closeVoucherDetailModal() {
+        document.getElementById('voucherDetailModal').style.display = 'none';
+        window.currentVoucherDetail = null;
+      }
+
+      // 전표 상세 출력 (일자별 페이지 구분)
+      function printVoucherDetail() {
+        if (!window.currentVoucherDetail) {
+          alert('출력할 전표 정보가 없습니다.');
+          return;
+        }
+
+        const { voucherNo, voucherDate, details } = window.currentVoucherDetail;
+        const 전표일자_formatted = `${voucherDate.substring(0, 4)}-${voucherDate.substring(4, 6)}-${voucherDate.substring(6, 8)}`;
+        const firstRow = details[0];
+
+        // 차변/대변 합계 계산
+        const 차변합계 = details.filter(v => v.차대구분 === 'D').reduce((sum, v) => sum + (v.금액 || 0), 0);
+        const 대변합계 = details.filter(v => v.차대구분 === 'C').reduce((sum, v) => sum + (v.금액 || 0), 0);
+
+        const printWindow = window.open('', '_blank');
+        const html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>회계전표 - ${voucherNo}</title>
+            <style>
+              @page {
+                size: A4;
+                margin: 15mm;
+              }
+              body {
+                font-family: 'Malgun Gothic', sans-serif;
+                font-size: 10pt;
+                line-height: 1.4;
+                margin: 0;
+                padding: 20px;
+              }
+              h2 {
+                text-align: center;
+                margin-bottom: 20px;
+                font-size: 18pt;
+                border-bottom: 2px solid #333;
+                padding-bottom: 10px;
+              }
+              .info-section {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+                margin-bottom: 20px;
+                border: 1px solid #ddd;
+                padding: 15px;
+                background-color: #f9f9f9;
+              }
+              .info-item {
+                padding: 5px 0;
+              }
+              .info-item strong {
+                display: inline-block;
+                width: 100px;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 20px;
+              }
+              th, td {
+                border: 1px solid #333;
+                padding: 8px;
+                text-align: left;
+              }
+              th {
+                background-color: #f0f0f0;
+                font-weight: bold;
+                text-align: center;
+              }
+              td.text-center { text-align: center; }
+              td.text-right { text-align: right; }
+              tfoot tr {
+                background-color: #f9f9f9;
+                font-weight: bold;
+              }
+              .debit { color: #007bff; }
+              .credit { color: #28a745; }
+              @media print {
+                body { padding: 0; }
+                @page { margin: 15mm; }
+              }
+            </style>
+          </head>
+          <body>
+            <h2>회계전표</h2>
+            <div class="info-section">
+              <div class="info-item"><strong>전표번호:</strong> ${voucherNo}</div>
+              <div class="info-item"><strong>전표일자:</strong> ${전표일자_formatted}</div>
+              <div class="info-item"><strong>참조전표:</strong> ${firstRow.참조전표 || ''}</div>
+              <div class="info-item"><strong>작성자:</strong> ${firstRow.사용자명 || ''}</div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>순번</th>
+                  <th>계정코드</th>
+                  <th>계정명</th>
+                  <th>차대</th>
+                  <th>금액</th>
+                  <th>적요</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${details.map(row => `
+                  <tr>
+                    <td class="text-center">${row.전표순번}</td>
+                    <td>${row.계정코드}</td>
+                    <td>${row.계정명}</td>
+                    <td class="text-center ${row.차대구분 === 'D' ? 'debit' : 'credit'}">
+                      ${row.차대구분 === 'D' ? '차변' : '대변'}
+                    </td>
+                    <td class="text-right">${(row.금액 || 0).toLocaleString()} 원</td>
+                    <td>${row.적요 || ''}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" class="text-right">합계</td>
+                  <td class="text-center debit">차변</td>
+                  <td class="text-right debit">${차변합계.toLocaleString()} 원</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td colspan="3" class="text-right"></td>
+                  <td class="text-center credit">대변</td>
+                  <td class="text-right credit">${대변합계.toLocaleString()} 원</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                }, 500);
+              };
+            <\/script>
+          </body>
+          </html>
+        `;
+
+        printWindow.document.write(html);
+        printWindow.document.close();
+      }
+
+      // 수정 모달 열기
+      function editSelectedVouchers() {
+        const checkedBoxes = $('.voucher-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+          alert('수정할 전표를 선택해주세요.');
+          return;
+        }
+
+        // 선택된 전표들의 데이터 수집
+        const selectedVouchers = [];
+        checkedBoxes.each(function () {
+          const voucherNo = $(this).data('voucher-no');
+          const voucherDate = $(this).data('voucher-date');
+          const voucherSeq = $(this).data('voucher-seq');
+
+          // DataTable에서 해당 행 데이터 찾기
+          const rowData = accountingVoucherTable.rows().data().toArray().find(
+            row => row.전표번호 === voucherNo && row.전표일자 === voucherDate && row.전표순번 === voucherSeq
+          );
+          if (rowData) {
+            selectedVouchers.push(rowData);
+          }
+        });
+
+        if (selectedVouchers.length === 0) {
+          alert('선택한 전표 정보를 찾을 수 없습니다.');
+          return;
+        }
+
+        // 수정 모달에 DataTable 표시
+        if (window.voucherEditTable) {
+          window.voucherEditTable.clear().destroy();
+        }
+
+        window.voucherEditTable = $('#voucherEditTable').DataTable({
+          data: selectedVouchers,
+          order: [],
+          paging: false,
+          searching: false,
+          info: false,
+          columns: [
+            { data: '전표번호' },
+            {
+              data: '전표일자',
+              render: (data) => {
+                if (!data) return '';
+                return `${data.substring(0, 4)}-${data.substring(4, 6)}-${data.substring(6, 8)}`;
+              }
+            },
+            { data: '전표순번' },
+            { data: '계정코드' },
+            { data: '계정명' },
+            {
+              data: '차대구분',
+              render: (data) => data === 'D' ? '차변' : '대변'
+            },
+            {
+              data: '금액',
+              render: (data, type, row) => {
+                return `<input type="number" class="form-control" value="${data || 0}"
+                  data-voucher-no="${row.전표번호}"
+                  data-voucher-date="${row.전표일자}"
+                  data-voucher-seq="${row.전표순번}"
+                  style="width: 150px; text-align: right" />`;
+              }
+            },
+            {
+              data: '적요',
+              render: (data, type, row) => {
+                return `<input type="text" class="form-control" value="${data || ''}"
+                  data-voucher-no="${row.전표번호}"
+                  data-voucher-date="${row.전표일자}"
+                  data-voucher-seq="${row.전표순번}"
+                  style="width: 200px" />`;
+              }
+            }
+          ]
+        });
+
+        document.getElementById('voucherEditModal').style.display = 'flex';
+      }
+
+      // 수정 모달 닫기
+      function closeVoucherEditModal() {
+        document.getElementById('voucherEditModal').style.display = 'none';
+        if (window.voucherEditTable) {
+          window.voucherEditTable.clear().destroy();
+          window.voucherEditTable = null;
+        }
+      }
+
+      // 전표 수정 저장
+      async function saveVoucherEdit() {
+        try {
+          // 수정된 데이터 수집
+          const updates = [];
+          $('#voucherEditTable tbody tr').each(function () {
+            const 금액Input = $(this).find('input[type="number"]');
+            const 적요Input = $(this).find('input[type="text"]');
+
+            updates.push({
+              전표번호: 금액Input.data('voucher-no'),
+              전표일자: 금액Input.data('voucher-date'),
+              전표순번: 금액Input.data('voucher-seq'),
+              금액: parseFloat(금액Input.val()) || 0,
+              적요: 적요Input.val()
+            });
+          });
+
+          if (updates.length === 0) {
+            alert('수정할 데이터가 없습니다.');
+            return;
+          }
+
+          // API 호출
+          const response = await fetch('/api/accounting-vouchers/batch-update', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ updates })
+          });
+
+          const result = await response.json();
+
+          if (!result.success) {
+            throw new Error(result.message);
+          }
+
+          alert('회계전표가 수정되었습니다.');
+          closeVoucherEditModal();
+          loadAccountingVouchers();
+        } catch (error) {
+          console.error('❌ 전표 수정 오류:', error);
+          alert('전표 수정 중 오류가 발생했습니다: ' + error.message);
+        }
+      }
+
+      // 삭제 모달 열기
+      function deleteSelectedVouchers() {
+        const checkedBoxes = $('.voucher-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+          alert('삭제할 전표를 선택해주세요.');
+          return;
+        }
+
+        document.getElementById('deleteVoucherCount').textContent = checkedBoxes.length;
+        document.getElementById('voucherDeleteModal').style.display = 'flex';
+      }
+
+      // 삭제 모달 닫기
+      function closeVoucherDeleteModal() {
+        document.getElementById('voucherDeleteModal').style.display = 'none';
+      }
+
+      // 전표 삭제 확인
+      async function confirmVoucherDelete() {
+        try {
+          const checkedBoxes = $('.voucher-checkbox:checked');
+          const deleteList = [];
+
+          checkedBoxes.each(function () {
+            deleteList.push({
+              전표번호: $(this).data('voucher-no'),
+              전표일자: $(this).data('voucher-date'),
+              전표순번: $(this).data('voucher-seq')
+            });
+          });
+
+          if (deleteList.length === 0) {
+            alert('삭제할 전표가 없습니다.');
+            return;
+          }
+
+          // API 호출
+          const response = await fetch('/api/accounting-vouchers/batch-delete', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deleteList })
+          });
+
+          const result = await response.json();
+
+          if (!result.success) {
+            throw new Error(result.message);
+          }
+
+          alert(`${deleteList.length}건의 회계전표가 삭제되었습니다.`);
+          closeVoucherDeleteModal();
+          loadAccountingVouchers();
+        } catch (error) {
+          console.error('❌ 전표 삭제 오류:', error);
+          alert('전표 삭제 중 오류가 발생했습니다: ' + error.message);
         }
       }
     </script>

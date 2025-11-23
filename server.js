@@ -4682,8 +4682,8 @@ app.get('/api/orders/:date/:no/print', async (req, res) => {
        WHERE T1.사업장코드 = @사업장코드
          AND T1.발주일자 = @발주일자
          AND T1.발주번호 = @발주번호
-         AND (T1.상태코드 = 1 OR T1.상태코드 = 2) AND T1.사용구분 = 0
-         AND (T2.상태코드 = 1 OR T2.상태코드 = 2) AND T2.사용구분 = 0
+         AND T1.사용구분 = 0
+         AND T2.사용구분 = 0
        ORDER BY T1.사업장코드, T1.발주일자, T1.발주번호, T2.발주시간
     `
         : `
@@ -4704,8 +4704,8 @@ app.get('/api/orders/:date/:no/print', async (req, res) => {
        WHERE T1.사업장코드 = @사업장코드
          AND T1.발주일자 = @발주일자
          AND T1.발주번호 = @발주번호
-         AND (T1.상태코드 = 1 OR T1.상태코드 = 2) AND T1.사용구분 = 0
-         AND (T2.상태코드 = 1 OR T2.상태코드 = 2) AND T2.사용구분 = 0
+         AND T1.사용구분 = 0
+         AND T2.사용구분 = 0
         ORDER BY T1.사업장코드, T1.발주일자, T1.발주번호, T2.발주시간
     `;
 
@@ -5028,8 +5028,10 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
   }
 });
 
-// ✅ 거래명세서 작성 (자재입출내역에 INSERT)
+// ✅ 거래명세서 작성 (자재입출내역에 INSERT + 회계전표 자동생성)
 app.post('/api/transactions', async (req, res) => {
+  const transaction = new sql.Transaction(pool);
+
   try {
     const { 거래일자, 입출고구분, 매출처코드, 적요, details } = req.body;
 
@@ -5044,21 +5046,74 @@ app.post('/api/transactions', async (req, res) => {
       });
     }
 
-    // 유효성 검사
+    // 📋 필수 필드 검증 (데이터 품질 보장)
     if (!거래일자 || !매출처코드 || !details || details.length === 0) {
       return res.status(400).json({
         success: false,
-        message: '필수 정보가 누락되었습니다.',
+        message: '필수 정보가 누락되었습니다. (거래일자, 매출처코드, 상세내역)',
       });
     }
+
+    // 📅 거래일자 형식 및 범위 검증
+    if (거래일자.length !== 8 || !/^\d{8}$/.test(거래일자)) {
+      return res.status(400).json({
+        success: false,
+        message: '거래일자는 YYYYMMDD 형식(8자리 숫자)이어야 합니다.',
+      });
+    }
+
+    const year = parseInt(거래일자.substring(0, 4));
+    if (year < 1900 || year > 2100) {
+      return res.status(400).json({
+        success: false,
+        message: '거래일자가 유효하지 않습니다. (1900년~2100년 사이여야 합니다)',
+      });
+    }
+
+    // 🏢 매출처코드 검증 (빈값 방지)
+    if (매출처코드.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: '매출처코드는 필수입니다.',
+      });
+    }
+
+    // 📦 상세내역 검증
+    for (let i = 0; i < details.length; i++) {
+      const detail = details[i];
+
+      if (!detail.자재코드 || detail.자재코드.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 항목: 자재코드가 누락되었습니다.`,
+        });
+      }
+
+      if (!detail.수량 || detail.수량 <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 항목: 수량은 0보다 커야 합니다.`,
+        });
+      }
+
+      // 단가는 0 허용 (나중에 수정 가능)
+      if (detail.단가 === null || detail.단가 === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 항목: 단가가 누락되었습니다.`,
+        });
+      }
+    }
+
+    // 트랜잭션 시작
+    await transaction.begin();
 
     // 거래번호 생성 (로그 테이블 사용)
     const 베이스코드 = 거래일자; // YYYYMMDD
     const 테이블명 = '자재입출내역';
 
     // 로그 테이블에서 다음 번호 조회 및 업데이트
-    const logResult = await pool
-      .request()
+    const logResult = await new sql.Request(transaction)
       .input('테이블명', sql.VarChar(20), 테이블명)
       .input('베이스코드', sql.VarChar(20), 베이스코드).query(`
         SELECT 최종로그 FROM 로그
@@ -5068,8 +5123,7 @@ app.post('/api/transactions', async (req, res) => {
     let 거래번호;
     if (logResult.recordset.length > 0) {
       거래번호 = logResult.recordset[0].최종로그 + 1;
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('최종로그', sql.Real, 거래번호)
         .input('테이블명', sql.VarChar(20), 테이블명)
         .input('베이스코드', sql.VarChar(20), 베이스코드).query(`
@@ -5078,8 +5132,7 @@ app.post('/api/transactions', async (req, res) => {
         `);
     } else {
       거래번호 = 1;
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('테이블명', sql.VarChar(20), 테이블명)
         .input('베이스코드', sql.VarChar(20), 베이스코드)
         .input('최종로그', sql.Real, 거래번호).query(`
@@ -5098,6 +5151,10 @@ app.post('/api/transactions', async (req, res) => {
 
     const 수정일자 = 거래일자;
 
+    // 💰 합계금액 계산
+    let 총공급가액 = 0;
+    let 총부가세 = 0;
+
     // 각 상세내역을 자재입출내역에 INSERT
     for (const detail of details) {
       const { 자재코드, 수량, 단가 } = detail;
@@ -5110,8 +5167,11 @@ app.post('/api/transactions', async (req, res) => {
       const 출고단가 = 단가;
       const 출고부가 = Math.round(출고수량 * 출고단가 * 0.1); // 부가세 10%
 
-      await pool
-        .request()
+      // 합계 누적
+      총공급가액 += 출고수량 * 출고단가;
+      총부가세 += 출고부가;
+
+      await new sql.Request(transaction)
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('분류코드', sql.VarChar(2), 분류코드)
         .input('세부코드', sql.VarChar(18), 세부코드)
@@ -5145,7 +5205,39 @@ app.post('/api/transactions', async (req, res) => {
         `);
     }
 
-    console.log(`✅ 거래명세서 작성 완료: ${거래일자}-${거래번호} (${details.length}건)`);
+    console.log(`✅ 자재입출내역 작성 완료: ${거래일자}-${거래번호} (${details.length}건)`);
+
+    // 2️⃣ 회계전표 자동 생성 (Stored Procedure 호출)
+    const 총매출금액 = 총공급가액 + 총부가세;
+
+    // 매출처명 조회
+    const customerResult = await new sql.Request(transaction)
+      .input('매출처코드', sql.VarChar(8), 매출처코드)
+      .query(`SELECT 매출처명 FROM 매출처 WHERE 매출처코드 = @매출처코드`);
+
+    const 매출처명 =
+      customerResult.recordset.length > 0 ? customerResult.recordset[0].매출처명 : '';
+
+    // SP 호출: sp_거래명세서_회계전표_자동생성 (부가세 분리)
+    const spResult = await new sql.Request(transaction)
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('거래일자', sql.VarChar(8), 거래일자)
+      .input('거래번호', sql.Real, 거래번호)
+      .input('매출처코드', sql.VarChar(8), 매출처코드)
+      .input('매출처명', sql.NVarChar(100), 매출처명)
+      .input('공급가액', sql.Money, 총공급가액)
+      .input('부가세액', sql.Money, 총부가세)
+      .input('작성자코드', sql.VarChar(4), 사용자코드)
+      .input('적요', sql.NVarChar(200), 적요 || null)
+      .execute('sp_거래명세서_회계전표_자동생성');
+
+    const 회계전표번호 = spResult.recordset[0]?.전표번호 || 'Unknown';
+    console.log(`✅ 회계전표 자동 생성 (SP): ${회계전표번호}`);
+
+    // 트랜잭션 커밋
+    await transaction.commit();
+
+    console.log(`✅ 거래명세서 작성 완료: ${거래일자}-${거래번호}`);
 
     // 사용자명 조회
     const userResult = await pool
@@ -5156,22 +5248,15 @@ app.post('/api/transactions', async (req, res) => {
     const 사용자명 =
       userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
 
-    // 매출처명 조회
-    const customerResult = await pool
-      .request()
-      .input('매출처코드', sql.VarChar(8), 매출처코드)
-      .query(`SELECT 매출처명 FROM 매출처 WHERE 매출처코드 = @매출처코드`);
-
-    const 매출처명 =
-      customerResult.recordset.length > 0 ? customerResult.recordset[0].매출처명 : '';
-
     res.json({
       success: true,
-      message: '거래명세서가 작성되었습니다.',
+      message: '거래명세서 및 회계전표가 생성되었습니다.',
       data: {
         거래일자,
         거래번호,
         명세서번호: `${거래일자}-${거래번호}`,
+        회계전표번호,
+        총매출금액,
         사용자코드,
         사용자명,
         매출처코드,
@@ -5179,6 +5264,12 @@ app.post('/api/transactions', async (req, res) => {
       },
     });
   } catch (err) {
+    // 트랜잭션 롤백
+    if (transaction) {
+      await transaction.rollback();
+      console.log('❌ 트랜잭션 롤백 완료');
+    }
+
     console.error('❌ 거래명세서 작성 에러:', err);
     res.status(500).json({
       success: false,
@@ -5460,6 +5551,264 @@ app.get('/api/tax-invoices', async (req, res) => {
       success: false,
       message: '세금계산서 목록 조회에 실패했습니다.',
       error: error.message,
+    });
+  }
+});
+
+// ========================================
+// 📄 세금계산서 생성 (POST /api/tax-invoices)
+// ========================================
+app.post('/api/tax-invoices', async (req, res) => {
+  let transaction;
+  try {
+    const {
+      작성일자,
+      매출처코드,
+      품목및규격,
+      수량,
+      공급가액,
+      세액,
+      적요,
+      발행구분, // 'A' = 임의 발행, 'T' = 거래 발행
+    } = req.body;
+
+    // 세션 사용자 정보
+    const 사업장코드 = req.session.user?.사업장코드 || '01';
+    const 사용자코드 = req.session.user?.사용자코드 || '8080';
+
+    console.log('='.repeat(80));
+    console.log('📝 [API 호출] 세금계산서 발행');
+    console.log(`📋 요청 데이터:`, {
+      사업장코드,
+      작성일자,
+      매출처코드,
+      품목및규격,
+      수량,
+      공급가액,
+      세액,
+      적요,
+      발행구분,
+      사용자코드,
+    });
+    console.log('='.repeat(80));
+
+    // 📋 필수 필드 검증
+    if (!작성일자 || !매출처코드 || !품목및규격) {
+      return res.status(400).json({
+        success: false,
+        message: '필수 정보가 누락되었습니다. (작성일자, 매출처코드, 품목및규격)',
+      });
+    }
+
+    // 📅 작성일자 형식 및 범위 검증
+    if (작성일자.length !== 8 || !/^\d{8}$/.test(작성일자)) {
+      return res.status(400).json({
+        success: false,
+        message: '작성일자는 YYYYMMDD 형식(8자리 숫자)이어야 합니다.',
+      });
+    }
+
+    const year = parseInt(작성일자.substring(0, 4));
+    if (year < 1900 || year > 2100) {
+      return res.status(400).json({
+        success: false,
+        message: '작성일자가 유효하지 않습니다. (1900년~2100년 사이여야 합니다)',
+      });
+    }
+
+    // 📅 작성년도 추출
+    const 작성년도 = 작성일자.substring(0, 4);
+
+    // 트랜잭션 시작
+    const pool = await sql.connect(dbConfig);
+    transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    console.log(`🔢 세금계산서 번호 생성 중... (작성년도: ${작성년도})`);
+
+    // 1️⃣ 책번호, 일련번호 생성 (로그 테이블 사용)
+    const 베이스코드 = `${사업장코드}${작성년도}`;
+    const 테이블명 = '세금계산서';
+
+    const logRequest = new sql.Request(transaction);
+    const logResult = await logRequest
+      .input('테이블명', sql.VarChar(50), 테이블명)
+      .input('베이스코드', sql.VarChar(50), 베이스코드).query(`
+        SELECT 최종로그, 최종로그1 FROM 로그
+        WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
+      `);
+
+    let 책번호 = 1;
+    let 일련번호 = 1;
+
+    if (logResult.recordset.length > 0) {
+      const log = logResult.recordset[0];
+      책번호 = (log.최종로그 || 0) + 1;
+      일련번호 = (log.최종로그1 || 0) + 1;
+
+      // 책번호가 999를 초과하면 다음 책으로 넘어가고 일련번호 리셋
+      if (일련번호 > 999) {
+        책번호 += 1;
+        일련번호 = 1;
+      }
+
+      await logRequest.query(`
+        UPDATE 로그
+        SET 최종로그 = ${책번호},
+            최종로그1 = ${일련번호},
+            수정일자 = '${new Date().toISOString().split('T')[0].replace(/-/g, '')}',
+            사용자코드 = '${사용자코드}'
+        WHERE 테이블명 = @테이블명 AND 베이스코드 = @베이스코드
+      `);
+    } else {
+      await logRequest
+        .input('수정일자', sql.VarChar(8), new Date().toISOString().split('T')[0].replace(/-/g, ''))
+        .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+          INSERT INTO 로그 (테이블명, 베이스코드, 최종로그, 최종로그1, 수정일자, 사용자코드)
+          VALUES (@테이블명, @베이스코드, ${책번호}, ${일련번호}, @수정일자, @사용자코드)
+        `);
+    }
+
+    console.log(`✅ 생성된 번호: 책번호=${책번호}, 일련번호=${일련번호}`);
+
+    // 2️⃣ 세금계산서 INSERT
+    const 수정일자 = new Date().toISOString().split('T')[0].replace(/-/g, '');
+
+    // 발행구분에 따라 발행여부 결정
+    // 'T' (거래 발행) → 발행여부='1' (즉시 발행됨, 미수금내역 생성됨)
+    // 'A' (임의 발행) → 발행여부='0' (미발행, 작성중)
+    const 발행여부 = 발행구분 === 'T' ? '1' : '0';
+
+    const insertRequest = new sql.Request(transaction);
+    await insertRequest
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('작성년도', sql.VarChar(4), 작성년도)
+      .input('책번호', sql.Real, 책번호)
+      .input('일련번호', sql.Real, 일련번호)
+      .input('작성일자', sql.VarChar(8), 작성일자)
+      .input('매출처코드', sql.VarChar(8), 매출처코드)
+      .input('품목및규격', sql.NVarChar(100), 품목및규격)
+      .input('수량', sql.Real, 수량 || 0)
+      .input('공급가액', sql.Money, 공급가액 || 0)
+      .input('세액', sql.Money, 세액 || 0)
+      .input('적요', sql.NVarChar(100), 적요 || '')
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .input('수정일자', sql.VarChar(8), 수정일자)
+      .input('금액구분', sql.VarChar(1), '0')
+      .input('영청구분', sql.VarChar(1), '0')
+      .input('발행여부', sql.VarChar(1), 발행여부)
+      .input('작성구분', sql.VarChar(1), '0')
+      .input('미수구분', sql.VarChar(1), '0')
+      .input('사용구분', sql.VarChar(1), '0').query(`
+        INSERT INTO 세금계산서 (
+          사업장코드, 작성년도, 책번호, 일련번호, 작성일자,
+          매출처코드, 품목및규격, 수량, 공급가액, 세액,
+          적요, 사용자코드, 수정일자,
+          금액구분, 영청구분, 발행여부, 작성구분, 미수구분, 사용구분
+        ) VALUES (
+          @사업장코드, @작성년도, @책번호, @일련번호, @작성일자,
+          @매출처코드, @품목및규격, @수량, @공급가액, @세액,
+          @적요, @사용자코드, @수정일자,
+          @금액구분, @영청구분, @발행여부, @작성구분, @미수구분, @사용구분
+        )
+      `);
+
+    console.log('✅ 세금계산서 INSERT 완료!');
+
+    // 3️⃣ 거래 발행인 경우 미수금내역 자동 생성
+    if (발행구분 === 'T') {
+      console.log(`💰 거래 발행 → 미수금내역 자동 생성 중...`);
+
+      const 합계금액 = 공급가액 + 세액;
+
+      const receivableRequest = new sql.Request(transaction);
+      await receivableRequest
+        .input('사업장코드', sql.VarChar(2), 사업장코드)
+        .input('매출처코드', sql.VarChar(8), 매출처코드)
+        .input('미수금발생일자', sql.VarChar(8), 작성일자)
+        .input('미수금발생금액', sql.Money, 합계금액)
+        .input('적요', sql.NVarChar(100), 적요 || `세금계산서 ${작성년도}-${책번호}-${일련번호}`)
+        .input('사용자코드', sql.VarChar(4), 사용자코드)
+        .input('수정일자', sql.VarChar(8), new Date().toISOString().split('T')[0].replace(/-/g, ''))
+        .query(`
+          INSERT INTO 미수금내역 (
+            사업장코드, 매출처코드, 미수금발생일자, 미수금발생금액,
+            적요, 사용자코드, 수정일자
+          ) VALUES (
+            @사업장코드, @매출처코드, @미수금발생일자, @미수금발생금액,
+            @적요, @사용자코드, @수정일자
+          )
+        `);
+
+      console.log(`✅ 미수금내역 생성 완료! (금액: ${합계금액.toLocaleString()}원)`);
+    }
+
+    // 트랜잭션 커밋
+    await transaction.commit();
+
+    console.log('✅ 세금계산서 발행 완료!');
+    console.log('='.repeat(80));
+
+    // 4️⃣ 매출처 정보 조회하여 응답
+    const customerResult = await pool.request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('매출처코드', sql.VarChar(8), 매출처코드).query(`
+        SELECT 매출처코드, 매출처명
+        FROM 매출처
+        WHERE 사업장코드 = @사업장코드 AND 매출처코드 = @매출처코드
+      `);
+
+    const 매출처명 = customerResult.recordset[0]?.매출처명 || '';
+
+    // 4️⃣ 사용자 정보 조회
+    const userResult = await pool.request()
+      .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+        SELECT 사용자명
+        FROM 사용자
+        WHERE 사용자코드 = @사용자코드
+      `);
+
+    const 사용자명 = userResult.recordset[0]?.사용자명 || '';
+
+    res.json({
+      success: true,
+      message: '세금계산서가 성공적으로 발행되었습니다.',
+      data: {
+        사업장코드,
+        작성년도,
+        책번호,
+        일련번호,
+        작성일자,
+        매출처코드,
+        매출처명,
+        품목및규격,
+        수량,
+        공급가액,
+        세액,
+        합계: 공급가액 + 세액,
+        적요,
+        사용자코드,
+        사용자명,
+      },
+    });
+  } catch (err) {
+    if (transaction) {
+      try {
+        await transaction.rollback();
+        console.log('❌ 트랜잭션 롤백됨');
+      } catch (rollbackErr) {
+        console.error('❌ 롤백 실패:', rollbackErr.message);
+      }
+    }
+
+    console.error('❌ 세금계산서 발행 오류:', err.message);
+    console.error(err);
+    console.log('='.repeat(80));
+
+    res.status(500).json({
+      success: false,
+      message: '세금계산서 발행 중 오류가 발생했습니다.',
+      error: err.message,
     });
   }
 });
@@ -5909,8 +6258,10 @@ app.get('/api/purchase-statements/price-history', async (req, res) => {
   }
 });
 
-// ✅ 매입전표 작성 (자재입출내역에 INSERT)
+// ✅ 매입전표 작성 (자재입출내역에 INSERT + 회계전표 자동생성)
 app.post('/api/purchase-statements', async (req, res) => {
+  const transaction = new sql.Transaction(pool);
+
   try {
     const { 거래일자, 입출고구분, 매입처코드, 적요, details } = req.body;
 
@@ -5925,20 +6276,73 @@ app.post('/api/purchase-statements', async (req, res) => {
       });
     }
 
-    // 유효성 검사
+    // 📋 필수 필드 검증 (데이터 품질 보장)
     if (!거래일자 || !매입처코드 || !details || details.length === 0) {
       return res.status(400).json({
         success: false,
-        message: '필수 정보가 누락되었습니다.',
+        message: '필수 정보가 누락되었습니다. (거래일자, 매입처코드, 상세내역)',
       });
     }
+
+    // 📅 거래일자 형식 및 범위 검증
+    if (거래일자.length !== 8 || !/^\d{8}$/.test(거래일자)) {
+      return res.status(400).json({
+        success: false,
+        message: '거래일자는 YYYYMMDD 형식(8자리 숫자)이어야 합니다.',
+      });
+    }
+
+    const year = parseInt(거래일자.substring(0, 4));
+    if (year < 1900 || year > 2100) {
+      return res.status(400).json({
+        success: false,
+        message: '거래일자가 유효하지 않습니다. (1900년~2100년 사이여야 합니다)',
+      });
+    }
+
+    // 🏢 매입처코드 검증 (빈값 방지)
+    if (매입처코드.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: '매입처코드는 필수입니다.',
+      });
+    }
+
+    // 📦 상세내역 검증
+    for (let i = 0; i < details.length; i++) {
+      const detail = details[i];
+
+      if (!detail.자재코드 || detail.자재코드.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 항목: 자재코드가 누락되었습니다.`,
+        });
+      }
+
+      if (!detail.수량 || detail.수량 <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 항목: 수량은 0보다 커야 합니다.`,
+        });
+      }
+
+      // 단가는 0 허용 (나중에 수정 가능)
+      if (detail.단가 === null || detail.단가 === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 항목: 단가가 누락되었습니다.`,
+        });
+      }
+    }
+
+    // 트랜잭션 시작
+    await transaction.begin();
 
     // 거래번호 생성 (로그 테이블 사용)
     const 베이스코드 = 거래일자;
     const 테이블명 = '자재입출내역';
 
-    const logResult = await pool
-      .request()
+    const logResult = await new sql.Request(transaction)
       .input('테이블명', sql.VarChar(20), 테이블명)
       .input('베이스코드', sql.VarChar(20), 베이스코드).query(`
         SELECT 최종로그 FROM 로그
@@ -5948,8 +6352,7 @@ app.post('/api/purchase-statements', async (req, res) => {
     let 거래번호;
     if (logResult.recordset.length > 0) {
       거래번호 = logResult.recordset[0].최종로그 + 1;
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('최종로그', sql.Real, 거래번호)
         .input('테이블명', sql.VarChar(20), 테이블명)
         .input('베이스코드', sql.VarChar(20), 베이스코드).query(`
@@ -5958,8 +6361,7 @@ app.post('/api/purchase-statements', async (req, res) => {
         `);
     } else {
       거래번호 = 1;
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('테이블명', sql.VarChar(20), 테이블명)
         .input('베이스코드', sql.VarChar(20), 베이스코드)
         .input('최종로그', sql.Real, 거래번호).query(`
@@ -5997,8 +6399,7 @@ app.post('/api/purchase-statements', async (req, res) => {
       총공급가액 += 입고수량 * 입고단가;
       총부가세 += 입고부가;
 
-      await pool
-        .request()
+      await new sql.Request(transaction)
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('분류코드', sql.VarChar(2), 분류코드)
         .input('세부코드', sql.VarChar(18), 세부코드)
@@ -6037,8 +6438,7 @@ app.post('/api/purchase-statements', async (req, res) => {
     // 2️⃣ 미지급금내역 자동 생성 (거래일자 기준)
     const 미지급금지급금액 = 총공급가액 + 총부가세;
 
-    await pool
-      .request()
+    await new sql.Request(transaction)
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('매입처코드', sql.VarChar(8), 매입처코드)
       .input('미지급금지급일자', sql.VarChar(8), 거래일자)
@@ -6064,6 +6464,37 @@ app.post('/api/purchase-statements', async (req, res) => {
     console.log(
       `✅ 미지급금내역 자동 생성: ${매입처코드} - ${미지급금지급금액.toLocaleString()}원`,
     );
+
+    // 3️⃣ 회계전표 자동 생성 (Stored Procedure 호출)
+    // 매입처명 조회
+    const supplierResult = await new sql.Request(transaction)
+      .input('매입처코드', sql.VarChar(8), 매입처코드)
+      .query(`SELECT 매입처명 FROM 매입처 WHERE 매입처코드 = @매입처코드`);
+
+    const 매입처명 =
+      supplierResult.recordset.length > 0 ? supplierResult.recordset[0].매입처명 : '';
+
+    // SP 호출 (부가세 분리)
+    const spResult = await new sql.Request(transaction)
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('거래일자', sql.VarChar(8), 거래일자)
+      .input('거래번호', sql.Real, 거래번호)
+      .input('매입처코드', sql.VarChar(8), 매입처코드)
+      .input('매입처명', sql.NVarChar(100), 매입처명)
+      .input('공급가액', sql.Money, 총공급가액)
+      .input('부가세액', sql.Money, 총부가세)
+      .input('작성자코드', sql.VarChar(4), 사용자코드)
+      .input('적요', sql.NVarChar(200), 적요 || null)
+      .execute('sp_매입전표_회계전표_자동생성');
+
+    const 회계전표번호 =
+      spResult.recordset.length > 0 ? spResult.recordset[0].전표번호 : null;
+
+    console.log(`✅ 회계전표 자동 생성 (SP): ${회계전표번호}`);
+
+    // 트랜잭션 커밋
+    await transaction.commit();
+
     console.log(`✅ 매입전표 작성 완료: ${거래일자}-${거래번호}`);
 
     // 사용자명 조회
@@ -6075,22 +6506,14 @@ app.post('/api/purchase-statements', async (req, res) => {
     const 사용자명 =
       userResult.recordset.length > 0 ? userResult.recordset[0].사용자명 : '알 수 없음';
 
-    // 매입처명 조회
-    const supplierResult = await pool
-      .request()
-      .input('매입처코드', sql.VarChar(8), 매입처코드)
-      .query(`SELECT 매입처명 FROM 매입처 WHERE 매입처코드 = @매입처코드`);
-
-    const 매입처명 =
-      supplierResult.recordset.length > 0 ? supplierResult.recordset[0].매입처명 : '';
-
     res.json({
       success: true,
-      message: '매입전표 및 미지급금이 생성되었습니다.',
+      message: '매입전표, 미지급금, 회계전표가 생성되었습니다.',
       data: {
         거래일자,
         거래번호,
         전표번호: `${거래일자}-${거래번호}`,
+        회계전표번호,
         미지급금지급금액,
         사용자코드,
         사용자명,
@@ -6099,6 +6522,12 @@ app.post('/api/purchase-statements', async (req, res) => {
       },
     });
   } catch (err) {
+    // 트랜잭션 롤백
+    if (transaction) {
+      await transaction.rollback();
+      console.log('❌ 트랜잭션 롤백 완료');
+    }
+
     console.error('❌ 매입전표 작성 에러:', err);
     res.status(500).json({
       success: false,
@@ -7370,32 +7799,137 @@ app.get('/api/trial-balance', async (req, res) => {
       });
     }
 
-    // sp합계시산표 저장 프로시저 호출
-    const result = await pool
+    // 년월 추출 (YYYYMM)
+    const 년월 = date.substring(0, 6);
+    const 월초일자 = 년월 + '01';
+
+    console.log('📊 합계잔액시산표 조회:', { 사업장코드, date, 년월, 월초일자 });
+
+    // 1. 기존 저장 프로시저 호출 (기존 시스템 데이터)
+    const spResult = await pool
       .request()
       .input('ParBranchCode', sql.VarChar(2), 사업장코드)
       .input('ParDate', sql.VarChar(8), date)
       .execute('sp합계시산표');
 
-    // 결과 가공
-    const data = result.recordset.map((row) => {
-      // 차변잔액 = 차변누계 - 대변누계
-      // 대변잔액 = 대변누계 - 차변누계 (차변잔액이 음수일 때)
-      const 차변합계 = row.차변누계 || 0;
-      const 대변합계 = row.대변누계 || 0;
-      const 잔액 = 차변합계 - 대변합계;
+    console.log('  ✓ 저장 프로시저 조회 완료:', spResult.recordset.length, '건');
 
-      return {
-        계정코드: row.계정코드 || '',
+    // 2. 회계전표 테이블에서 직접 조회 (신규 회계전표 시스템 데이터)
+    const voucherResult = await pool.request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('조회일자', sql.VarChar(8), date)
+      .input('월초일자', sql.VarChar(8), 월초일자)
+      .query(`
+        SELECT
+          c.계정코드,
+          c.계정명,
+          c.계정구분,
+          -- 당월 차변 합계
+          ISNULL(SUM(CASE
+            WHEN v.차대구분 = 'D' AND v.전표일자 >= @월초일자 AND v.전표일자 <= @조회일자
+            THEN v.금액
+            ELSE 0
+          END), 0) AS 차변당월,
+          -- 누계 차변 합계 (기초부터 조회일까지)
+          ISNULL(SUM(CASE
+            WHEN v.차대구분 = 'D' AND v.전표일자 <= @조회일자
+            THEN v.금액
+            ELSE 0
+          END), 0) AS 차변누계,
+          -- 당월 대변 합계
+          ISNULL(SUM(CASE
+            WHEN v.차대구분 = 'C' AND v.전표일자 >= @월초일자 AND v.전표일자 <= @조회일자
+            THEN v.금액
+            ELSE 0
+          END), 0) AS 대변당월,
+          -- 누계 대변 합계 (기초부터 조회일까지)
+          ISNULL(SUM(CASE
+            WHEN v.차대구분 = 'C' AND v.전표일자 <= @조회일자
+            THEN v.금액
+            ELSE 0
+          END), 0) AS 대변누계
+        FROM 계정과목 c
+          LEFT JOIN 회계전표 v
+            ON c.계정코드 = v.계정코드
+            AND v.사업장코드 = @사업장코드
+            AND v.사용구분 = 0
+        WHERE c.사용구분 = 0
+        GROUP BY c.계정코드, c.계정명, c.계정구분
+        HAVING
+          -- 거래가 있는 계정만 표시
+          SUM(CASE WHEN v.차대구분 = 'D' THEN v.금액 ELSE 0 END) > 0
+          OR SUM(CASE WHEN v.차대구분 = 'C' THEN v.금액 ELSE 0 END) > 0
+        ORDER BY c.계정코드
+      `);
+
+    console.log('  ✓ 회계전표 테이블 조회 완료:', voucherResult.recordset.length, '건');
+
+    // 3. 두 결과를 계정코드별로 합산
+    const accountMap = new Map();
+
+    // 기존 프로시저 결과 추가
+    spResult.recordset.forEach((row) => {
+      const code = row.계정코드 || '';
+      accountMap.set(code, {
+        계정코드: code,
         계정명: row.계정명 || '',
+        계정구분: row.계정구분 || '',
         차변당월: row.차변당월 || 0,
         차변누계: row.차변누계 || 0,
         대변당월: row.대변당월 || 0,
         대변누계: row.대변누계 || 0,
-        차변잔액: 잔액 >= 0 ? 잔액 : 0,
-        대변잔액: 잔액 < 0 ? Math.abs(잔액) : 0,
-      };
+      });
     });
+
+    // 회계전표 결과 합산
+    voucherResult.recordset.forEach((row) => {
+      const code = row.계정코드 || '';
+      const existing = accountMap.get(code);
+
+      if (existing) {
+        // 기존 데이터에 합산
+        existing.차변당월 += row.차변당월 || 0;
+        existing.차변누계 += row.차변누계 || 0;
+        existing.대변당월 += row.대변당월 || 0;
+        existing.대변누계 += row.대변누계 || 0;
+      } else {
+        // 새 계정 추가
+        accountMap.set(code, {
+          계정코드: code,
+          계정명: row.계정명 || '',
+          계정구분: row.계정구분 || '',
+          차변당월: row.차변당월 || 0,
+          차변누계: row.차변누계 || 0,
+          대변당월: row.대변당월 || 0,
+          대변누계: row.대변누계 || 0,
+        });
+      }
+    });
+
+    // 4. 결과 가공
+    const data = Array.from(accountMap.values())
+      .map((row) => {
+        // 차변잔액 = 차변누계 - 대변누계
+        // 대변잔액 = 대변누계 - 차변누계 (차변잔액이 음수일 때)
+        const 차변합계 = row.차변누계 || 0;
+        const 대변합계 = row.대변누계 || 0;
+        const 잔액 = 차변합계 - 대변합계;
+
+        return {
+          계정코드: row.계정코드,
+          계정명: row.계정명,
+          계정구분: row.계정구분,
+          차변당월: row.차변당월,
+          차변누계: row.차변누계,
+          대변당월: row.대변당월,
+          대변누계: row.대변누계,
+          차변잔액: 잔액 >= 0 ? 잔액 : 0,
+          대변잔액: 잔액 < 0 ? Math.abs(잔액) : 0,
+        };
+      })
+      .sort((a, b) => a.계정코드.localeCompare(b.계정코드)); // 계정코드순 정렬
+
+    console.log('✅ 합산 완료 - 총 계정 수:', data.length);
 
     res.json({
       success: true,
@@ -7407,6 +7941,249 @@ app.get('/api/trial-balance', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '합계잔액시산표 조회 중 오류가 발생했습니다: ' + err.message,
+    });
+  }
+});
+
+// =============================================
+// 📊 회계전표 조회 API
+// =============================================
+app.get('/api/accounting-vouchers', async (req, res) => {
+  try {
+    const 사업장코드 = req.session.user?.사업장코드 || '01';
+    const { startDate, endDate, voucherType } = req.query;
+
+    let query = `
+      SELECT
+        회계전표.전표번호,
+        회계전표.전표순번,
+        회계전표.사업장코드,
+        회계전표.전표일자,
+        회계전표.전표시간,
+        회계전표.계정코드,
+        계정과목.계정명,
+        회계전표.차대구분,
+        회계전표.금액,
+        회계전표.적요,
+        회계전표.참조전표,
+        회계전표.작성자코드,
+        사용자.사용자명
+      FROM 회계전표
+        LEFT JOIN 계정과목
+          ON 회계전표.계정코드 = 계정과목.계정코드
+        LEFT JOIN 사용자
+          ON 회계전표.작성자코드 = 사용자.사용자코드
+      WHERE 회계전표.사업장코드 = @사업장코드
+        AND 회계전표.사용구분 = 0
+    `;
+
+    const request = pool.request();
+    request.input('사업장코드', sql.VarChar(2), 사업장코드);
+
+    // 날짜 필터
+    if (startDate) {
+      query += ` AND 회계전표.전표일자 >= @startDate`;
+      request.input('startDate', sql.VarChar(8), startDate.replace(/-/g, ''));
+    }
+    if (endDate) {
+      query += ` AND 회계전표.전표일자 <= @endDate`;
+      request.input('endDate', sql.VarChar(8), endDate.replace(/-/g, ''));
+    }
+
+    // 전표 유형 필터 (참조전표 기준)
+    if (voucherType) {
+      query += ` AND 회계전표.참조전표 LIKE @voucherType`;
+      request.input('voucherType', sql.VarChar(20), `${voucherType}%`);
+    }
+
+    query += ` ORDER BY 회계전표.전표일자 DESC, 회계전표.전표번호 DESC, 회계전표.전표순번 ASC`;
+
+    const result = await request.query(query);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('❌ 회계전표 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '회계전표 조회 중 오류가 발생했습니다: ' + err.message,
+    });
+  }
+});
+
+// ==========================================
+// 자재입출내역 조회 API (거래일자 + 거래번호)
+// ==========================================
+app.get('/api/inventory-transactions/:date/:no', async (req, res) => {
+  try {
+    const 사업장코드 = req.session.user?.사업장코드 || '01';
+    const { date, no } = req.params;
+
+    const result = await pool.request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('거래일자', sql.VarChar(8), date)
+      .input('거래번호', sql.Real, parseFloat(no))
+      .query(`
+        SELECT
+          i.*,
+          자재.자재명,
+          자재.규격,
+          자재.단위,
+          매출처.매출처명,
+          매입처.매입처명
+        FROM 자재입출내역 i
+          LEFT JOIN 자재
+            ON i.분류코드 = 자재.분류코드
+            AND i.세부코드 = 자재.세부코드
+          LEFT JOIN 매출처
+            ON i.매출처코드 = 매출처.매출처코드
+            AND i.사업장코드 = 매출처.사업장코드
+          LEFT JOIN 매입처
+            ON i.매입처코드 = 매입처.매입처코드
+            AND i.사업장코드 = 매입처.사업장코드
+        WHERE i.사업장코드 = @사업장코드
+          AND i.거래일자 = @거래일자
+          AND i.거래번호 = @거래번호
+          AND i.사용구분 = 0
+        ORDER BY i.일련번호
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('❌ 자재입출내역 조회 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '자재입출내역 조회 중 오류가 발생했습니다: ' + err.message,
+    });
+  }
+});
+
+// ==========================================
+// 회계전표 일괄 수정 API
+// ==========================================
+app.put('/api/accounting-vouchers/batch-update', async (req, res) => {
+  try {
+    const { updates } = req.body;
+
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '수정할 전표 정보가 없습니다.',
+      });
+    }
+
+    const 사업장코드 = req.session.user?.사업장코드 || '01';
+
+    // 트랜잭션 시작
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      for (const update of updates) {
+        const { 전표번호, 전표일자, 전표순번, 금액, 적요 } = update;
+
+        await transaction.request()
+          .input('전표번호', sql.VarChar(20), 전표번호)
+          .input('전표일자', sql.VarChar(8), 전표일자)
+          .input('전표순번', sql.Real, 전표순번)
+          .input('사업장코드', sql.VarChar(2), 사업장코드)
+          .input('금액', sql.Money, 금액)
+          .input('적요', sql.NVarChar(100), 적요)
+          .query(`
+            UPDATE 회계전표
+            SET 금액 = @금액,
+                적요 = @적요
+            WHERE 전표번호 = @전표번호
+              AND 전표일자 = @전표일자
+              AND 전표순번 = @전표순번
+              AND 사업장코드 = @사업장코드
+          `);
+      }
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: `${updates.length}건의 회계전표가 수정되었습니다.`,
+      });
+
+      console.log(`✅ 회계전표 일괄 수정 완료: ${updates.length}건`);
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+  } catch (err) {
+    console.error('❌ 회계전표 일괄 수정 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '회계전표 수정 중 오류가 발생했습니다: ' + err.message,
+    });
+  }
+});
+
+// ==========================================
+// 회계전표 일괄 삭제 API (소프트 삭제)
+// ==========================================
+app.delete('/api/accounting-vouchers/batch-delete', async (req, res) => {
+  try {
+    const { deleteList } = req.body;
+
+    if (!deleteList || !Array.isArray(deleteList) || deleteList.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '삭제할 전표 정보가 없습니다.',
+      });
+    }
+
+    const 사업장코드 = req.session.user?.사업장코드 || '01';
+
+    // 트랜잭션 시작
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      for (const item of deleteList) {
+        const { 전표번호, 전표일자, 전표순번 } = item;
+
+        await transaction.request()
+          .input('전표번호', sql.VarChar(20), 전표번호)
+          .input('전표일자', sql.VarChar(8), 전표일자)
+          .input('전표순번', sql.Real, 전표순번)
+          .input('사업장코드', sql.VarChar(2), 사업장코드)
+          .query(`
+            UPDATE 회계전표
+            SET 사용구분 = 1
+            WHERE 전표번호 = @전표번호
+              AND 전표일자 = @전표일자
+              AND 전표순번 = @전표순번
+              AND 사업장코드 = @사업장코드
+          `);
+      }
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: `${deleteList.length}건의 회계전표가 삭제되었습니다.`,
+      });
+
+      console.log(`✅ 회계전표 일괄 삭제 완료: ${deleteList.length}건`);
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+  } catch (err) {
+    console.error('❌ 회계전표 일괄 삭제 오류:', err);
+    res.status(500).json({
+      success: false,
+      message: '회계전표 삭제 중 오류가 발생했습니다: ' + err.message,
     });
   }
 });

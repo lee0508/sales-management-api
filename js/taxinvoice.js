@@ -1101,8 +1101,734 @@ function printTaxInvoiceFromDetail() {
   console.log('✅ 세금계산서 출력:', { 작성년도, 책번호, 일련번호 });
 }
 
+/**
+ * 세금계산서 신규 발행 모달 열기
+ */
+window.openNewTaxInvoiceModal = function () {
+  console.log('✅ 세금계산서 신규 발행 모달 열기');
+
+  // 모달 표시
+  document.getElementById('newTaxInvoiceModal').style.display = 'flex';
+
+  // 폼 초기화
+  document.getElementById('newTaxInvoiceForm').reset();
+
+  // 오늘 날짜 설정
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('newTaxDate').value = today;
+
+  // 초기값 설정
+  document.getElementById('newTaxQuantity').value = '1';
+  document.getElementById('newTaxSupplyAmount').value = '0';
+  document.getElementById('newTaxAmount').value = '0';
+  document.getElementById('newTaxTotal').value = '0';
+
+  // 매출처 초기화
+  document.getElementById('newTaxCustomerCode').value = '';
+  document.getElementById('newTaxCustomerName').value = '';
+};
+
+/**
+ * 세금계산서 신규 발행 모달 닫기
+ */
+window.closeNewTaxInvoiceModal = function () {
+  console.log('✅ 세금계산서 신규 발행 모달 닫기');
+  document.getElementById('newTaxInvoiceModal').style.display = 'none';
+  document.getElementById('newTaxInvoiceForm').reset();
+};
+
+/**
+ * 공급가액 변경 시 세액/합계 자동 계산
+ */
+window.calculateNewTaxTotal = function () {
+  const supplyAmount = parseFloat(document.getElementById('newTaxSupplyAmount').value) || 0;
+  const taxAmount = Math.round(supplyAmount * 0.1); // 10% 부가세
+  const total = supplyAmount + taxAmount;
+
+  document.getElementById('newTaxAmount').value = taxAmount;
+  document.getElementById('newTaxTotal').value = total;
+};
+
+/**
+ * 매출처 검색 모달 열기 (세금계산서용)
+ */
+window.openCustomerSearchForTax = function () {
+  console.log('✅ 매출처 검색 모달 열기');
+
+  // 매출처 검색 모달이 있는지 확인
+  const customerModal = document.getElementById('customerSelectModal');
+  if (customerModal) {
+    // 기존 매출처 선택 모달 재사용
+    customerModal.style.display = 'flex';
+
+    // 매출처 목록 로드
+    if (typeof window.loadCustomersForSelect === 'function') {
+      window.loadCustomersForSelect('tax'); // 'tax' 모드로 로드
+    }
+  } else {
+    // 간단한 프롬프트로 대체
+    const customerCode = prompt('매출처코드를 입력하세요:');
+    if (customerCode) {
+      selectCustomerForTax(customerCode);
+    }
+  }
+};
+
+/**
+ * 매출처 선택 (세금계산서용)
+ */
+window.selectCustomerForTax = async function (customerCode, customerName) {
+  console.log('✅ 매출처 선택:', { customerCode, customerName });
+
+  if (!customerCode) {
+    alert('매출처코드가 필요합니다.');
+    return;
+  }
+
+  try {
+    // 매출처 정보 조회
+    const response = await fetch(`/api/customers/${customerCode}`);
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '매출처 정보를 가져올 수 없습니다.');
+    }
+
+    const customer = result.data;
+
+    // 폼에 매출처 정보 설정
+    document.getElementById('newTaxCustomerCode').value = customer.매출처코드;
+    document.getElementById('newTaxCustomerName').value = customer.매출처명;
+
+    // 모달 닫기
+    const customerModal = document.getElementById('customerSelectModal');
+    if (customerModal) {
+      customerModal.style.display = 'none';
+    }
+
+    console.log('✅ 매출처 선택 완료:', customer);
+  } catch (error) {
+    console.error('❌ 매출처 조회 실패:', error);
+    alert('매출처 정보를 가져오는데 실패했습니다: ' + error.message);
+  }
+};
+
+/**
+ * 세금계산서 저장 (신규 발행)
+ */
+window.saveTaxInvoice = async function (event) {
+  event.preventDefault();
+  console.log('✅ 세금계산서 저장 시작');
+
+  // 폼 데이터 수집
+  const 작성일자 = document.getElementById('newTaxDate').value.replace(/-/g, '');
+  const 매출처코드 = document.getElementById('newTaxCustomerCode').value;
+  const 품목및규격 = document.getElementById('newTaxItemSpec').value;
+  const 수량 = parseFloat(document.getElementById('newTaxQuantity').value) || 0;
+  const 공급가액 = parseFloat(document.getElementById('newTaxSupplyAmount').value) || 0;
+  const 세액 = parseFloat(document.getElementById('newTaxAmount').value) || 0;
+  const 적요 = document.getElementById('newTaxRemark').value || '';
+
+  // 유효성 검증
+  if (!작성일자 || 작성일자.length !== 8) {
+    alert('작성일자를 올바르게 입력하세요.');
+    return;
+  }
+
+  if (!매출처코드 || 매출처코드.trim() === '') {
+    alert('매출처를 선택하세요.');
+    return;
+  }
+
+  if (!품목및규격 || 품목및규격.trim() === '') {
+    alert('품목및규격을 입력하세요.');
+    return;
+  }
+
+  if (공급가액 <= 0) {
+    alert('공급가액은 0보다 커야 합니다.');
+    return;
+  }
+
+  try {
+    // API 호출 데이터 구성
+    const requestData = {
+      사업장코드: sessionStorage.getItem('사업장코드') || '01',
+      작성일자,
+      매출처코드,
+      품목및규격,
+      수량,
+      공급가액,
+      세액,
+      적요,
+      발행구분: 'A', // 'A' = 임의 발행 (미수금내역 생성 안함)
+      발행여부: 0, // 작성중
+      작성구분: 'N', // 신규
+    };
+
+    console.log('📤 세금계산서 발행 요청:', requestData);
+
+    const response = await fetch('/api/tax-invoices', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '세금계산서 발행에 실패했습니다.');
+    }
+
+    console.log('✅ 세금계산서 발행 성공:', result);
+    alert('세금계산서가 발행되었습니다.');
+
+    // 모달 닫기
+    closeNewTaxInvoiceModal();
+
+    // 목록 새로고침
+    if (typeof window.loadTaxInvoices === 'function') {
+      window.loadTaxInvoices(true);
+    }
+  } catch (error) {
+    console.error('❌ 세금계산서 발행 실패:', error);
+    alert('세금계산서 발행에 실패했습니다: ' + error.message);
+  }
+};
+
+// ========================================
+// 거래 발행 모달 관련 함수
+// ========================================
+
+let transactionTaxItemsTableInstance = null;
+
+/**
+ * 거래 발행 모달 열기
+ */
+window.openTransactionTaxInvoiceModal = function () {
+  document.getElementById('transactionTaxInvoiceModal').style.display = 'flex';
+
+  // 폼 초기화
+  document.getElementById('transactionTaxInvoiceForm').reset();
+  document.getElementById('txTaxCustomerCode').value = '';
+  document.getElementById('txTaxCustomerName').value = '';
+  document.getElementById('txTaxTotalSupply').value = '';
+  document.getElementById('txTaxTotalTax').value = '';
+  document.getElementById('txTaxTotalAmount').value = '';
+
+  // DataTable 초기화
+  if (transactionTaxItemsTableInstance) {
+    transactionTaxItemsTableInstance.clear().draw();
+  }
+
+  // 오늘 날짜로 초기화
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('txTaxTransactionDate').value = today;
+};
+
+/**
+ * 거래 발행 모달 닫기
+ */
+window.closeTransactionTaxInvoiceModal = function () {
+  document.getElementById('transactionTaxInvoiceModal').style.display = 'none';
+};
+
+/**
+ * 거래명세서 조회 및 품목 로드
+ */
+window.loadTransactionForTax = async function () {
+  try {
+    const dateInput = document.getElementById('txTaxTransactionDate').value;
+    const transactionNo = document.getElementById('txTaxTransactionNo').value;
+
+    if (!dateInput || !transactionNo) {
+      alert('거래일자와 거래번호를 입력하세요.');
+      return;
+    }
+
+    // YYYY-MM-DD → YYYYMMDD 변환
+    const 거래일자 = dateInput.replace(/-/g, '');
+
+    // API 호출: 거래명세서 상세 조회
+    const response = await fetch(`/api/transactions/${거래일자}/${transactionNo}`);
+    if (!response.ok) {
+      throw new Error('거래명세서를 찾을 수 없습니다.');
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || '거래명세서 조회 실패');
+    }
+
+    const { master, details } = result.data;
+
+    // 매출처 정보 표시
+    document.getElementById('txTaxCustomerCode').value = master.매출처코드 || '';
+    document.getElementById('txTaxCustomerName').value = master.매출처명 || '';
+
+    // 품목 리스트를 DataTable에 표시
+    const tableData = details.map((detail, index) => {
+      const 공급가액 = detail.출고수량 * detail.출고단가;
+      const 부가세 = Math.round(공급가액 * 0.1);
+      const 합계 = 공급가액 + 부가세;
+
+      return {
+        no: index + 1,
+        자재코드: detail.자재코드 || '',
+        자재명: detail.자재명 || '',
+        규격: detail.규격 || '',
+        단위: detail.단위 || '',
+        출고수량: detail.출고수량 || 0,
+        출고단가: (detail.출고단가 || 0).toLocaleString(),
+        공급가액: 공급가액.toLocaleString(),
+        부가세: 부가세.toLocaleString(),
+        합계: 합계.toLocaleString(),
+      };
+    });
+
+    // DataTable 초기화 또는 업데이트
+    if (transactionTaxItemsTableInstance) {
+      transactionTaxItemsTableInstance.clear();
+      transactionTaxItemsTableInstance.rows.add(tableData);
+      transactionTaxItemsTableInstance.draw();
+    } else {
+      transactionTaxItemsTableInstance = $('#transactionTaxItemsTable').DataTable({
+        data: tableData,
+        order: [], // 입력 순서 유지
+        paging: false,
+        searching: false,
+        info: false,
+        columns: [
+          { data: 'no', width: '50px' },
+          { data: '자재코드', width: '120px' },
+          { data: '자재명', width: '150px' },
+          { data: '규격', width: '120px' },
+          { data: '단위', width: '60px' },
+          { data: '출고수량', className: 'dt-right', width: '80px' },
+          { data: '출고단가', className: 'dt-right', width: '100px' },
+          { data: '공급가액', className: 'dt-right', width: '100px' },
+          { data: '부가세', className: 'dt-right', width: '100px' },
+          { data: '합계', className: 'dt-right', width: '100px' },
+        ],
+        language: {
+          emptyTable: '거래 품목이 없습니다.',
+        },
+      });
+    }
+
+    // 합계 계산 및 표시
+    const 총공급가액 = details.reduce((sum, d) => sum + d.출고수량 * d.출고단가, 0);
+    const 총부가세 = Math.round(총공급가액 * 0.1);
+    const 총합계 = 총공급가액 + 총부가세;
+
+    document.getElementById('txTaxTotalSupply').value = 총공급가액.toLocaleString();
+    document.getElementById('txTaxTotalTax').value = 총부가세.toLocaleString();
+    document.getElementById('txTaxTotalAmount').value = 총합계.toLocaleString();
+
+    alert(`거래명세서를 성공적으로 조회했습니다. (총 ${details.length}개 품목)`);
+  } catch (error) {
+    console.error('❌ 거래명세서 조회 실패:', error);
+    alert('거래명세서 조회에 실패했습니다: ' + error.message);
+  }
+};
+
+/**
+ * 거래 발행 저장 (세금계산서 생성)
+ */
+window.saveTransactionTaxInvoice = async function (event) {
+  event.preventDefault();
+
+  try {
+    const dateInput = document.getElementById('txTaxTransactionDate').value;
+    const 매출처코드 = document.getElementById('txTaxCustomerCode').value;
+    const 공급가액 = parseInt(
+      document.getElementById('txTaxTotalSupply').value.replace(/,/g, '') || 0
+    );
+    const 세액 = parseInt(document.getElementById('txTaxTotalTax').value.replace(/,/g, '') || 0);
+    const 적요 = document.getElementById('txTaxRemarks').value;
+
+    if (!dateInput || !매출처코드) {
+      alert('거래명세서를 먼저 조회하세요.');
+      return;
+    }
+
+    if (공급가액 <= 0) {
+      alert('공급가액이 0보다 커야 합니다.');
+      return;
+    }
+
+    // YYYY-MM-DD → YYYYMMDD 변환
+    const 작성일자 = dateInput.replace(/-/g, '');
+
+    // 품목및규격: 거래명세서 기준으로 생성
+    const transactionNo = document.getElementById('txTaxTransactionNo').value;
+    const 품목및규격 = `거래명세서 ${작성일자}-${transactionNo}`;
+
+    // API 호출: 세금계산서 생성 (거래 발행 → 미수금내역 자동 생성)
+    const response = await fetch('/api/tax-invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        작성일자,
+        매출처코드,
+        품목및규격,
+        수량: 1, // 거래 발행은 건수로 계산
+        공급가액,
+        세액,
+        적요: 적요 || `거래명세서 ${작성일자}-${transactionNo}`,
+        발행구분: 'T', // 'T' = 거래 발행 (미수금내역 자동 생성)
+      }),
+    });
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || '세금계산서 발행 실패');
+    }
+
+    alert('세금계산서가 성공적으로 발행되었습니다.');
+
+    // 모달 닫기
+    closeTransactionTaxInvoiceModal();
+
+    // 목록 새로고침
+    if (typeof window.loadTaxInvoices === 'function') {
+      window.loadTaxInvoices(true);
+    }
+  } catch (error) {
+    console.error('❌ 세금계산서 발행 실패:', error);
+    alert('세금계산서 발행에 실패했습니다: ' + error.message);
+  }
+};
+
 // 전역 함수 노출
 window.printTaxInvoice = printTaxInvoice;
 window.printTaxInvoiceFromDetail = printTaxInvoiceFromDetail;
+
+// ========================================
+// 임의 발행 모달 - 매출처 검색 및 품목 추가 기능
+// ========================================
+
+let selectedCustomer = null; // 선택된 매출처 정보
+let taxInvoiceItems = []; // 세금계산서 품목 배열
+
+/**
+ * 매출처 검색
+ */
+window.searchCustomerForTax = async function () {
+  const searchTerm = document.getElementById('newTaxCustomerSearch').value.trim();
+
+  if (!searchTerm) {
+    alert('검색어를 입력하세요.');
+    return;
+  }
+
+  try {
+    const 사업장코드 = sessionStorage.getItem('사업장코드') || '01';
+    const response = await fetch(`/api/customers?사업장코드=${사업장코드}&search=${encodeURIComponent(searchTerm)}`);
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '매출처 검색 실패');
+    }
+
+    const customers = result.data || [];
+    displayCustomerSearchResults(customers);
+  } catch (error) {
+    console.error('❌ 매출처 검색 오류:', error);
+    alert('매출처 검색에 실패했습니다: ' + error.message);
+  }
+};
+
+/**
+ * 매출처 검색 결과 표시
+ */
+function displayCustomerSearchResults(customers) {
+  const resultsDiv = document.getElementById('customerSearchResults');
+
+  if (customers.length === 0) {
+    resultsDiv.innerHTML = '<div style="padding: 16px; text-align: center; color: #6b7280">검색 결과가 없습니다.</div>';
+    resultsDiv.style.display = 'block';
+    return;
+  }
+
+  let html = '';
+  customers.forEach((customer) => {
+    html += `
+      <div
+        onclick="selectCustomer('${customer.매출처코드}', '${customer.매출처명.replace(/'/g, "\\'")}')"
+        style="
+          padding: 12px 16px;
+          border-bottom: 1px solid #e5e7eb;
+          cursor: pointer;
+          transition: background 0.2s;
+        "
+        onmouseover="this.style.background='#f3f4f6'"
+        onmouseout="this.style.background='white'"
+      >
+        <div style="font-weight: 600; color: #1e40af; margin-bottom: 4px">
+          ${customer.매출처코드}
+        </div>
+        <div style="color: #374151">
+          ${customer.매출처명}
+        </div>
+        ${customer.전화번호 ? `<div style="color: #6b7280; font-size: 13px; margin-top: 4px">${customer.전화번호}</div>` : ''}
+      </div>
+    `;
+  });
+
+  resultsDiv.innerHTML = html;
+  resultsDiv.style.display = 'block';
+}
+
+/**
+ * 매출처 선택
+ */
+window.selectCustomer = function (code, name) {
+  selectedCustomer = { 매출처코드: code, 매출처명: name };
+
+  // 선택된 매출처 표시
+  document.getElementById('selectedCustomerCode').textContent = code;
+  document.getElementById('selectedCustomerName').textContent = name;
+  document.getElementById('selectedCustomerDisplay').style.display = 'block';
+
+  // 검색 결과 숨기기
+  document.getElementById('customerSearchResults').style.display = 'none';
+  document.getElementById('newTaxCustomerSearch').value = '';
+};
+
+/**
+ * 선택된 매출처 삭제
+ */
+window.clearSelectedCustomer = function () {
+  selectedCustomer = null;
+  document.getElementById('selectedCustomerDisplay').style.display = 'none';
+  document.getElementById('newTaxCustomerSearch').value = '';
+};
+
+/**
+ * 품목 추가 버튼 클릭
+ */
+window.addTaxInvoiceItem = function () {
+  const itemName = document.getElementById('itemName').value.trim();
+  const itemQuantity = parseFloat(document.getElementById('itemQuantity').value) || 0;
+  const itemUnitPrice = parseFloat(document.getElementById('itemUnitPrice').value) || 0;
+
+  if (!itemName) {
+    alert('품목명을 입력하세요.');
+    return;
+  }
+
+  if (itemQuantity <= 0) {
+    alert('수량은 0보다 커야 합니다.');
+    return;
+  }
+
+  if (itemUnitPrice < 0) {
+    alert('단가는 0 이상이어야 합니다.');
+    return;
+  }
+
+  const supplyAmount = itemQuantity * itemUnitPrice;
+
+  const item = {
+    품목명: itemName,
+    수량: itemQuantity,
+    단가: itemUnitPrice,
+    공급가액: supplyAmount,
+  };
+
+  taxInvoiceItems.push(item);
+
+  // 입력 폼 초기화
+  document.getElementById('itemName').value = '';
+  document.getElementById('itemQuantity').value = '1';
+  document.getElementById('itemUnitPrice').value = '';
+  document.getElementById('itemSupplyAmount').value = '';
+
+  // 품목 목록 갱신
+  renderTaxInvoiceItems();
+};
+
+/**
+ * 품목 목록 렌더링
+ */
+function renderTaxInvoiceItems() {
+  const tbody = document.getElementById('taxInvoiceItemsList');
+  tbody.innerHTML = '';
+
+  let totalSupplyAmount = 0;
+
+  taxInvoiceItems.forEach((item, index) => {
+    totalSupplyAmount += item.공급가액;
+
+    const row = document.createElement('tr');
+    row.style.background = index % 2 === 0 ? 'white' : '#f9fafb';
+    row.innerHTML = `
+      <td style="padding: 12px; border: 1px solid #e5e7eb">${item.품목명}</td>
+      <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb">${item.수량.toLocaleString()}</td>
+      <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb">${item.단가.toLocaleString()}</td>
+      <td style="padding: 12px; text-align: right; border: 1px solid #e5e7eb">${item.공급가액.toLocaleString()}</td>
+      <td style="padding: 12px; text-align: center; border: 1px solid #e5e7eb">
+        <button
+          onclick="removeTaxInvoiceItem(${index})"
+          style="
+            padding: 4px 12px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+          "
+        >
+          삭제
+        </button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  const taxAmount = Math.round(totalSupplyAmount * 0.1);
+  const grandTotal = totalSupplyAmount + taxAmount;
+
+  document.getElementById('totalSupplyAmount').textContent = totalSupplyAmount.toLocaleString();
+  document.getElementById('totalTaxAmount').textContent = taxAmount.toLocaleString();
+  document.getElementById('grandTotal').textContent = grandTotal.toLocaleString();
+}
+
+/**
+ * 품목 삭제
+ */
+window.removeTaxInvoiceItem = function (index) {
+  taxInvoiceItems.splice(index, 1);
+  renderTaxInvoiceItems();
+};
+
+/**
+ * 단가/수량 입력 시 공급가액 자동 계산
+ */
+window.calculateItemSupplyAmount = function () {
+  const quantity = parseFloat(document.getElementById('itemQuantity').value) || 0;
+  const unitPrice = parseFloat(document.getElementById('itemUnitPrice').value) || 0;
+  const supplyAmount = quantity * unitPrice;
+  document.getElementById('itemSupplyAmount').value = supplyAmount;
+};
+
+/**
+ * 임의 발행 모달 열기 - 초기화
+ */
+window.openNewTaxInvoiceModal = function () {
+  // 초기화
+  selectedCustomer = null;
+  taxInvoiceItems = [];
+
+  document.getElementById('selectedCustomerDisplay').style.display = 'none';
+  document.getElementById('customerSearchResults').style.display = 'none';
+  document.getElementById('newTaxCustomerSearch').value = '';
+  document.getElementById('newTaxDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('newTaxRemark').value = '';
+
+  document.getElementById('itemName').value = '';
+  document.getElementById('itemQuantity').value = '1';
+  document.getElementById('itemUnitPrice').value = '';
+  document.getElementById('itemSupplyAmount').value = '';
+
+  renderTaxInvoiceItems();
+
+  // 모달 표시
+  document.getElementById('newTaxInvoiceModal').style.display = 'flex';
+
+  // 드래그 기능
+  makeDraggable('newTaxInvoiceModalHeader', 'newTaxInvoiceModalContent');
+};
+
+/**
+ * 임의 발행 모달 닫기
+ */
+window.closeNewTaxInvoiceModal = function () {
+  document.getElementById('newTaxInvoiceModal').style.display = 'none';
+};
+
+/**
+ * 세금계산서 발행 (수정된 버전)
+ */
+window.saveTaxInvoice = async function (event) {
+  event.preventDefault();
+
+  // 매출처 선택 확인
+  if (!selectedCustomer) {
+    alert('매출처를 선택하세요.');
+    return;
+  }
+
+  // 품목 확인
+  if (taxInvoiceItems.length === 0) {
+    alert('최소 1개 이상의 품목을 추가하세요.');
+    return;
+  }
+
+  const 작성일자 = document.getElementById('newTaxDate').value.replace(/-/g, '');
+  const 적요 = document.getElementById('newTaxRemark').value.trim();
+
+  // 합계 계산
+  const totalSupplyAmount = taxInvoiceItems.reduce((sum, item) => sum + item.공급가액, 0);
+  const totalTaxAmount = Math.round(totalSupplyAmount * 0.1);
+
+  // 품목및규격 문자열 생성 (첫 번째 품목명 외)
+  const 품목및규격 = taxInvoiceItems.length > 1
+    ? `${taxInvoiceItems[0].품목명} 외 ${taxInvoiceItems.length - 1}건`
+    : taxInvoiceItems[0].품목명;
+
+  const data = {
+    작성일자,
+    매출처코드: selectedCustomer.매출처코드,
+    품목및규격,
+    수량: taxInvoiceItems.reduce((sum, item) => sum + item.수량, 0),
+    공급가액: totalSupplyAmount,
+    세액: totalTaxAmount,
+    적요,
+    발행구분: 'A', // 임의 발행
+  };
+
+  try {
+    const response = await fetch('/api/tax-invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '세금계산서 발행 실패');
+    }
+
+    alert('세금계산서가 성공적으로 발행되었습니다.');
+    closeNewTaxInvoiceModal();
+
+    // 목록 새로고침
+    if (typeof window.loadTaxInvoices === 'function') {
+      window.loadTaxInvoices(true);
+    }
+  } catch (error) {
+    console.error('❌ 세금계산서 발행 실패:', error);
+    alert('세금계산서 발행에 실패했습니다: ' + error.message);
+  }
+};
+
+// 입력 필드에 이벤트 리스너 추가 (DOM 로드 후)
+document.addEventListener('DOMContentLoaded', function () {
+  const itemQuantity = document.getElementById('itemQuantity');
+  const itemUnitPrice = document.getElementById('itemUnitPrice');
+
+  if (itemQuantity) {
+    itemQuantity.addEventListener('input', calculateItemSupplyAmount);
+  }
+  if (itemUnitPrice) {
+    itemUnitPrice.addEventListener('input', calculateItemSupplyAmount);
+  }
+});
 
 console.log('✅ taxinvoice.js 로드 완료');
