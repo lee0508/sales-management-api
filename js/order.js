@@ -98,20 +98,20 @@ $(document).ready(function () {
         },
       },
       {
-        // 입고희망일자
-        data: '입고희망일자',
-        className: 'text-center',
-        render: function (data, type, row) {
-          if (!data) return '-';
-          return data.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-        },
-      },
-      {
         // 제목
         data: '제목',
         className: 'text-left',
         render: function (data, type, row) {
           return data || '-';
+        },
+      },
+      {
+        // 발주금액
+        data: '합계금액',
+        className: 'text-right',
+        render: function (data, type, row) {
+          if (!data) return '0원';
+          return data.toLocaleString() + '원';
         },
       },
       {
@@ -151,18 +151,9 @@ $(document).ready(function () {
           const orderKey = `${row.발주일자}_${row.발주번호}`;
           return `
             <div class="action-buttons" id="actions-${orderKey}">
-              <button class="btn-icon btn-view" onclick="viewOrderDetail('${row.발주일자}', ${row.발주번호})" title="상세보기"
-                      style="padding: 6px 12px; font-size: 13px; margin-right: 4px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                상세
-              </button>
-              <button class="btn-icon btn-edit" onclick="editOrder('${row.발주일자}', ${row.발주번호})" title="수정"
-                      style="padding: 6px 12px; font-size: 13px; margin-right: 4px; background: #ffc107; color: #000; border: none; border-radius: 4px; cursor: pointer; display: none;">
-                수정
-              </button>
-              <button class="btn-icon btn-delete" onclick="deleteOrder('${row.발주일자}', ${row.발주번호})" title="삭제"
-                      style="padding: 6px 12px; font-size: 13px; margin-right: 4px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none;">
-                삭제
-              </button>
+              <button class="btn-icon btn-view" onclick="viewOrderDetail('${row.발주일자}', ${row.발주번호})" title="상세보기">상세</button>
+              <button class="btn-icon btn-edit" style="display: none;" onclick="editOrder('${row.발주일자}', ${row.발주번호})" title="수정">수정</button>
+              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteOrder('${row.발주일자}', ${row.발주번호})" title="삭제">삭제</button>
             </div>
           `;
         },

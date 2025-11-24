@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ✅ 매입전표 목록 불러오기
 async function loadPurchaseStatements() {
-  // 페이지가 표시될 때마다 날짜 초기화
+  // 페이지가 표시될 때마다 날짜를 오늘 날짜(로그인 날짜)로 초기화
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
@@ -22,13 +22,14 @@ async function loadPurchaseStatements() {
   const endDateInput = document.getElementById('purchaseStatementEndDate');
   const createDateInput = document.getElementById('purchaseStatementCreateDate');
 
-  if (startDateInput && !startDateInput.value) {
+  // 항상 오늘 날짜로 설정
+  if (startDateInput) {
     startDateInput.value = todayStr;
   }
-  if (endDateInput && !endDateInput.value) {
+  if (endDateInput) {
     endDateInput.value = todayStr;
   }
-  if (createDateInput && !createDateInput.value) {
+  if (createDateInput) {
     createDateInput.value = todayStr;
   }
   try {
@@ -666,18 +667,24 @@ async function submitPurchaseStatementCreate(event) {
     단가: item.단가,
   }));
 
+  // 디버깅: 전송 데이터 확인
+  const requestData = {
+    거래일자,
+    입출고구분: parseInt(입출고구분),
+    매입처코드,
+    적요,
+    details,
+  };
+
+  console.log('📤 매입전표 작성 요청 데이터:', requestData);
+  console.log('   - 매입처코드:', `'${매입처코드}'`, '(길이:', 매입처코드?.length || 0, ')');
+
   try {
     const res = await fetch(`${API_BASE_URL}/purchase-statements`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include', // 세션 쿠키 포함
-      body: JSON.stringify({
-        거래일자,
-        입출고구분: parseInt(입출고구분),
-        매입처코드,
-        적요,
-        details,
-      }),
+      body: JSON.stringify(requestData),
     });
 
     const data = await res.json();
@@ -727,8 +734,19 @@ async function editPurchaseStatement(date, no) {
     window.currentEditingPurchaseStatement = {
       거래일자: date,
       거래번호: no,
+      매입처코드: firstRow.매입처코드 || '', // ✅ 추가
+      입출고구분: 1, // 매입전표는 항상 입고
+      적요: firstRow.적요 || '', // ✅ 추가
       details: details,
     };
+
+    console.log('✅ 매입전표 정보 로드:', {
+      거래일자: date,
+      거래번호: no,
+      매입처코드: firstRow.매입처코드,
+      매입처명: firstRow.매입처명,
+      품목수: details.length,
+    });
 
     // DataTable 초기화
     if (window.purchaseStatementEditDetailTableInstance) {
@@ -1137,7 +1155,13 @@ async function submitPurchaseStatementEdit() {
     return;
   }
 
-  const { 거래일자, 거래번호, details } = window.currentEditingPurchaseStatement;
+  const { 거래일자, 거래번호, 매입처코드, 입출고구분, 적요, details } = window.currentEditingPurchaseStatement;
+
+  // 매입처코드 검증
+  if (!매입처코드) {
+    alert('매입처 정보가 없습니다. 매입전표를 다시 불러와주세요.');
+    return;
+  }
 
   try {
     const res = await fetch(`${API_BASE_URL}/purchase-statements/${거래일자}/${거래번호}`, {
@@ -1145,6 +1169,9 @@ async function submitPurchaseStatementEdit() {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
+        입출고구분: 입출고구분 || 1, // 기본: 입고
+        매입처코드: 매입처코드,
+        적요: 적요 || '',
         details: details.map(item => ({
           자재코드: item.자재코드,
           수량: item.수량,
@@ -1156,7 +1183,12 @@ async function submitPurchaseStatementEdit() {
     const data = await res.json();
 
     if (data.success) {
-      alert('매입전표가 수정되었습니다.');
+      alert('매입전표가 수정되었습니다.\n\n' +
+            '✅ 자재입출내역 업데이트\n' +
+            '✅ 미지급금내역 업데이트\n' +
+            '✅ 회계전표 자동 생성\n\n' +
+            `회계전표번호: ${data.data?.회계전표번호 || '생성됨'}\n` +
+            `미지급금액: ${(data.data?.미지급금지급금액 || 0).toLocaleString()}원`);
       closePurchaseStatementEditModal();
       loadPurchaseStatements();
     } else {

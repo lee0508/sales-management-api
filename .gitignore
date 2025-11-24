@@ -26,6 +26,7 @@ backups/
 *.swo
 *~
 nul
+*.png
 # Production config (keep templates only)
 config/production.js
 

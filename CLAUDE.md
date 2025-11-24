@@ -156,7 +156,9 @@ Quotations (견적) and Purchase Orders (발주) follow master-detail architectu
 ### Soft Delete Pattern
 Uses `사용구분` (usage flag) field:
 - 0 = active/in-use
-- 1 = deleted/inactive
+- 9 = deleted/inactive
+
+**IMPORTANT**: All tables use `사용구분 = 9` for soft delete, NOT 1.
 
 ### Workplace Code (사업장코드) Usage Pattern (CRITICAL!)
 
@@ -601,7 +603,9 @@ See `MATERIAL_LEDGER_CLOSING.md` for detailed implementation guide.
 거래명세서 작성 (POST /api/transactions)
          ↓
 ┌────────────────────────────────────────────────┐
-│ 1️⃣ 자재입출내역 테이블 (✅ 현재 구현됨)         │
+│ ✅ AUTOMATIC PROCESS (단일 트랜잭션)            │
+│                                                │
+│ 1️⃣ 자재입출내역 테이블                         │
 │    INSERT with:                                │
 │    - 입출고구분 = 2 (출고)                      │
 │    - 매출처코드                                 │
@@ -611,35 +615,30 @@ See `MATERIAL_LEDGER_CLOSING.md` for detailed implementation guide.
 │    공급가액 = 출고수량 × 출고단가               │
 │    부가세 = 출고부가 (10%)                      │
 │    합계 = 공급가액 + 부가세                     │
-└────────────────────────────────────────────────┘
-         ↓
-┌────────────────────────────────────────────────┐
-│ 2️⃣ 세금계산서 테이블 (❌ TODO - 추후 구현)     │
-│    INSERT when status = "확정" or "발행완료":   │
-│    - 작성일자 = 거래일자                        │
+│         ↓                                      │
+│         ↓ (자동 계산 후 즉시 실행)              │
+│         ↓                                      │
+│ 2️⃣ 미수금내역 테이블                           │
+│    AUTO INSERT immediately after:              │
 │    - 매출처코드                                 │
-│    - 공급가액 = SUM(출고수량 × 출고단가)        │
-│    - 세액 = SUM(출고부가)                      │
-│    - 합계금액 = 공급가액 + 세액                 │
+│    - 미수금입금일자 = 거래일자                  │
+│    - 미수금입금금액 = SUM(합계금액)             │
+│    - 적요 = "거래명세서 거래일자-거래번호"      │
 │                                                │
-│    전자세금계산서 발행 준비                     │
-└────────────────────────────────────────────────┘
-         ↓
-┌────────────────────────────────────────────────┐
-│ 3️⃣ 미수금내역 테이블 (❌ TODO - 추후 구현)     │
-│    INSERT when status = "확정":                │
-│    - 매출처코드                                 │
-│    - 미수금발생일자 = 거래일자                  │
-│    - 미수금발생금액 = 합계금액                  │
-│                                                │
-│    이후 입금 처리로 미수금 차감                 │
+│    ⚡ 거래명세서 작성 시 자동 생성됨!            │
+│    ⚠️ 필드명 주의: 미수금입금일자/금액 사용     │
+│         ↓                                      │
+│         ↓                                      │
+│ 3️⃣ 회계전표 자동 생성 (Stored Procedure)       │
+│    - 차변: 미수금 (총매출금액)                  │
+│    - 대변: 매출 (공급가액) + 부가세예수금 (세액)│
 └────────────────────────────────────────────────┘
 ```
 
 **Implementation Status:**
-- ✅ **Step 1**: 자재입출내역 INSERT implemented (server.js lines 3208-3333)
-- ❌ **Step 2**: 세금계산서 generation (장부 테이블 - to be implemented later)
-- ❌ **Step 3**: 미수금내역 tracking (to be implemented later)
+- ✅ **Step 1**: 자재입출내역 INSERT implemented (server.js lines 5158-5206)
+- ✅ **Step 2**: 미수금내역 AUTO generation (server.js lines 5210-5238) - **NEW!**
+- ❌ **Step 3**: 세금계산서 generation (장부 테이블 - to be implemented later)
 
 ### 매입관리 프로세스 (Purchase Management Process)
 
@@ -676,12 +675,19 @@ See `MATERIAL_LEDGER_CLOSING.md` for detailed implementation guide.
 ```
 
 **Implementation Status:**
-- ✅ **Steps 1 & 2**: 자재입출내역 + 미지급금내역 AUTOMATIC insertion (server.js lines 3585-3680)
-  - Single API call creates both records
+
+- ✅ **Steps 1 & 2 & 3**: 자재입출내역 + 미지급금내역 + 회계전표 AUTOMATIC insertion (server.js lines 6294-6568)
+  - Single API call creates all three records
   - 거래일자 기준으로 자동 생성
   - Total amount calculated during inventory insertion
-  - Accounts payable generated immediately in same transaction
-- ✅ **Additional APIs**: 미지급금내역 management (server.js lines 3787-3941)
+  - Accounts payable and accounting entries generated immediately in same transaction
+  - Stored procedure: sp_매입전표_회계전표_자동생성
+- ✅ **Automatic Update on Modification**: PUT /api/purchase-statements/:date/:no (server.js lines 6570-6793)
+  - Automatically deletes existing 자재입출내역, 미지급금내역, 회계전표내역
+  - Recalculates totals and regenerates all three records
+  - Single transaction ensures data consistency
+  - **CRITICAL**: 매입처코드 must be provided in request body
+- ✅ **Additional APIs**: 미지급금내역 management (server.js lines 6839-7041)
   - GET /api/accounts-payable/balance/:supplierCode - 잔액 조회
   - Manual POST /api/accounts-payable also available if needed
 
@@ -871,14 +877,24 @@ GET /api/transactions/:date/:no
    - 합계 검증: 미지급금/미수금 금액 = SUM(자재입출내역 품목별 금액)
 
 4. **데이터 무결성 (Data Integrity)**:
+
    - 매입전표 작성 시 → 미지급금내역 자동 생성 (✅ 구현됨)
-   - 거래명세서 작성 시 → 미수금내역 자동 생성 (❌ TODO)
+   - 거래명세서 작성 시 → 미수금내역 자동 생성 (✅ 구현됨 - 2025-11-23)
+     - **중요**: 미수금내역 테이블의 필드명은 `미수금입금일자`, `미수금입금금액` 사용
+     - 거래명세서 작성 시점에 미수금 발생을 기록 (입금 예정으로 등록)
    - 삭제 시 연관 데이터 처리 고려 필요
 
 **Implementation Status:**
-- ❌ 매입처장부관리 API 및 화면 (TODO)
-- ❌ 매출처장부관리 API 및 화면 (TODO)
-- ❌ 미수금내역 자동 생성 로직 (TODO)
+
+- ✅ 미수금내역 자동 생성 로직 (2025-11-23 완료) - [server.js:5210-5238](server.js#L5210-L5238)
+- ✅ 미수금 입금 처리 API (2025-11-23 완료) - [server.js:6922-6990](server.js#L6922-L6990)
+- ✅ 미수금 잔액 조회 API (2025-11-23 완료) - [server.js:6993-7041](server.js#L6993-L7041)
+- ✅ 미수금 내역 조회 API (2025-11-23 완료) - [server.js:6879-6919](server.js#L6879-L6919)
+- ✅ 미지급금 지급 처리 API (기존) - [server.js:6761-6828](server.js#L6761-L6828)
+- ✅ 미지급금 잔액 조회 API (기존) - [server.js:6831-6872](server.js#L6831-L6872)
+- ✅ 미지급금 내역 조회 API (기존) - [server.js:6720-6759](server.js#L6720-L6759)
+- ❌ 매입처장부관리 화면 (TODO)
+- ❌ 매출처장부관리 화면 (TODO)
 
 ## API Architecture
 
@@ -1036,7 +1052,7 @@ See [SESSION_AND_PERMISSION_GUIDE.md](SESSION_AND_PERMISSION_GUIDE.md) for detai
 - GET `/api/materials/:code` - Get with ledger info
 - POST `/api/materials` - Create
 - PUT `/api/materials/:code` - Update
-- DELETE `/api/materials/:code` - Soft delete (사용구분=1)
+- DELETE `/api/materials/:code` - Soft delete (사용구분=9)
 
 **Material Categories**: `/api/material-categories`
 - GET `/api/material-categories` - List active categories
@@ -1177,6 +1193,42 @@ Functions for viewing record details (read-only):
   - `openTransactionDetailModal(transactionNo)` - View transaction details
 
 **Why This Matters**: Clear naming prevents confusion between creating new records vs editing existing ones, especially important in Korean UI where buttons may say "작성" (create) vs "수정" (edit).
+
+#### Global Function Naming for Shared Operations (CRITICAL!)
+**PROBLEM**: When multiple modules (quotation.js, taxinvoice.js, transaction.js) define the same global function name (e.g., `window.selectCustomer`), the **last-loaded module overwrites** earlier definitions.
+
+**SOLUTION**: Use **module-specific prefixes** for all global functions:
+- **Pattern**: `module` + FunctionName
+- **Examples**:
+  - Quotation module: `window.selectQuotationCustomer(customer)` ✅
+  - Tax invoice module: `window.selectTaxInvoiceCustomer(customer)` ✅
+  - Transaction module: `window.selectTransactionCustomer(customer)` ✅
+  - Generic (DON'T USE): `window.selectCustomer(customer)` ❌ Causes conflicts!
+
+**Real-World Example from 2025-11-23**:
+```javascript
+// quotation.js (loaded line 22 in index.html)
+window.selectCustomer = function(customer) { ... }  // ❌ Gets overwritten!
+
+// taxinvoice.js (loaded line 36 in index.html)
+window.selectCustomer = function(code, name) { ... } // ❌ Overwrites quotation's function!
+
+// Result: Quotation page calls taxinvoice's function → BROKEN!
+```
+
+**Fix Applied**:
+```javascript
+// quotation.js
+window.selectQuotationCustomer = function(customer) { ... }  // ✅ Unique name!
+
+// taxinvoice.js
+window.selectTaxInvoiceCustomer = function(code, name) { ... } // ✅ Unique name!
+```
+
+**Best Practice**:
+1. **Always prefix global functions with module name**
+2. **Define global functions at file top** (before any code that might call them)
+3. **Document which functions are global** in file header comments
 
 ## Critical Frontend Development Rules
 

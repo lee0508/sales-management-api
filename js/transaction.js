@@ -18,17 +18,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ✅ 거래명세서 목록 불러오기
 async function loadTransactions() {
-  // 페이지가 표시될 때마다 날짜 초기화
+  // 페이지가 표시될 때마다 날짜를 오늘 날짜(로그인 날짜)로 초기화
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
   const startDateInput = document.getElementById('transactionStartDate');
   const endDateInput = document.getElementById('transactionEndDate');
 
-  if (startDateInput && !startDateInput.value) {
+  // 항상 오늘 날짜로 설정
+  if (startDateInput) {
     startDateInput.value = todayStr;
   }
-  if (endDateInput && !endDateInput.value) {
+  if (endDateInput) {
     endDateInput.value = todayStr;
   }
   try {
