@@ -90,7 +90,7 @@ function initAccountsPayablePage() {
         // 결제방법
         data: '결제방법',
         render: function (data) {
-          const methods = { '0': '현금', '1': '수표', '2': '어음', '3': '기타' };
+          const methods = { 0: '현금', 1: '수표', 2: '어음', 3: '기타' };
           return methods[data] || '';
         },
         width: '80px',
@@ -127,14 +127,22 @@ function initAccountsPayablePage() {
         render: function (data, type, row, meta) {
           const payableKey = `${row.미지급금지급일자}-${row.매입처코드}`;
           return `
-            <div class="action-buttons" id="payable-actions-${payableKey.replace(/[^a-zA-Z0-9]/g, '_')}">
-              <button class="btn-icon btn-view" onclick="viewAccountsPayableDetail(${meta.row})" title="상세보기">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editAccountsPayableByRow(${meta.row})" title="수정">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteAccountsPayableByRow(${meta.row})" title="삭제">삭제</button>
+            <div class="action-buttons" id="payable-actions-${payableKey.replace(
+              /[^a-zA-Z0-9]/g,
+              '_',
+            )}">
+              <button class="btn-icon btn-view" onclick="viewAccountsPayableDetail(${
+                meta.row
+              })" title="상세보기">상세</button>
+              <button class="btn-icon btn-edit" style="display: none;" onclick="editAccountsPayableByRow(${
+                meta.row
+              })" title="수정">수정</button>
+              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteAccountsPayableByRow(${
+                meta.row
+              })" title="삭제">삭제</button>
             </div>
           `;
         },
-        width: '120px',
       },
     ],
     pageLength: 25,
@@ -147,9 +155,9 @@ function initAccountsPayablePage() {
   });
 
   // 체크박스 변경 이벤트
-  $('#accountsPayableTable tbody').on('change', '.payable-checkbox', function () {
-    updatePayableButtonStates();
-  });
+  // $('#accountsPayableTable tbody').on('change', '.payable-checkbox', function () {
+  //   updatePayableButtonStates();
+  // });
 
   // 자동 조회
   loadAccountsPayable();
@@ -187,7 +195,31 @@ async function loadAccountsPayable() {
     document.getElementById('payableCount').textContent = result.data.length;
 
     // 체크박스 초기화
-    document.getElementById('payableSelectAll').checked = false;
+    // document.getElementById('payableSelectAll').checked = false;
+
+    $('#payableSelectAll').on('change', function () {
+      const isChecked = $(this).prop('checked');
+      $('.payable-checkbox').prop('checked', isChecked).trigger('change');
+    });
+    // 개별 체크박스 이벤트 (이벤트 위임 방식)
+    $(document).on('change', '.payable-checkbox', function () {
+      const quotationDate = $(this).data('date');
+      const quotationNo = $(this).data('no');
+      const isChecked = $(this).prop('checked');
+      const actionDiv = $(`#actions-${quotationDate}_${quotationNo}`);
+
+      if (isChecked) {
+        actionDiv.find('.btn-view').hide();
+        actionDiv.find('.btn-edit').show();
+        actionDiv.find('.btn-delete').show();
+        actionDiv.find('.btn-approve').show();
+      } else {
+        actionDiv.find('.btn-view').show();
+        actionDiv.find('.btn-edit').hide();
+        actionDiv.find('.btn-delete').hide();
+        actionDiv.find('.btn-approve').hide();
+      }
+    });
   } catch (err) {
     console.error('❌ 미지급금 조회 에러:', err);
     alert('조회 중 오류가 발생했습니다.');
@@ -221,7 +253,11 @@ function updatePayableButtonStates() {
       const actionsDivId = `payable-actions-${payableKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const actionsDiv = document.getElementById(actionsDivId);
 
-      console.log(`체크박스 index=${index}, checked=${checkbox.checked}, actionsDivId=${actionsDivId}, found=${!!actionsDiv}`);
+      console.log(
+        `체크박스 index=${index}, checked=${
+          checkbox.checked
+        }, actionsDivId=${actionsDivId}, found=${!!actionsDiv}`,
+      );
 
       if (actionsDiv) {
         const editBtn = actionsDiv.querySelector('.btn-edit');
@@ -307,7 +343,7 @@ async function deleteSelectedAccountsPayable() {
         `/api/accounts-payable/${row.매입처코드}/${row.미지급금지급일자}`,
         {
           method: 'DELETE',
-        }
+        },
       );
 
       const result = await response.json();
@@ -376,9 +412,7 @@ function viewAccountsPayableDetail(rowIndex) {
           </tr>
           <tr>
             <th>결제방법</th>
-            <td>${
-              { '0': '현금', '1': '수표', '2': '어음', '3': '기타' }[data.결제방법] || ''
-            }</td>
+            <td>${{ 0: '현금', 1: '수표', 2: '어음', 3: '기타' }[data.결제방법] || ''}</td>
             <th>만기일자</th>
             <td>${data.만기일자 ? formatDateDisplay(data.만기일자) : ''}</td>
           </tr>
@@ -458,7 +492,7 @@ async function editAccountsPayable(매입처코드, 지급일자) {
               <th>지급일자 *</th>
               <td>
                 <input type="date" id="editPayableDate" value="${formatDate(
-                  data.미지급금지급일자
+                  data.미지급금지급일자,
                 )}" readonly />
               </td>
             </tr>
@@ -636,7 +670,7 @@ function exportAccountsPayableToCSV() {
 
     // CSV 데이터 생성
     const rows = data.map((row, index) => {
-      const 결제방법 = { '0': '현금', '1': '수표', '2': '어음', '3': '기타' }[row.결제방법] || '';
+      const 결제방법 = { 0: '현금', 1: '수표', 2: '어음', 3: '기타' }[row.결제방법] || '';
 
       return [
         index + 1,
