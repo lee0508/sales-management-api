@@ -661,21 +661,7 @@ window.exportTaxInvoicesToCSV = function () {
   console.log('✅ 세금계산서 CSV 내보내기 완료');
 };
 
-/**
- * 날짜 포맷 변환 (YYYYMMDD → YYYY-MM-DD)
- */
-function formatDate(dateStr) {
-  if (!dateStr || dateStr.length !== 8) return dateStr;
-  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
-}
-
-/**
- * 날짜 포맷 변환 (YYYYMMDD → YYYY-MM-DD for input)
- */
-function formatDateForInput(dateStr) {
-  if (!dateStr || dateStr.length !== 8) return '';
-  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
-}
+// formatDate, formatDateForInput 함수는 common.js에서 정의됨
 
 /**
  * 세금계산서 인쇄 함수

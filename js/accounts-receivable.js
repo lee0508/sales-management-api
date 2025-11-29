@@ -90,7 +90,7 @@ function initAccountsReceivablePage() {
         // 결제방법
         data: '결제방법',
         render: function (data) {
-          const methods = { '0': '현금', '1': '수표', '2': '어음', '3': '기타' };
+          const methods = { 0: '현금', 1: '수표', 2: '어음', 3: '기타' };
           return methods[data] || '';
         },
         width: '80px',
@@ -127,10 +127,19 @@ function initAccountsReceivablePage() {
         render: function (data, type, row, meta) {
           const receivableKey = `${row.미수금입금일자}-${row.매출처코드}`;
           return `
-            <div class="action-buttons" id="receivable-actions-${receivableKey.replace(/[^a-zA-Z0-9]/g, '_')}">
-              <button class="btn-icon btn-view" onclick="viewAccountsReceivableDetail(${meta.row})" title="상세보기">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editAccountsReceivableByRow(${meta.row})" title="수정">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteAccountsReceivableByRow(${meta.row})" title="삭제">삭제</button>
+            <div class="action-buttons" id="receivable-actions-${receivableKey.replace(
+              /[^a-zA-Z0-9]/g,
+              '_',
+            )}">
+              <button class="btn-icon btn-view" onclick="viewAccountsReceivableDetail(${
+                meta.row
+              })" title="상세보기">상세</button>
+              <button class="btn-icon btn-edit" style="display: none;" onclick="editAccountsReceivableByRow(${
+                meta.row
+              })" title="수정">수정</button>
+              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteAccountsReceivableByRow(${
+                meta.row
+              })" title="삭제">삭제</button>
             </div>
           `;
         },
@@ -143,7 +152,7 @@ function initAccountsReceivablePage() {
       [10, 25, 50, 100],
     ],
     responsive: true,
-    dom: '<"top"lf>rt<"bottom"ip>',
+    // dom: '<"top"lf>rt<"bottom"ip>',
   });
 
   // 체크박스 변경 이벤트
@@ -221,7 +230,11 @@ function updateReceivableButtonStates() {
       const actionsDivId = `receivable-actions-${receivableKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const actionsDiv = document.getElementById(actionsDivId);
 
-      console.log(`체크박스 index=${index}, checked=${checkbox.checked}, actionsDivId=${actionsDivId}, found=${!!actionsDiv}`);
+      console.log(
+        `체크박스 index=${index}, checked=${
+          checkbox.checked
+        }, actionsDivId=${actionsDivId}, found=${!!actionsDiv}`,
+      );
 
       if (actionsDiv) {
         const editBtn = actionsDiv.querySelector('.btn-edit');
@@ -342,9 +355,7 @@ function viewAccountsReceivableDetail(rowIndex) {
           </tr>
           <tr>
             <th>결제방법</th>
-            <td>${
-              { '0': '현금', '1': '수표', '2': '어음', '3': '기타' }[data.결제방법] || ''
-            }</td>
+            <td>${{ 0: '현금', 1: '수표', 2: '어음', 3: '기타' }[data.결제방법] || ''}</td>
             <th>만기일자</th>
             <td>${data.만기일자 ? formatDateDisplay(data.만기일자) : ''}</td>
           </tr>
@@ -382,7 +393,9 @@ function editAccountsReceivableByRow(rowIndex) {
     }
     // TODO: 내일 구현 예정
     alert(
-      `미수금 수정\n\n매출처: ${data.매출처명}\n입금일자: ${formatDateDisplay(data.미수금입금일자)}\n입금금액: ${data.미수금입금금액.toLocaleString()}원\n\n※ 수정 기능은 내일 구현 예정입니다.`
+      `미수금 수정\n\n매출처: ${data.매출처명}\n입금일자: ${formatDateDisplay(
+        data.미수금입금일자,
+      )}\n입금금액: ${data.미수금입금금액.toLocaleString()}원\n\n※ 수정 기능은 내일 구현 예정입니다.`,
     );
   } catch (err) {
     console.error('❌ 수정 에러:', err);
@@ -403,7 +416,9 @@ function deleteAccountsReceivableByRow(rowIndex) {
     // TODO: 내일 구현 예정
     if (
       confirm(
-        `미수금 삭제\n\n매출처: ${data.매출처명}\n입금일자: ${formatDateDisplay(data.미수금입금일자)}\n입금금액: ${data.미수금입금금액.toLocaleString()}원\n\n정말 삭제하시겠습니까?\n\n※ 실제 삭제 기능은 내일 구현 예정입니다.`
+        `미수금 삭제\n\n매출처: ${data.매출처명}\n입금일자: ${formatDateDisplay(
+          data.미수금입금일자,
+        )}\n입금금액: ${data.미수금입금금액.toLocaleString()}원\n\n정말 삭제하시겠습니까?\n\n※ 실제 삭제 기능은 내일 구현 예정입니다.`,
       )
     ) {
       alert('삭제 기능은 내일 구현 예정입니다.');
@@ -437,7 +452,7 @@ function exportAccountsReceivableToCSV() {
   ];
 
   const rows = data.map((row, index) => {
-    const methods = { '0': '현금', '1': '수표', '2': '어음', '3': '기타' };
+    const methods = { 0: '현금', 1: '수표', 2: '어음', 3: '기타' };
     return [
       index + 1,
       row.매출처코드,
@@ -459,23 +474,7 @@ function exportAccountsReceivableToCSV() {
   link.click();
 }
 
-/**
- * 날짜 형식 변환 (YYYYMMDD → YYYY-MM-DD)
- */
-function formatDateDisplay(dateStr) {
-  if (!dateStr || dateStr.length !== 8) return '';
-  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
-}
-
-/**
- * 날짜 형식 변환 (Date → YYYY-MM-DD)
- */
-function formatDate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+// formatDate, formatDateDisplay 함수는 common.js에서 정의됨
 
 // 페이지 로드 시 초기화
 window.addEventListener('load', function () {

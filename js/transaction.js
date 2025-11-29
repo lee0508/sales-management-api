@@ -1,7 +1,21 @@
 // ✅ 거래명세서관리 스크립트 (transaction.js)
+// 최초 1회만 호출
+
+let transactionTableInstance = null;
+
+function initTransactionDates() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const start = document.getElementById('transactionStartDate');
+  const end = document.getElementById('transactionEndDate');
+  if (!start.value) start.value = todayStr;
+  if (!end.value) end.value = todayStr;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
-  window.loadTransactions = loadTransactions;
+  initTransactionDates();
+  loadTransactions(); // 필요시 초기 로드
+  // window.loadTransactions = loadTransactions;
 
   // ✅ 수정 모달 닫기 버튼 이벤트
   $(document).on('click', '#closeTransactionEditModalBtn', () => {
@@ -19,19 +33,19 @@ document.addEventListener('DOMContentLoaded', () => {
 // ✅ 거래명세서 목록 불러오기
 async function loadTransactions() {
   // 페이지가 표시될 때마다 날짜를 오늘 날짜(로그인 날짜)로 초기화
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  // const today = new Date();
+  // const todayStr = today.toISOString().slice(0, 10);
 
   const startDateInput = document.getElementById('transactionStartDate');
   const endDateInput = document.getElementById('transactionEndDate');
 
   // 항상 오늘 날짜로 설정
-  if (startDateInput) {
-    startDateInput.value = todayStr;
-  }
-  if (endDateInput) {
-    endDateInput.value = todayStr;
-  }
+  // if (startDateInput) {
+  //   startDateInput.value = todayStr;
+  // }
+  // if (endDateInput) {
+  //   endDateInput.value = todayStr;
+  // }
   try {
     const startDate = document.getElementById('transactionStartDate').value;
     const endDate = document.getElementById('transactionEndDate').value;
@@ -576,7 +590,7 @@ async function searchTransactionMaterials() {
       .map(
         (material) => `
       <tr style="border-bottom: 1px solid #e5e7eb;">
-        <td style="padding: 12px;">${material.자재코드}</td>
+        <td style="padding: 12px;">${material.세부코드}</td>
         <td style="padding: 12px;">${material.자재명}</td>
         <td style="padding: 12px;">${material.규격 || '-'}</td>
         <td style="padding: 12px; text-align: right;">${(
@@ -643,7 +657,8 @@ function selectTransactionMaterial(material) {
 
   // 상세내역 추가
   newTransactionDetails.push({
-    자재코드: material.자재코드,
+    분류코드: material.분류코드,
+    세부코드: material.세부코드,
     자재명: material.자재명,
     규격: material.규격,
     수량: parseFloat(수량),
@@ -691,7 +706,7 @@ function renderNewTransactionDetailTable() {
     tr.style.borderBottom = '1px solid #e5e7eb';
     tr.innerHTML = `
       <td style="padding: 12px; text-align: center;">${index + 1}</td>
-      <td style="padding: 12px;">${detail.자재코드}</td>
+      <td style="padding: 12px;">${detail.세부코드}</td>
       <td style="padding: 12px;">${detail.자재명 || '-'}</td>
       <td style="padding: 12px;">${detail.규격 || '-'}</td>
       <td style="padding: 12px; text-align: right;">${detail.수량.toLocaleString()}</td>
@@ -925,13 +940,23 @@ async function editTransaction(transactionDate, transactionNo) {
           render: (data, type, row, meta) => meta.row + 1,
         },
         {
-          data: '자재코드',
+          data: '분류코드',
           defaultContent: '-',
-          render: (d) => {
-            if (!d) return '-';
-            // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
-            return d.length > 2 ? d.substring(2) : d;
-          },
+          visible: false, // 칼럼 숨김
+          // render: (d) => {
+          //   if (!d) return '-';
+          //   // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
+          //   return d.length > 2 ? d.substring(2) : d;
+          // },
+        },
+        {
+          data: '세부코드',
+          defaultContent: '-',
+          // render: (d) => {
+          //   if (!d) return '-';
+          //   // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
+          //   return d.length > 2 ? d.substring(2) : d;
+          // },
         },
         { data: '자재명', defaultContent: '-' },
         { data: '규격', defaultContent: '-' },
@@ -972,7 +997,7 @@ async function editTransaction(transactionDate, transactionNo) {
           },
         },
       ],
-      order: [[0, 'asc']],
+      // order: [[0, 'asc']],
       pageLength: 10,
       language: {
         lengthMenu: '페이지당 _MENU_ 개씩 보기',
@@ -1046,8 +1071,21 @@ async function submitTransactionEdit() {
     // 기존 데이터에서 필요한 필드만 추출
     const firstDetail = window.currentEditingTransaction.details[0] || {};
 
+    // 분류코드, 세부코드가 없으면 자재코드에서 분리
+    let 분류코드 = detail.분류코드;
+    let 세부코드 = detail.세부코드;
+
+    if (!분류코드 || !세부코드) {
+      // 자재코드가 있으면 분리 (fallback)
+      if (detail.자재코드) {
+        분류코드 = detail.자재코드.substring(0, 2);
+        세부코드 = detail.자재코드.substring(2);
+      }
+    }
+
     return {
-      자재코드: detail.자재코드,
+      분류코드: 분류코드,
+      세부코드: 세부코드,
       수량: detail.수량,
       단가: detail.단가,
       매출처코드: detail.매출처코드 || firstDetail.매출처코드 || '', // 기존 매출처코드 유지
@@ -1231,7 +1269,12 @@ function confirmTransactionDetailAdd() {
   }
 
   // DataTable에 행 추가
+  // 매출처코드는 기존 거래명세서의 매출처코드 사용
+  const firstDetail = window.currentEditingTransaction?.details[0] || {};
+
   const newRow = {
+    분류코드: material.분류코드,
+    세부코드: material.세부코드,
     자재코드: material.자재코드,
     자재명: material.자재명,
     규격: material.규격 || '-',
@@ -1240,6 +1283,7 @@ function confirmTransactionDetailAdd() {
     공급가액: 공급가액,
     부가세: 부가세,
     합계금액: 합계금액,
+    매출처코드: firstDetail.매출처코드 || '',
     _isNew: true,
   };
 

@@ -7,63 +7,7 @@
 // 유틸리티 함수
 // ===========================
 
-/**
- * 날짜 포맷 변환 (YYYYMMDD → YYYY-MM-DD)
- */
-function formatDate(dateStr) {
-  if (!dateStr || dateStr.length !== 8) return '';
-  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
-}
-
-/**
- * 숫자를 금액 형식으로 포맷 (천단위 쉼표)
- */
-function formatCurrency(amount) {
-  // 입력값 검증 및 변환
-  if (amount === undefined || amount === null || amount === '' || isNaN(amount)) {
-    return '0';
-  }
-
-  // 문자열인 경우 숫자로 변환
-  const numValue = typeof amount === 'string' ? parseFloat(amount) : amount;
-
-  // NaN이거나 0인 경우 처리
-  if (isNaN(numValue)) {
-    return '0';
-  }
-
-  // return numValue.toLocaleString('ko-KR');
-}
-
-/**
- * 사업자번호 포맷 (123-45-67890)
- */
-function formatBusinessNumber(num) {
-  if (!num) return '';
-  const cleaned = num.replace(/[^0-9]/g, '');
-  if (cleaned.length === 10) {
-    return `${cleaned.substring(0, 3)}-${cleaned.substring(3, 5)}-${cleaned.substring(5, 10)}`;
-  }
-  return num;
-}
-
-/**
- * 전화번호 포맷
- */
-function formatPhoneNumber(num) {
-  if (!num) return '';
-  const cleaned = num.replace(/[^0-9]/g, '');
-
-  if (cleaned.length === 11) {
-    return `${cleaned.substring(0, 3)}-${cleaned.substring(3, 7)}-${cleaned.substring(7, 11)}`;
-  } else if (cleaned.length === 10) {
-    return `${cleaned.substring(0, 3)}-${cleaned.substring(3, 6)}-${cleaned.substring(6, 10)}`;
-  } else if (cleaned.length === 9 && cleaned.startsWith('02')) {
-    return `${cleaned.substring(0, 2)}-${cleaned.substring(2, 5)}-${cleaned.substring(5, 9)}`;
-  }
-
-  return num;
-}
+// formatDate, formatCurrency, formatBusinessNumber, formatPhoneNumber 함수는 common.js에서 정의됨
 
 // ===========================
 // 견적서 프린트

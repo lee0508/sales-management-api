@@ -24,7 +24,7 @@ function initMaterialHistoryTable() {
         className: 'dt-center',
         width: '40px',
         render: function (data, type, row) {
-          return `<input type="checkbox" class="material-checkbox" data-code="${row.자재코드}" />`;
+          return `<input type="checkbox" class="material-checkbox" data-code="${row.세부코드}" />`;
         },
       },
       {
@@ -34,16 +34,22 @@ function initMaterialHistoryTable() {
         render: (data, type, row, meta) => meta.row + 1,
       },
       {
-        data: '분류명',
-        defaultContent: '-',
+        data: '분류코드',
+        render: (data) => {
+          // 자재코드에서 사업장코드 + 분류코드 제거하고 순수 세부코드만 표시
+          // if (data && data.length >= 2) {
+          //   return data.substring(2); // 앞 4자리(사업장코드2 + 분류코드2) 제거
+          // }
+          return data || '-';
+        },
       },
       {
         data: '자재코드',
         render: (data) => {
           // 자재코드에서 사업장코드 + 분류코드 제거하고 순수 세부코드만 표시
-          if (data && data.length >= 4) {
-            return data.substring(4); // 앞 4자리(사업장코드2 + 분류코드2) 제거
-          }
+          // if (data && data.length >= 2) {
+          //   return data.substring(2); // 앞 4자리(사업장코드2 + 분류코드2) 제거
+          // }
           return data || '-';
         },
       },
@@ -52,7 +58,9 @@ function initMaterialHistoryTable() {
         defaultContent: '-',
         render: (data, type, row) => {
           if (row.사용구분 === 9) {
-            return `<span style="color: #dc3545; text-decoration: line-through;">${data || '-'}</span> <span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 8px; font-size: 10px; margin-left: 4px;">삭제됨</span>`;
+            return `<span style="color: #dc3545; text-decoration: line-through;">${
+              data || '-'
+            }</span> <span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 8px; font-size: 10px; margin-left: 4px;">삭제됨</span>`;
           }
           return data || '-';
         },
@@ -90,7 +98,9 @@ function initMaterialHistoryTable() {
           // 삭제된 자재는 상세 버튼만 표시
           if (row.사용구분 === 9) {
             return `
-              <button class="btn-detail" onclick="viewMaterialDetail('${row.자재코드}')"
+              <button class="btn-detail" onclick="viewMaterialDetail('${
+                row.분류코드 + row.세부코드
+              }')"
                       style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
                 상세
               </button>
@@ -100,15 +110,17 @@ function initMaterialHistoryTable() {
 
           // 정상 자재는 모든 버튼 표시
           return `
-            <button class="btn-detail" onclick="viewMaterialDetail('${row.자재코드}')"
+            <button class="btn-detail" onclick="viewMaterialDetail('${
+              row.분류코드 + row.세부코드
+            }')"
                     style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; margin-right: 4px;">
               상세
             </button>
-            <button class="btn-edit" onclick="editMaterial('${row.자재코드}')"
+            <button class="btn-edit" onclick="editMaterial('${row.분류코드 + row.세부코드}')"
                     style="padding: 6px 12px; background: #ffc107; color: #333; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; margin-right: 4px;">
               수정
             </button>
-            <button class="btn-delete" onclick="deleteMaterial('${row.자재코드}')"
+            <button class="btn-delete" onclick="deleteMaterial('${row.분류코드 + row.세부코드}')"
                     style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
               삭제
             </button>
@@ -136,7 +148,7 @@ function initMaterialHistoryTable() {
       [10, 25, 50, 100, -1],
       [10, 25, 50, 100, '전체'],
     ],
-    dom: '<"top"lf>rt<"bottom"ip>',
+    // dom: '<"top d-flex justify-content-between"<"left"l><"right"f>>rt<"bottom"ip>',
   });
 
   // 체크박스 전체 선택/해제
@@ -472,6 +484,7 @@ async function viewMaterialDetail(자재코드) {
     const result = await response.json();
 
     if (result.success && result.data) {
+      console.log('✅ 자재 상세 정보 조회 성공:', result.data);
       displayMaterialDetailModal(result.data);
     } else {
       alert('자재 상세 정보를 불러올 수 없습니다.');
@@ -493,7 +506,7 @@ function displayMaterialDetailModal(data) {
     <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
       <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #333;">📦 자재 기본 정보</h3>
       <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-        <div><strong>자재코드:</strong> ${material.자재코드 || '-'}</div>
+        <div><strong>자재코드:</strong> ${material.세부코드 || '-'}</div>
         <div><strong>분류명:</strong> ${material.분류명 || '-'}</div>
         <div><strong>자재명:</strong> ${material.자재명 || '-'}</div>
         <div><strong>규격:</strong> ${material.규격 || '-'}</div>
@@ -528,11 +541,21 @@ function displayMaterialDetailModal(data) {
     prices.forEach((price) => {
       pricesHtml += `
         <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;">${price.매입처명 || price.매입처코드 || '-'}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${formatDate(price.적용일자)}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(price.입고단가 || 0)}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(price.출고단가 || 0)}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatNumber(price.마진율 || 0)}%</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${
+            price.매입처명 || price.매입처코드 || '-'
+          }</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${
+            price.적용일자 || '-'
+          }</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(
+            price.입고단가 || 0,
+          )}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(
+            price.출고단가 || 0,
+          )}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatNumber(
+            price.마진율 || 0,
+          )}%</td>
         </tr>
       `;
     });
@@ -562,8 +585,8 @@ function displayMaterialDetailModal(data) {
         <div><strong>출고단가1:</strong> ${formatCurrency(ledger.출고단가1 || 0)}</div>
         <div><strong>출고단가2:</strong> ${formatCurrency(ledger.출고단가2 || 0)}</div>
         <div><strong>출고단가3:</strong> ${formatCurrency(ledger.출고단가3 || 0)}</div>
-        <div><strong>최종입고일:</strong> ${formatDate(ledger.최종입고일자)}</div>
-        <div><strong>최종출고일:</strong> ${formatDate(ledger.최종출고일자)}</div>
+        <div><strong>최종입고일:</strong> ${ledger.최종입고일자 || ''}</div>
+        <div><strong>최종출고일:</strong> ${ledger.최종출고일자 || ''}</div>
         <div style="grid-column: 1 / -1;"><strong>비고:</strong> ${ledger.비고란 || '-'}</div>
       </div>
     `;
@@ -585,7 +608,7 @@ function displayMaterialDetailModal(data) {
         <thead style="position: sticky; top: 0; background: #fff;">
           <tr style="background: #f1f1f1;">
             <th style="padding: 6px; border: 1px solid #ddd;">구분</th>
-            <th style="padding: 6px; border: 1px solid #ddd;">입출고일자</th>
+            <th style="padding: 6px; border: 1px solid #ddd;">거래일자</th>
             <th style="padding: 6px; border: 1px solid #ddd;">거래처</th>
             <th style="padding: 6px; border: 1px solid #ddd;">수량</th>
             <th style="padding: 6px; border: 1px solid #ddd;">단가</th>
@@ -608,11 +631,19 @@ function displayMaterialDetailModal(data) {
       transactionsHtml += `
         <tr>
           <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${구분Badge}</td>
-          <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${formatDate(tx.입출고일자)}</td>
+          <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${
+            tx.거래일자 || '-'
+          }</td>
           <td style="padding: 6px; border: 1px solid #ddd;">${tx.거래처명 || '-'}</td>
-          <td style="padding: 6px; border: 1px solid #ddd; text-align: right;">${formatNumber(수량 || 0)}</td>
-          <td style="padding: 6px; border: 1px solid #ddd; text-align: right;">${formatCurrency(단가 || 0)}</td>
-          <td style="padding: 6px; border: 1px solid #ddd; text-align: right;">${formatCurrency(공급가액 || 0)}</td>
+          <td style="padding: 6px; border: 1px solid #ddd; text-align: right;">${formatNumber(
+            수량 || 0,
+          )}</td>
+          <td style="padding: 6px; border: 1px solid #ddd; text-align: right;">${formatCurrency(
+            단가 || 0,
+          )}</td>
+          <td style="padding: 6px; border: 1px solid #ddd; text-align: right;">${formatCurrency(
+            공급가액 || 0,
+          )}</td>
           <td style="padding: 6px; border: 1px solid #ddd;">${tx.적요 || '-'}</td>
         </tr>
       `;
@@ -721,29 +752,13 @@ function exportHistoryToGoogleSheets() {
   }
 }
 
-/**
- * 유틸리티 함수: 날짜 포맷
- */
-function formatDate(dateStr) {
-  if (!dateStr || dateStr.length !== 8) return '-';
-  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
-}
+// formatDate, formatNumber, formatCurrencyKRW 함수는 common.js에서 정의됨
 
 /**
- * 유틸리티 함수: 숫자 포맷
+ * formatCurrency는 common.js의 formatCurrencyKRW를 사용
+ * (material-history.js에서는 "원" 단위가 필요하므로 별칭 사용)
  */
-function formatNumber(num) {
-  if (num === null || num === undefined) return '0';
-  return Number(num).toLocaleString('ko-KR');
-}
-
-/**
- * 유틸리티 함수: 통화 포맷
- */
-function formatCurrency(num) {
-  if (num === null || num === undefined) return '0원';
-  return Number(num).toLocaleString('ko-KR') + '원';
-}
+const formatCurrency = formatCurrencyKRW;
 
 // 페이지 로드 시 DataTable 초기화
 $(document).ready(function () {

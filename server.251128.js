@@ -93,35 +93,10 @@ async function connectDB() {
   try {
     pool = await sql.connect(dbConfig);
     console.log('✅ SQL Server 연결 성공');
-
-    // 서버 시작 시 모든 사용자 로그아웃 처리 (서버 강제 종료 대응)
-    await resetAllLoginStatus();
-
     return pool;
   } catch (err) {
     console.error('❌ SQL Server 연결 실패:', err);
     throw err;
-  }
-}
-
-// 서버 시작 시 모든 로그인 상태 초기화
-async function resetAllLoginStatus() {
-  try {
-    const result = await pool.request().query(`
-      UPDATE 사용자
-      SET 로그인여부 = 'N'
-      WHERE 로그인여부 = 'Y'
-    `);
-
-    const affectedRows = result.rowsAffected[0];
-    if (affectedRows > 0) {
-      console.log(`✅ 서버 시작: ${affectedRows}명의 로그인 상태 초기화 완료`);
-    } else {
-      console.log('✅ 서버 시작: 로그인 중인 사용자 없음');
-    }
-  } catch (err) {
-    console.error('❌ 로그인 상태 초기화 실패:', err);
-    // 초기화 실패해도 서버는 계속 실행
   }
 }
 
@@ -409,39 +384,39 @@ app.get('/api/auth/me', (req, res) => {
   }
 });
 
-// Heartbeat - 사용자 활동 상태 업데이트 (비활성화됨)
-// app.post('/api/auth/heartbeat', async (req, res) => {
-//   try {
-//     // 세션에서 사용자 정보 확인
-//     if (!req.session.user) {
-//       return res.status(401).json({
-//         success: false,
-//         message: '로그인이 필요합니다.',
-//       });
-//     }
+// Heartbeat - 사용자 활동 상태 업데이트
+app.post('/api/auth/heartbeat', async (req, res) => {
+  try {
+    // 세션에서 사용자 정보 확인
+    if (!req.session.user) {
+      return res.status(401).json({
+        success: false,
+        message: '로그인이 필요합니다.',
+      });
+    }
 
-//     const 사용자코드 = req.session.user.사용자코드;
-//     const 마지막활동시간 = new Date().toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
+    const 사용자코드 = req.session.user.사용자코드;
+    const 마지막활동시간 = new Date().toISOString().replace(/[-:T]/g, '').replace(/\..+/, '');
 
-//     // 마지막 활동 시간 업데이트
-//     await pool
-//       .request()
-//       .input('사용자코드', sql.VarChar(4), 사용자코드)
-//       .input('마지막활동시간', sql.VarChar(17), 마지막활동시간).query(`
-//         UPDATE 사용자
-//         SET 마지막활동시간 = @마지막활동시간
-//         WHERE 사용자코드 = @사용자코드
-//       `);
+    // 마지막 활동 시간 업데이트
+    await pool
+      .request()
+      .input('사용자코드', sql.VarChar(4), 사용자코드)
+      .input('마지막활동시간', sql.VarChar(17), 마지막활동시간).query(`
+        UPDATE 사용자
+        SET 마지막활동시간 = @마지막활동시간
+        WHERE 사용자코드 = @사용자코드
+      `);
 
-//     res.json({
-//       success: true,
-//       message: 'Heartbeat received',
-//     });
-//   } catch (err) {
-//     console.error('Heartbeat 에러:', err);
-//     res.status(500).json({ success: false, message: '서버 오류' });
-//   }
-// });
+    res.json({
+      success: true,
+      message: 'Heartbeat received',
+    });
+  } catch (err) {
+    console.error('Heartbeat 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
 
 // 강제 로그아웃 (브라우저 종료 시 사용)
 app.post('/api/auth/force-logout', async (req, res) => {
@@ -3155,7 +3130,7 @@ app.get('/api/materials', async (req, res) => {
 
     let query = `
             SELECT
-                (m.분류코드+m.세부코드) as 자재코드,
+                m.세부코드 as 자재코드,
                 m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
                 m.바코드, m.과세구분, m.적요, m.사용구분,
                 c.분류명,
@@ -3320,7 +3295,6 @@ app.get('/api/materials/transaction-history', async (req, res) => {
     res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
   }
 });
-
 app.get('/api/materials/:code', async (req, res) => {
   try {
     const { code } = req.params;
@@ -4881,7 +4855,8 @@ app.get('/api/transactions/:date/:no', async (req, res) => {
         LEFT JOIN 사용자 u ON i.사용자코드 = u.사용자코드
         WHERE i.거래일자 = @거래일자
           AND i.거래번호 = @거래번호
-          AND i.입출고구분 = 2 
+          AND i.입출고구분 = 2
+        ORDER BY i.거래일자 ASC,i.거래번호 ASC 
       `);
 
     console.log('거래명세서 상세 조회 결과:', result.recordset.length, '건');
@@ -4984,11 +4959,11 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
 
     // 3. 새로운 상세내역 INSERT
     for (const detail of details) {
-      const { 분류코드, 세부코드, 수량, 단가, 매출처코드 } = detail;
+      const { 자재코드, 수량, 단가, 매출처코드 } = detail;
 
       // 자재코드 분리
-      const 분류코드2 = 분류코드;
-      const 세부코드2 = 세부코드;
+      const 분류코드 = 자재코드.substring(0, 2);
+      const 세부코드 = 자재코드.substring(2);
 
       const 출고수량 = 수량;
       const 출고단가 = 단가;
@@ -4998,8 +4973,8 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
       // Step 1: 자재 테이블에 자재가 존재하는지 확인
       const materialCheck = await pool
         .request()
-        .input('분류코드', sql.VarChar(2), 분류코드2)
-        .input('세부코드', sql.VarChar(16), 세부코드2).query(`
+        .input('분류코드', sql.VarChar(2), 분류코드)
+        .input('세부코드', sql.VarChar(16), 세부코드).query(`
         SELECT COUNT(*) as cnt FROM 자재
         WHERE 분류코드 = @분류코드
         AND 세부코드 = @세부코드
@@ -5010,7 +4985,7 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
         // 자재가 존재하지 않으면 에러 반환 (자재는 사전에 등록되어야 함)
         return res.status(400).json({
           success: false,
-          message: `자재코드 ${세부코드2}는 등록되지 않은 자재입니다. 먼저 자재내역관리에서 자재를 등록해주세요.`,
+          message: `자재코드 ${자재코드}는 등록되지 않은 자재입니다. 먼저 자재내역관리에서 자재를 등록해주세요.`,
         });
       }
 
@@ -5018,8 +4993,8 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
       const ledgerCheck = await pool
         .request()
         .input('사업장코드', sql.VarChar(2), 사업장코드)
-        .input('분류코드', sql.VarChar(2), 분류코드2)
-        .input('세부코드', sql.VarChar(16), 세부코드2).query(`
+        .input('분류코드', sql.VarChar(2), 분류코드)
+        .input('세부코드', sql.VarChar(16), 세부코드).query(`
         SELECT COUNT(*) as cnt FROM 자재원장
         WHERE 사업장코드 = @사업장코드
         AND 분류코드 = @분류코드
@@ -5027,13 +5002,13 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
         `);
 
       if (ledgerCheck.recordset[0].cnt === 0) {
-        console.log(`⚡ 자재원장 레코드 자동 생성: ${사업장코드}-${분류코드2}-${세부코드2}`);
+        console.log(`⚡ 자재원장 레코드 자동 생성: ${사업장코드}-${분류코드}-${세부코드}`);
 
         await pool
           .request()
           .input('사업장코드', sql.VarChar(2), 사업장코드)
-          .input('분류코드', sql.VarChar(2), 분류코드2)
-          .input('세부코드', sql.VarChar(16), 세부코드2)
+          .input('분류코드', sql.VarChar(2), 분류코드)
+          .input('세부코드', sql.VarChar(16), 세부코드)
           .input('수정일자', sql.VarChar(8), 수정일자)
           .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
             INSERT INTO 자재원장 (
@@ -5059,8 +5034,8 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
       await pool
         .request()
         .input('사업장코드', sql.VarChar(2), 사업장코드)
-        .input('분류코드', sql.VarChar(2), 분류코드2)
-        .input('세부코드', sql.VarChar(16), 세부코드2)
+        .input('분류코드', sql.VarChar(2), 분류코드)
+        .input('세부코드', sql.VarChar(16), 세부코드)
         .input('입출고구분', sql.TinyInt, 입출고구분 || 2)
         .input('입출고일자', sql.VarChar(8), 거래일자)
         .input('입출고시간', sql.VarChar(9), 입출고시간)

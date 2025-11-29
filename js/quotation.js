@@ -49,7 +49,6 @@ window.closeCustomerSearchModal = function closeCustomerSearchModal() {
 // ==================================================================
 
 $(document).ready(function () {
-
   // 견적서 작성 모달 드래그 기능
   makeModalDraggable('quotationModalContent', 'quotationModalHeader');
   // 견적서 수정 모달 드래그 기능
@@ -90,22 +89,22 @@ $(document).ready(function () {
   });
 
   // ✅ 상세 버튼 모달 닫기 함수
-  function closeQuotationDetailModal() {
-    const modal = document.getElementById('quotationDetailModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.style.display = 'none';
-    }
-    // DataTable 정리 (메모리 누수 방지)
-    if (window.quotationDetailDataTable) {
-      window.quotationDetailDataTable.destroy();
-      window.quotationDetailDataTable = null;
-      $('#quotationDetailTable tbody').empty();
-    }
-  }
+  // function closeQuotationDetailModal() {
+  //   const modal = document.getElementById('quotationDetailModal');
+  //   if (modal) {
+  //     modal.classList.add('hidden');
+  //     modal.style.display = 'none';
+  //   }
+  //   // DataTable 정리 (메모리 누수 방지)
+  //   if (window.quotationDetailDataTable) {
+  //     window.quotationDetailDataTable.destroy();
+  //     window.quotationDetailDataTable = null;
+  //     $('#quotationDetailTable tbody').empty();
+  //   }
+  // }
 
   // ✅ 전역으로 즉시 노출 (HTML에서 호출할 수 있도록)
-  window.closeQuotationDetailModal = closeQuotationDetailModal;
+  // window.closeQuotationDetailModal = closeQuotationDetailModal;
 
   // ✅ 상세 보기 모달 닫기 버튼
   $('#closeQuotationDetailModal').on('click', () => {
@@ -173,7 +172,6 @@ $(document).ready(function () {
 
   // 견적 데이터 로드 함수 (DataTable 초기화)
   async function loadQuotations() {
-
     // 페이지가 표시될 때마다 날짜를 오늘 날짜(로그인 날짜)로 초기화
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
@@ -405,6 +403,10 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
           defaultContent: '-',
         },
         {
+          data: '단위',
+          defaultContent: '-',
+        },
+        {
           data: '수량',
           defaultContent: 0,
           render: function (data) {
@@ -472,12 +474,27 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
 // 전역 함수로 노출
 window.openQuotationDetailModal = openQuotationDetailModal;
 
-// 필터링 함수
-function filterQuotations() {
-  if (window.quotationTableInstance) {
-    window.quotationTableInstance.ajax.reload();
+// ✅ 상세 버튼 모달 닫기 함수
+function closeQuotationDetailModal() {
+  const modal = document.getElementById('quotationDetailModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+  // DataTable 정리 (메모리 누수 방지)
+  if (window.quotationDetailDataTable) {
+    window.quotationDetailDataTable.destroy();
+    window.quotationDetailDataTable = null;
+    $('#quotationDetailTable tbody').empty();
   }
 }
+
+// 필터링 함수
+// function filterQuotations() {
+//   if (window.quotationTableInstance) {
+//     window.quotationTableInstance.ajax.reload();
+//   }
+// }
 
 // ✅ 견적 상세보기 함수 (DataTable 버튼에서 호출)
 function viewQuotationDetail(quotationDate, quotationNo) {
@@ -569,6 +586,10 @@ async function editQuotation(quotationDate, quotationNo) {
         },
         {
           data: '규격',
+          defaultContent: '-',
+        },
+        {
+          data: '단위',
           defaultContent: '-',
         },
         {
@@ -785,7 +806,6 @@ function selectMaterial(material) {
 
   // 검색 결과 숨기기
   document.getElementById('materialSearchResults').style.display = 'none';
-
 }
 
 // ✅ 선택된 자재 취소
@@ -1161,7 +1181,6 @@ function confirmQuotationDetailAdd() {
 
       // 모드 플래그 초기화
       isNewQuotationMode = false;
-
     } else {
       // 견적 수정 모드 - DataTable에 행 추가
       const newRow = {
@@ -1178,7 +1197,6 @@ function confirmQuotationDetailAdd() {
 
       // 합계 재계산
       recalculateQuotationEditTotal();
-
     }
 
     // 모달 닫기
@@ -1205,7 +1223,6 @@ function editQuotationDetailRow(rowIndex) {
       alert('행 데이터를 찾을 수 없습니다.');
       return;
     }
-
 
     // 모달에 데이터 표시
     document.getElementById('editDetailCode').textContent = rowData.자재코드 || '-';
@@ -1261,7 +1278,6 @@ function confirmQuotationDetailEdit() {
 
     // 합계 재계산
     recalculateQuotationEditTotal();
-
 
     // 모달 닫기
     closeQuotationDetailEditModal();
@@ -1437,7 +1453,6 @@ async function submitQuotationEdit() {
         };
       });
 
-
       const detailResponse = await fetch(
         `/api/quotations/${quotationDate}/${quotationNo}/details`,
         {
@@ -1455,7 +1470,6 @@ async function submitQuotationEdit() {
       if (!detailResult.success) {
         throw new Error(detailResult.message || '견적 상세 수정 실패');
       }
-
     }
 
     alert('✅ 견적이 성공적으로 수정되었습니다.');
@@ -1668,7 +1682,6 @@ function openNewQuotationModal() {
     makeModalDraggable('quotationModal', 'quotationModalHeader');
     window.quotationModalDraggable = true;
   }
-
 }
 
 // ✅ 견적서 작성 모달 닫기
@@ -1689,7 +1702,6 @@ function openCustomerSearchModal() {
   if (searchValue) {
     searchQuotationCustomers();
   }
-
 }
 
 // ✅ 전역으로 노출 (HTML에서 호출할 수 있도록)
@@ -1964,7 +1976,6 @@ async function showPriceHistoryForNewQuotation(material) {
 
     // 모달 표시
     document.getElementById('priceHistoryModal').style.display = 'block';
-
   } catch (err) {
     console.error('❌ 단가 이력 조회 오류:', err);
     alert('단가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
@@ -2096,7 +2107,6 @@ function selectMaterialForQuotation(material) {
 
   renderNewQuotationDetailTable();
   closeMaterialSearchModal();
-
 }
 
 // ✅ 새 견적서 상세내역 테이블 렌더링
@@ -2211,7 +2221,6 @@ async function submitQuotation(event) {
       })),
     };
 
-
     // API 호출
     const response = await fetch('/api/quotations_add', {
       method: 'POST',
@@ -2235,7 +2244,6 @@ async function submitQuotation(event) {
     if ($.fn.DataTable.isDataTable('#quotationTable')) {
       $('#quotationTable').DataTable().ajax.reload();
     }
-
   } catch (err) {
     console.error('❌ 견적서 저장 오류:', err);
     alert('견적서 저장 중 오류가 발생했습니다: ' + err.message);
@@ -2365,7 +2373,6 @@ function openMaterialSearchModal() {
   const modal = document.getElementById('newQuotationMaterialModal');
   modal.style.display = 'block';
   modal.style.zIndex = '9999';
-
 }
 
 // 테스트 모달 닫기
@@ -2463,7 +2470,6 @@ function selectNewMaterial(material) {
   document.getElementById('newSelectedMaterialInfo').style.display = 'block';
 
   document.getElementById('newMaterialSearchResults').style.display = 'none';
-
 }
 
 // 선택된 자재 취소
@@ -2528,7 +2534,6 @@ function confirmNewQuotationMaterialAdd() {
 
     // 모달 닫기 (견적서 작성 모달은 그대로 유지)
     closeNewQuotationMaterialModal();
-
   } catch (err) {
     console.error('❌ 자재 추가 오류:', err);
     alert('자재 추가 중 오류가 발생했습니다: ' + err.message);
@@ -2593,7 +2598,6 @@ async function showNewPriceHistory() {
     // 모달 표시 (인라인 스타일에 이미 z-index: 10000 설정됨)
     const modal = document.getElementById('newQuotationPriceHistoryModal');
     modal.style.display = 'block';
-
   } catch (err) {
     console.error('❌ 단가 이력 조회 오류:', err);
     alert('단가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
@@ -2887,7 +2891,6 @@ function makeModalDraggable(modalContentId, dragHandleId) {
   }
 }
 
-
 // ==================== 필터링 함수 ====================
 
 // 견적 필터링 함수 (상태, 시작일, 종료일 기준으로 데이터 재조회)
@@ -2924,11 +2927,11 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
     // 출력 창 생성 (A4 크기)
     const printWindow = window.open('', '_blank', 'width=800,height=900');
 
-    // 날짜 포맷팅 함수
-    const formatDate = (dateStr) => {
-      if (!dateStr) return '-';
-      return dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-    };
+    // 날짜 포맷팅 함수 (common.js의 formatDate 사용)
+    // const formatDate = (dateStr) => {
+    //   if (!dateStr) return '-';
+    //   return dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+    // };
 
     // 숫자를 한자로 변환하는 함수
     const numberToKoreanHanja = (num) => {
@@ -3357,7 +3360,6 @@ async function printQuotation(quotationDate, quotationNo, mode = 1) {
 
     printWindow.document.write(html);
     printWindow.document.close();
-
   } catch (error) {
     console.error('❌ 견적서 출력 실패:', error);
     alert('견적서 출력 중 오류가 발생했습니다.');

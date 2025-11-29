@@ -151,7 +151,7 @@ function initAccountsPayablePage() {
       [10, 25, 50, 100],
     ],
     responsive: true,
-    dom: '<"top"lf>rt<"bottom"ip>',
+    // dom: '<"top"lf>rt<"bottom"ip>',
   });
 
   // 체크박스 변경 이벤트
@@ -203,7 +203,7 @@ async function loadAccountsPayable() {
     });
     // 개별 체크박스 이벤트 (이벤트 위임 방식)
     $(document).on('change', '.payable-checkbox', function () {
-      const quotationDate = $(this).data('date');
+      const payableDate = $(this).data('date');
       const quotationNo = $(this).data('no');
       const isChecked = $(this).prop('checked');
       const actionDiv = $(`#actions-${quotationDate}_${quotationNo}`);
@@ -710,72 +710,7 @@ function exportAccountsPayableToCSV() {
   }
 }
 
-/**
- * 날짜 포맷 (YYYYMMDD → YYYY-MM-DD)
- */
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  if (dateStr instanceof Date) {
-    return dateStr.toISOString().split('T')[0];
-  }
-  const str = String(dateStr);
-  if (str.length === 8) {
-    return `${str.substring(0, 4)}-${str.substring(4, 6)}-${str.substring(6, 8)}`;
-  }
-  return str;
-}
-
-/**
- * 날짜 표시 포맷 (YYYYMMDD → YYYY-MM-DD)
- */
-function formatDateDisplay(dateStr) {
-  if (!dateStr) return '';
-  const str = String(dateStr);
-  if (str.length === 8) {
-    return `${str.substring(0, 4)}-${str.substring(4, 6)}-${str.substring(6, 8)}`;
-  }
-  return str;
-}
-
-/**
- * 간단한 모달 표시 (재사용)
- */
-function showModal(title, content) {
-  // 기존 모달 제거
-  const existingModal = document.getElementById('simpleModal');
-  if (existingModal) {
-    existingModal.remove();
-  }
-
-  // 모달 생성
-  const modal = document.createElement('div');
-  modal.id = 'simpleModal';
-  modal.className = 'modal';
-  modal.innerHTML = `
-    <div class="modal-content" style="max-width: 800px;">
-      <div class="modal-header">
-        <h2>${title}</h2>
-        <button class="close-btn" onclick="closeModal()">&times;</button>
-      </div>
-      <div class="modal-body">
-        ${content}
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-  modal.style.display = 'block';
-}
-
-/**
- * 모달 닫기
- */
-function closeModal() {
-  const modal = document.getElementById('simpleModal');
-  if (modal) {
-    modal.remove();
-  }
-}
+// formatDate, formatDateDisplay, showModal, closeModal 함수는 common.js에서 정의됨
 
 // 페이지 로드 시 초기화
 window.addEventListener('load', function () {

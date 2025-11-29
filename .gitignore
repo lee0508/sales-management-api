@@ -27,6 +27,10 @@ backups/
 *~
 nul
 *.png
+*.md
+*.json
+*.backup
+*.txt
 # Production config (keep templates only)
 config/production.js
 
