@@ -3,162 +3,194 @@
  * 견적관리(quotation.js)와 동일한 패턴 적용
  */
 
+// 전역 변수로 DataTable 인스턴스 저장
+let orderTable = null;
+let orderListTable = null;
+
 $(document).ready(function () {
-  let table;
-
-  // ✅ 오늘 날짜 자동 설정
-  function setDefaultDates() {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
-
-    // 시작일과 종료일 모두 오늘 날짜로 설정
-    document.getElementById('orderStartDate').value = todayStr;
-    document.getElementById('orderEndDate').value = todayStr;
-
-    console.log(`✅ 발주관리 날짜 자동 설정: ${todayStr} ~ ${todayStr}`);
-  }
-
   // 발주 목록 로드 (DataTable 초기화)
-  function loadOrders() {
-    // 페이지가 표시될 때마다 날짜 초기화
-    setDefaultDates();
+  async function loadOrders() {
+    // 날짜 필드가 비어있을 때만 오늘 날짜로 초기화 (최초 1회만)
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+
+    const startDateInput = document.getElementById('orderStartDate');
+    const endDateInput = document.getElementById('orderEndDate');
+
+    // 값이 비어있을 때만 오늘 날짜로 설정 (사용자가 선택한 날짜 유지)
+    if (startDateInput && !startDateInput.value) {
+      startDateInput.value = todayStr;
+    }
+    if (endDateInput && !endDateInput.value) {
+      endDateInput.value = todayStr;
+    }
 
     // 이미 DataTable이 존재하면 파괴
-    if (table) {
-      table.destroy();
+    if (orderTable) {
+      orderTable.destroy();
+      orderTable = null;
     }
 
-    // 날짜 필터 값 가져오기
-    const startDate = document.getElementById('orderStartDate')?.value.replace(/-/g, '') || '';
-    const endDate = document.getElementById('orderEndDate')?.value.replace(/-/g, '') || '';
-    const status = document.getElementById('orderStatusFilter').value;
+    // DataTable 초기화
+    orderTable = $('#orderTable').DataTable({
+      ajax: {
+        url: '/api/orders',
+        data: function () {
+          // 필터링 파라미터 추가
+          const 상태코드 = $('#orderStatusFilter').val();
+          const orderStartDate = $('#orderStartDate').val()?.replace(/-/g, '');
+          const orderEndDate = $('#orderEndDate').val()?.replace(/-/g, '');
 
-    // API URL 구성
-    let apiUrl = '/api/orders?';
-    if (status) {
-      apiUrl += `상태코드=${status}&`;
-    }
-    if (startDate && endDate) {
-      apiUrl += `startDate=${startDate}&endDate=${endDate}&`;
-    }
+          const params = {};
 
-    table = initDataTable('orderTable', apiUrl, [
-      {
-        // 선택 체크박스
-        data: null,
-        orderable: false,
-        className: 'text-center',
-        render: function (data, type, row) {
-          return (
-            '<input type="checkbox" class="orderCheckbox" data-date="' +
-            row.발주일자 +
-            '" data-no="' +
-            row.발주번호 +
-            '" />'
-          );
-        },
-      },
-      {
-        // 순번 (역순: 가장 오래된 발주 = 1, 최신 발주 = 마지막 번호)
-        data: null,
-        orderable: false,
-        className: 'text-center',
-        render: function (data, type, row, meta) {
-          const info = table.page.info();
-          return info.recordsDisplay - meta.row;
-        },
-      },
-      {
-        // 발주번호
-        data: '발주번호',
-        className: 'text-center',
-        render: function (data, type, row) {
-          return `${row.발주일자}-${row.발주번호}`;
-        },
-      },
-      {
-        // 매입처명
-        data: '매입처명',
-        className: 'text-left',
-        render: function (data, type, row) {
-          return data || '-';
-        },
-      },
-      {
-        // 발주일자
-        data: '발주일자',
-        className: 'text-center',
-        render: function (data, type, row) {
-          if (!data) return '-';
-          // YYYYMMDD -> YYYY-MM-DD 형식 변환
-          return data.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-        },
-      },
-      {
-        // 제목
-        data: '제목',
-        className: 'text-left',
-        render: function (data, type, row) {
-          return data || '-';
-        },
-      },
-      {
-        // 발주금액
-        data: '합계금액',
-        className: 'text-right',
-        render: function (data, type, row) {
-          if (!data) return '0원';
-          return data.toLocaleString() + '원';
-        },
-      },
-      {
-        // 담당자
-        data: '사용자명',
-        className: 'text-center',
-        render: function (data, type, row) {
-          return data || '-';
-        },
-      },
-      {
-        // 상태
-        data: '상태코드',
-        className: 'text-center',
-        render: function (data, type, row) {
-          // 상태코드: 0=발주대기, 1=발주완료, 2=입고완료
-          let statusText = '대기';
-          let statusClass = 'status-pending';
-
-          if (data === 1) {
-            statusText = '발주완료';
-            statusClass = 'status-active';
-          } else if (data === 2) {
-            statusText = '입고완료';
-            statusClass = 'status-completed';
+          if (상태코드) {
+            params.상태코드 = 상태코드;
+          }
+          if (orderStartDate && orderEndDate) {
+            params.orderStartDate = orderStartDate;
+            params.orderEndDate = orderEndDate;
           }
 
-          return '<span class="status-badge ' + statusClass + '">' + statusText + '</span>';
+          return params;
+        },
+        dataSrc: function (json) {
+          // 발주 건수 업데이트
+          const countEl = document.getElementById('orderCount');
+          if (countEl && json.total !== undefined) {
+            countEl.innerText = `${json.total.toLocaleString()}`;
+          }
+
+          return json.data || [];
         },
       },
-      {
-        // 관리 버튼
-        data: null,
-        orderable: false,
-        className: 'text-center',
-        render: function (data, type, row) {
-          const orderKey = `${row.발주일자}_${row.발주번호}`;
-          return `
-            <div class="action-buttons" id="actions-${orderKey}">
-              <button class="btn-icon btn-view" onclick="viewOrderDetail('${row.발주일자}', ${row.발주번호})" title="상세보기">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editOrder('${row.발주일자}', ${row.발주번호})" title="수정">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteOrder('${row.발주일자}', ${row.발주번호})" title="삭제">삭제</button>
-            </div>
-          `;
+      columns: [
+        {
+          // 선택 체크박스
+          data: null,
+          orderable: false,
+          className: 'text-center',
+          render: function (data, type, row) {
+            return `<input type="checkbox" class="orderCheckbox" data-date="${row.발주일자}" data-no="${row.발주번호}" />`;
+          },
+        },
+        {
+          // 순번 (역순: 가장 오래된 발주 = 1, 최신 발주 = 마지막 번호)
+          data: null,
+          className: 'text-center',
+          /* render: function (data, type, row, meta) {
+            // const info = orderTable.page.info();
+            // return info.recordsDisplay - meta.row;
+          }, */
+          render: (data, type, row, meta) => meta.row + 1,
+        },
+        {
+          // 발주번호
+          data: '발주번호',
+          className: 'text-center',
+          render: function (data, type, row) {
+            return `${row.발주일자}-${row.발주번호}`;
+          },
+        },
+        {
+          // 매입처명
+          data: '매입처명',
+          className: 'text-left',
+          render: function (data, type, row) {
+            return data || '-';
+          },
+        },
+        {
+          // 발주일자
+          data: '발주일자',
+          className: 'text-center',
+          render: function (data, type, row) {
+            if (!data) return '-';
+            // YYYYMMDD -> YYYY-MM-DD 형식 변환
+            return data.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+          },
+        },
+        {
+          // 제목
+          data: '제목',
+          className: 'text-left',
+          render: function (data, type, row) {
+            return data || '-';
+          },
+        },
+        {
+          // 발주금액
+          data: '합계금액',
+          className: 'text-right',
+          render: function (data, type, row) {
+            if (!data) return '0원';
+            return data.toLocaleString() + '원';
+          },
+        },
+        {
+          // 담당자
+          data: '사용자명',
+          className: 'text-center',
+          render: function (data, type, row) {
+            return data || '-';
+          },
+        },
+        {
+          // 상태
+          data: '상태코드',
+          className: 'text-center',
+          render: function (data, type, row) {
+            // 상태코드: 0=발주대기, 1=발주완료, 2=입고완료
+            let statusText = '대기';
+            let statusClass = 'status-pending';
+
+            if (data === 1) {
+              statusText = '발주완료';
+              statusClass = 'status-active';
+            } else if (data === 2) {
+              statusText = '입고완료';
+              statusClass = 'status-completed';
+            }
+
+            return '<span class="status-badge ' + statusClass + '">' + statusText + '</span>';
+          },
+        },
+        {
+          // 관리 버튼
+          data: null,
+          orderable: false,
+          className: 'text-center',
+          render: function (data, type, row) {
+            const orderKey = `${row.발주일자}_${row.발주번호}`;
+            return `
+              <div class="action-buttons" id="actions-${orderKey}">
+                <button class="btn-icon btn-view" onclick="viewOrderDetail('${row.발주일자}', ${row.발주번호})" title="상세보기">상세</button>
+                <button class="btn-icon btn-edit" style="display: none;" onclick="editOrder('${row.발주일자}', ${row.발주번호})" title="수정">수정</button>
+                <button class="btn-icon btn-delete" style="display: none;" onclick="deleteOrder('${row.발주일자}', ${row.발주번호})" title="삭제">삭제</button>
+              </div>
+            `;
+          },
+        },
+      ],
+      language: {
+        lengthMenu: '페이지당 _MENU_ 개씩 보기',
+        zeroRecords: '발주 데이터가 없습니다',
+        info: '전체 _TOTAL_개 중 _START_-_END_개 표시',
+        infoEmpty: '데이터 없음',
+        infoFiltered: '(전체 _MAX_개 중 검색결과)',
+        search: '검색:',
+        paginate: {
+          first: '처음',
+          last: '마지막',
+          next: '다음',
+          previous: '이전',
         },
       },
-    ]);
+      order: [], // 백엔드에서 제공하는 등록 순서 유지 (최신 등록이 맨 위)
+      pageLength: 10,
+      lengthMenu: [10, 25, 50, 100],
+      responsive: true,
+      autoWidth: false,
+    });
 
     // 체크박스 전체 선택/해제
     $('#selectAllOrders')
@@ -184,20 +216,6 @@ $(document).ready(function () {
           }
         });
       });
-
-    // 총 발주 수 업데이트
-    table.on('draw', function () {
-      const info = table.page.info();
-      $('#orderCount').text(info.recordsDisplay);
-      console.log('✅ 발주 건수 업데이트:', info.recordsDisplay);
-    });
-
-    // DataTable 초기화 완료 후 건수 업데이트
-    table.on('init', function () {
-      const info = table.page.info();
-      $('#orderCount').text(info.recordsDisplay);
-      console.log('✅ 발주 DataTable 초기화 완료, 건수:', info.recordsDisplay);
-    });
   }
 
   // 개별 체크박스 이벤트 (전역으로 한 번만 등록)
@@ -252,149 +270,102 @@ async function viewOrderDetail(orderDate, orderNo) {
       발주번호: orderNo,
     };
 
-    // 마스터 정보 HTML
-    const masterHtml = `
-      <div style="background: #f9fafb; padding: 20px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #e5e7eb;">
-        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151;">기본 정보</h3>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
-          <div style="display: flex; align-items: center;">
-            <span style="font-weight: 500; color: #6b7280; min-width: 120px;">발주일자</span>
-            <span style="color: #1f2937;">${
-              master.발주일자 ? master.발주일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '-'
-            }</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            <span style="font-weight: 500; color: #6b7280; min-width: 120px;">발주번호</span>
-            <span style="color: #1f2937;">${master.발주번호 || '-'}</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            <span style="font-weight: 500; color: #6b7280; min-width: 120px;">매입처명</span>
-            <span style="color: #1f2937;">${master.매입처명 || '-'}</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            <span style="font-weight: 500; color: #6b7280; min-width: 120px;">사업자번호</span>
-            <span style="color: #1f2937;">${master.사업자번호 || '-'}</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            <span style="font-weight: 500; color: #6b7280; min-width: 120px;">입고희망일자</span>
-            <span style="color: #1f2937;">${
-              master.입고희망일자
-                ? master.입고희망일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')
-                : '-'
-            }</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            <span style="font-weight: 500; color: #6b7280; min-width: 120px;">결제방법</span>
-            <span style="color: #1f2937;">${master.결제방법 || '-'}</span>
-          </div>
-          <div style="grid-column: 1 / -1; display: flex; align-items: center;">
-            <span style="font-weight: 500; color: #6b7280; min-width: 120px;">제목</span>
-            <span style="color: #1f2937;">${master.제목 || '-'}</span>
-          </div>
-          <div style="grid-column: 1 / -1; display: flex; align-items: flex-start;">
-            <span style="font-weight: 500; color: #6b7280; min-width: 120px;">적요</span>
-            <span style="color: #1f2937; white-space: pre-wrap;">${master.적요 || '-'}</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            <span style="font-weight: 500; color: #6b7280; min-width: 120px;">상태</span>
-            ${getOrderStatusText(master.상태코드)}
-          </div>
-        </div>
-      </div>
+    // 기본 정보 표시
+    document.getElementById('orderDetailNo').textContent = `${orderDate}-${orderNo}`;
+    document.getElementById('orderDetailDate').textContent = orderDate.replace(
+      /(\d{4})(\d{2})(\d{2})/,
+      '$1-$2-$3'
+    );
+    document.getElementById('orderDetailSupplier').textContent = master.매입처명 || '-';
+    document.getElementById('orderDetailRemark').textContent = master.적요 || '-';
 
-      <div style="margin-bottom: 24px;">
-        <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #374151;">발주 품목</h3>
-        <div style="overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
-          <table style="width: 100%; border-collapse: collapse; background: white;">
-            <thead style="background: #f9fafb;">
-              <tr>
-                <th style="padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: center;">순번</th>
-                <th style="padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: left;">자재명</th>
-                <th style="padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: center;">규격</th>
-                <th style="padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: center;">단위</th>
-                <th style="padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: right;">발주량</th>
-                <th style="padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: right;">입고단가</th>
-                <th style="padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: right;">출고단가</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${
-                details.length > 0
-                  ? details
-                      .map(
-                        (item, idx) => `
-                <tr>
-                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${
-                    idx + 1
-                  }</td>
-                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${
-                    item.자재명 || '-'
-                  }</td>
-                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${
-                    item.규격 || '-'
-                  }</td>
-                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${
-                    item.단위 || '-'
-                  }</td>
-                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${(
-                    item.발주량 || 0
-                  ).toLocaleString()}</td>
-                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${(
-                    item.입고단가 || 0
-                  ).toLocaleString()}</td>
-                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${(
-                    item.출고단가 || 0
-                  ).toLocaleString()}</td>
-                </tr>
-              `,
-                      )
-                      .join('')
-                  : `
-                <tr>
-                  <td colspan="7" style="padding: 40px; text-align: center; color: #9ca3af;">
-                    발주 품목이 없습니다
-                  </td>
-                </tr>
-              `
-              }
-            </tbody>
-          </table>
-        </div>
-      </div>
+    // ✅ DataTable이 이미 초기화되어 있으면 destroy 후 재생성
+    if (window.orderDetailDataTable) {
+      window.orderDetailDataTable.destroy();
+    }
 
-      <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
-        <button onclick="closeOrderDetailModal()" style="
-          padding: 10px 20px;
-          background: #dc2626;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: background 0.2s;
-        " onmouseover="this.style.background='#b91c1c';"
-           onmouseout="this.style.background='#dc2626';">
-          ✕ 닫기
-        </button>
-        <button onclick="printOrderFromDetail()" style="
-          padding: 10px 20px;
-          background: #2563eb;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: background 0.2s;
-        " onmouseover="this.style.background='#1d4ed8';"
-           onmouseout="this.style.background='#2563eb';">
-          📄 출력
-        </button>
-      </div>
-    `;
+    // ✅ DataTable 초기화 (견적관리와 동일한 구조)
+    window.orderDetailDataTable = $('#orderDetailTable').DataTable({
+      data: details || [],
+      columns: [
+        {
+          data: '자재코드',
+          defaultContent: '-',
+        },
+        {
+          data: '자재명',
+          defaultContent: '-',
+        },
+        {
+          data: '규격',
+          defaultContent: '-',
+        },
+        {
+          data: '단위',
+          defaultContent: '-',
+        },
+        {
+          data: '발주량',
+          defaultContent: 0,
+          render: function (data) {
+            return (data || 0).toLocaleString();
+          },
+          className: 'dt-right',
+        },
+        {
+          data: '입고단가',
+          defaultContent: 0,
+          render: function (data) {
+            return (data || 0).toLocaleString();
+          },
+          className: 'dt-right',
+        },
+        {
+          data: null,
+          defaultContent: 0,
+          render: function (data, type, row) {
+            const 금액 = (row.발주량 || 0) * (row.입고단가 || 0);
+            return 금액.toLocaleString();
+          },
+          className: 'dt-right',
+        },
+      ],
+      language: {
+        lengthMenu: '페이지당 _MENU_ 개씩 보기',
+        zeroRecords: '상세 내역이 없습니다',
+        info: '전체 _TOTAL_개 중 _START_-_END_개 표시',
+        infoEmpty: '데이터 없음',
+        infoFiltered: '(전체 _MAX_개 중 검색결과)',
+        search: '검색:',
+        paginate: {
+          first: '처음',
+          last: '마지막',
+          next: '다음',
+          previous: '이전',
+        },
+      },
+      order: [],
+      pageLength: 10,
+      lengthMenu: [5, 10, 25, 50],
+      responsive: true,
+      autoWidth: false,
+      searching: true,
+      paging: true,
+      info: true,
+    });
 
-    document.getElementById('orderDetailContent').innerHTML = masterHtml;
+    console.log(`✅ 발주 상세 DataTable 초기화 완료 (${details ? details.length : 0}건)`);
+
+    // ✅ 합계 금액 계산 (발주량 * 입고단가)
+    const totalAmount = (details || []).reduce((sum, item) => {
+      return sum + (item.발주량 || 0) * (item.입고단가 || 0);
+    }, 0);
+
+    // 합계 표시
+    $('#orderDetailTotal').text(totalAmount.toLocaleString());
+    console.log(`✅ 발주 합계 금액: ${totalAmount.toLocaleString()}원`);
+
+    // 모달 표시
     document.getElementById('orderDetailModal').style.display = 'flex';
     document.getElementById('orderDetailModal').classList.remove('hidden');
 
@@ -413,8 +384,17 @@ async function viewOrderDetail(orderDate, orderNo) {
  * 발주 상세 모달 닫기
  */
 function closeOrderDetailModal() {
-  document.getElementById('orderDetailModal').style.display = 'none';
-  document.getElementById('orderDetailModal').classList.add('hidden');
+  const modal = document.getElementById('orderDetailModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+  // DataTable 정리 (메모리 누수 방지)
+  if (window.orderDetailDataTable) {
+    window.orderDetailDataTable.destroy();
+    window.orderDetailDataTable = null;
+    $('#orderDetailTable tbody').empty();
+  }
 }
 
 /**
@@ -2893,7 +2873,9 @@ function renderNewOrderDetailTable() {
     총부가세 += 부가세;
 
     // 자재코드 표시 (세부코드만)
-    const 자재코드표시 = detail.자재코드 ? detail.자재코드.substring(4) : '-';
+    // const 자재코드표시 = detail.자재코드 ? detail.자재코드.substring(4) : '-';
+
+    const 자재코드표시 = detail.자재코드 ? detail.자재코드 : '-';
 
     const row = document.createElement('tr');
     row.innerHTML = `
@@ -3012,9 +2994,9 @@ async function submitNewOrder(event) {
 }
 
 /**
- * 견적서 출력 함수
+ * 발주서 출력 함수
  * @param {string} orderDate - 발주일자 (YYYYMMDD)
- * @param {number} orderNo - 견적번호
+ * @param {number} orderNo - 발주번호
  */
 async function printOrder(orderDate, orderNo, mode = 1) {
   try {

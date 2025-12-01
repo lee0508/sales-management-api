@@ -28,6 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
       closeTransactionEditModal();
     }
   });
+
+  // ✅ 품목 수정 모달 닫기 버튼 이벤트
+  $(document).on('click', '#closeTransactionDetailEditModalBtn', () => {
+    closeTransactionDetailEditModal();
+  });
 });
 
 // ✅ 거래명세서 목록 불러오기

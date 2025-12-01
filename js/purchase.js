@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ✅ 매입전표 목록 불러오기
 async function loadPurchaseStatements() {
-  // 페이지가 표시될 때마다 날짜를 오늘 날짜(로그인 날짜)로 초기화
+  // 날짜 필드가 비어있을 때만 오늘 날짜로 초기화 (최초 1회만)
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
@@ -22,14 +22,14 @@ async function loadPurchaseStatements() {
   const endDateInput = document.getElementById('purchaseStatementEndDate');
   const createDateInput = document.getElementById('purchaseStatementCreateDate');
 
-  // 항상 오늘 날짜로 설정
-  if (startDateInput) {
+  // 값이 비어있을 때만 오늘 날짜로 설정 (사용자가 선택한 날짜 유지)
+  if (startDateInput && !startDateInput.value) {
     startDateInput.value = todayStr;
   }
-  if (endDateInput) {
+  if (endDateInput && !endDateInput.value) {
     endDateInput.value = todayStr;
   }
-  if (createDateInput) {
+  if (createDateInput && !createDateInput.value) {
     createDateInput.value = todayStr;
   }
   try {
@@ -68,7 +68,7 @@ async function loadPurchaseStatements() {
         {
           data: null,
           render: (data, type, row, meta) => meta.row + 1,
-          defaultContent: '-'
+          defaultContent: '-',
         },
         { data: '전표번호', defaultContent: '-' },
         {
@@ -132,9 +132,9 @@ async function loadPurchaseStatements() {
       pageLength: 10,
       responsive: true,
       autoWidth: false,
-      drawCallback: function(settings) {
+      drawCallback: function (settings) {
         // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
-        $('.purchaseStatementCheckbox').each(function() {
+        $('.purchaseStatementCheckbox').each(function () {
           const $checkbox = $(this);
           const purchaseDate = String($checkbox.data('date'));
           const purchaseNo = String($checkbox.data('no'));
@@ -151,7 +151,7 @@ async function loadPurchaseStatements() {
             actionDiv.find('.btn-delete').hide();
           }
         });
-      }
+      },
     });
   } catch (err) {
     console.error('❌ 매입전표 조회 에러:', err);
@@ -213,7 +213,7 @@ async function openPurchaseStatementDetailModal(statementNo) {
     document.getElementById('detailPurchaseStatementNo').textContent = statementNo;
     document.getElementById('detailPurchaseStatementDate').textContent = date.replace(
       /(\d{4})(\d{2})(\d{2})/,
-      '$1-$2-$3'
+      '$1-$2-$3',
     );
     document.getElementById('detailSupplierName').textContent = firstRow.매입처명 || '-';
     document.getElementById('detailPurchaseUserName').textContent = firstRow.사용자명 || '-';
@@ -227,7 +227,15 @@ async function openPurchaseStatementDetailModal(statementNo) {
       data: details,
       columns: [
         { data: null, render: (d, t, r, meta) => meta.row + 1 },
-        { data: '자재코드', render: (d) => (d ? d.substring(4) : '-') },
+        {
+          data: '자재코드',
+          defaultContent: '-',
+          render: (d) => {
+            if (!d) return '-';
+            // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
+            return d.length > 2 ? d.substring(2) : d;
+          },
+        },
         { data: '자재명', defaultContent: '-' },
         { data: '규격', defaultContent: '-' },
         { data: '수량', render: (d) => (d ? d.toLocaleString() : '0'), className: 'dt-right' },
@@ -308,13 +316,15 @@ function updateNewPurchaseStatementDetailsTable() {
   const tbody = document.getElementById('purchaseStatementCreateDetailTableBody');
 
   if (newPurchaseStatementDetails.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="padding: 40px; text-align: center; color: #6b7280;">자재 추가 버튼을 클릭하여 매입 상세내역을 입력하세요</td></tr>';
+    tbody.innerHTML =
+      '<tr><td colspan="9" style="padding: 40px; text-align: center; color: #6b7280;">자재 추가 버튼을 클릭하여 매입 상세내역을 입력하세요</td></tr>';
   } else {
-    tbody.innerHTML = newPurchaseStatementDetails.map((item, index) => {
-      const 공급가액 = item.수량 * item.단가;
-      const 부가세 = Math.round(공급가액 * 0.1);
+    tbody.innerHTML = newPurchaseStatementDetails
+      .map((item, index) => {
+        const 공급가액 = item.수량 * item.단가;
+        const 부가세 = Math.round(공급가액 * 0.1);
 
-      return `
+        return `
         <tr>
           <td style="padding: 12px; text-align: center;">${index + 1}</td>
           <td style="padding: 12px;">${item.자재코드.substring(4)}</td>
@@ -330,17 +340,24 @@ function updateNewPurchaseStatementDetailsTable() {
           </td>
         </tr>
       `;
-    }).join('');
+      })
+      .join('');
   }
 
   // 합계 계산
-  const totalSupply = newPurchaseStatementDetails.reduce((sum, item) => sum + (item.수량 * item.단가), 0);
+  const totalSupply = newPurchaseStatementDetails.reduce(
+    (sum, item) => sum + item.수량 * item.단가,
+    0,
+  );
   const totalVat = Math.round(totalSupply * 0.1);
   const grandTotal = totalSupply + totalVat;
 
-  document.getElementById('purchaseStatementCreateTotalSupply').textContent = totalSupply.toLocaleString();
-  document.getElementById('purchaseStatementCreateTotalVat').textContent = totalVat.toLocaleString();
-  document.getElementById('purchaseStatementCreateGrandTotal').textContent = grandTotal.toLocaleString();
+  document.getElementById('purchaseStatementCreateTotalSupply').textContent =
+    totalSupply.toLocaleString();
+  document.getElementById('purchaseStatementCreateTotalVat').textContent =
+    totalVat.toLocaleString();
+  document.getElementById('purchaseStatementCreateGrandTotal').textContent =
+    grandTotal.toLocaleString();
 }
 
 // ✅ 신규 매입전표 자재 추가 모달 열기
@@ -350,8 +367,14 @@ function openNewPurchaseStatementDetailAddModal() {
   console.log('✅ 자재 검색 모달 열기 (매입전표용)');
 
   // 드래그 기능 활성화 (최초 1회만 실행)
-  if (typeof makeModalDraggable === 'function' && !window.purchaseStatementMaterialSearchModalDraggable) {
-    makeModalDraggable('purchaseStatementMaterialSearchModal', 'purchaseStatementMaterialSearchModalHeader');
+  if (
+    typeof makeModalDraggable === 'function' &&
+    !window.purchaseStatementMaterialSearchModalDraggable
+  ) {
+    makeModalDraggable(
+      'purchaseStatementMaterialSearchModal',
+      'purchaseStatementMaterialSearchModalHeader',
+    );
     window.purchaseStatementMaterialSearchModalDraggable = true;
   }
 }
@@ -363,7 +386,9 @@ function closePurchaseStatementMaterialSearchModal() {
 
 // ✅ 자재 검색 (매입전표 작성 모달용)
 async function searchPurchaseStatementMaterials() {
-  const searchKeyword = document.getElementById('purchaseStatementMaterialSearchInput').value.trim();
+  const searchKeyword = document
+    .getElementById('purchaseStatementMaterialSearchInput')
+    .value.trim();
   if (!searchKeyword) {
     alert('검색어를 입력해주세요.');
     return;
@@ -449,7 +474,10 @@ function selectPurchaseStatementMaterial(material) {
   }
 
   window.selectedPurchaseStatementMaterial = material;
-  console.log('✅ window.selectedPurchaseStatementMaterial 저장됨:', window.selectedPurchaseStatementMaterial);
+  console.log(
+    '✅ window.selectedPurchaseStatementMaterial 저장됨:',
+    window.selectedPurchaseStatementMaterial,
+  );
 
   document.getElementById('purchaseStatementSelectedMaterialName').textContent =
     material.자재명 || '-';
@@ -532,7 +560,11 @@ function confirmPurchaseStatementDetailAdd() {
   clearSelectedPurchaseStatementMaterial();
   closePurchaseStatementMaterialSearchModal();
 
-  console.log('✅ 자재 추가 완료 (신규 등록):', material.자재명, `수량: ${quantity}, 단가: ${price}`);
+  console.log(
+    '✅ 자재 추가 완료 (신규 등록):',
+    material.자재명,
+    `수량: ${quantity}, 단가: ${price}`,
+  );
 }
 
 // ✅ 이전 단가 보기 (TODO: 구현 예정)
@@ -580,9 +612,7 @@ async function searchPurchaseStatementSuppliers() {
   try {
     const searchText = document.getElementById('purchaseStatementSupplierSearchInput').value.trim();
 
-    const response = await fetch(
-      `/api/suppliers?search=${encodeURIComponent(searchText)}`,
-    );
+    const response = await fetch(`/api/suppliers?search=${encodeURIComponent(searchText)}`);
     const result = await response.json();
 
     if (!result.success) {
@@ -610,7 +640,10 @@ async function searchPurchaseStatementSuppliers() {
         <td style="padding: 12px;">${supplier.매입처명}</td>
         <td style="padding: 12px;">${supplier.전화번호 || '-'}</td>
         <td style="padding: 12px; text-align: center;">
-          <button onclick='selectPurchaseStatementSupplier(${JSON.stringify(supplier).replace(/'/g, '&apos;')})' style="
+          <button onclick='selectPurchaseStatementSupplier(${JSON.stringify(supplier).replace(
+            /'/g,
+            '&apos;',
+          )})' style="
             padding: 6px 16px;
             background: #2563eb;
             color: white;
@@ -661,7 +694,7 @@ async function submitPurchaseStatementCreate(event) {
     return;
   }
 
-  const details = newPurchaseStatementDetails.map(item => ({
+  const details = newPurchaseStatementDetails.map((item) => ({
     자재코드: item.자재코드,
     수량: item.수량,
     단가: item.단가,
@@ -753,7 +786,9 @@ async function editPurchaseStatement(date, no) {
       window.purchaseStatementEditDetailTableInstance.destroy();
     }
 
-    window.purchaseStatementEditDetailTableInstance = $('#purchaseStatementEditDetailTable').DataTable({
+    window.purchaseStatementEditDetailTableInstance = $(
+      '#purchaseStatementEditDetailTable',
+    ).DataTable({
       data: details,
       columns: [
         {
@@ -808,7 +843,7 @@ async function editPurchaseStatement(date, no) {
           },
         },
       ],
-      order: [],  // 입력 순서대로 표시
+      order: [], // 입력 순서대로 표시
       pageLength: 10,
       language: {
         lengthMenu: '페이지당 _MENU_ 개씩 보기',
@@ -856,11 +891,12 @@ function updatePurchaseStatementEditTotal() {
   if (!window.currentEditingPurchaseStatement) return;
 
   const total = window.currentEditingPurchaseStatement.details.reduce(
-    (sum, item) => sum + ((item.수량 || 0) * (item.단가 || 0) * 1.1),
-    0
+    (sum, item) => sum + (item.수량 || 0) * (item.단가 || 0) * 1.1,
+    0,
   );
 
-  document.getElementById('purchaseStatementEditDetailTotal').textContent = Math.round(total).toLocaleString();
+  document.getElementById('purchaseStatementEditDetailTotal').textContent =
+    Math.round(total).toLocaleString();
 }
 
 // ✅ 매입전표 수정 - 자재 추가 버튼
@@ -884,7 +920,9 @@ function closePurchaseStatementDetailAddModal() {
 
 // ✅ 매입전표 수정 - 자재 검색
 async function searchPurchaseStatementEditMaterials() {
-  const searchKeyword = document.getElementById('purchaseStatementEditMaterialSearchInput').value.trim();
+  const searchKeyword = document
+    .getElementById('purchaseStatementEditMaterialSearchInput')
+    .value.trim();
   if (!searchKeyword) {
     alert('검색어를 입력해주세요.');
     return;
@@ -1032,7 +1070,9 @@ function confirmPurchaseStatementEditDetailAdd() {
 
   // DataTable 다시 로드
   window.purchaseStatementEditDetailTableInstance.clear();
-  window.purchaseStatementEditDetailTableInstance.rows.add(window.currentEditingPurchaseStatement.details);
+  window.purchaseStatementEditDetailTableInstance.rows.add(
+    window.currentEditingPurchaseStatement.details,
+  );
   window.purchaseStatementEditDetailTableInstance.draw();
 
   // 합계 업데이트
@@ -1041,7 +1081,11 @@ function confirmPurchaseStatementEditDetailAdd() {
   // 모달 닫기
   closePurchaseStatementDetailAddModal();
 
-  console.log('✅ 자재 추가 완료 (수정모달):', material.자재명, `수량: ${quantity}, 단가: ${price}`);
+  console.log(
+    '✅ 자재 추가 완료 (수정모달):',
+    material.자재명,
+    `수량: ${quantity}, 단가: ${price}`,
+  );
 }
 
 // ✅ 매입전표 수정 - 품목 수정 모달 열기
@@ -1059,8 +1103,14 @@ function editPurchaseStatementDetailRow(rowIndex) {
   document.getElementById('purchaseStatementDetailEditModal').style.display = 'flex';
 
   // 드래그 기능 활성화 (최초 1회만 실행)
-  if (typeof makeModalDraggable === 'function' && !window.purchaseStatementDetailEditModalDraggable) {
-    makeModalDraggable('purchaseStatementDetailEditModal', 'purchaseStatementDetailEditModalHeader');
+  if (
+    typeof makeModalDraggable === 'function' &&
+    !window.purchaseStatementDetailEditModalDraggable
+  ) {
+    makeModalDraggable(
+      'purchaseStatementDetailEditModal',
+      'purchaseStatementDetailEditModalHeader',
+    );
     window.purchaseStatementDetailEditModalDraggable = true;
   }
 }
@@ -1113,7 +1163,9 @@ function confirmPurchaseStatementDetailEdit() {
 
   // DataTable 다시 로드
   window.purchaseStatementEditDetailTableInstance.clear();
-  window.purchaseStatementEditDetailTableInstance.rows.add(window.currentEditingPurchaseStatement.details);
+  window.purchaseStatementEditDetailTableInstance.rows.add(
+    window.currentEditingPurchaseStatement.details,
+  );
   window.purchaseStatementEditDetailTableInstance.draw();
 
   // 합계 업데이트
@@ -1134,7 +1186,9 @@ function deletePurchaseStatementDetailRow(rowIndex) {
 
   // DataTable 다시 로드
   window.purchaseStatementEditDetailTableInstance.clear();
-  window.purchaseStatementEditDetailTableInstance.rows.add(window.currentEditingPurchaseStatement.details);
+  window.purchaseStatementEditDetailTableInstance.rows.add(
+    window.currentEditingPurchaseStatement.details,
+  );
   window.purchaseStatementEditDetailTableInstance.draw();
 
   // 합계 업데이트
@@ -1155,7 +1209,8 @@ async function submitPurchaseStatementEdit() {
     return;
   }
 
-  const { 거래일자, 거래번호, 매입처코드, 입출고구분, 적요, details } = window.currentEditingPurchaseStatement;
+  const { 거래일자, 거래번호, 매입처코드, 입출고구분, 적요, details } =
+    window.currentEditingPurchaseStatement;
 
   // 매입처코드 검증
   if (!매입처코드) {
@@ -1172,7 +1227,7 @@ async function submitPurchaseStatementEdit() {
         입출고구분: 입출고구분 || 1, // 기본: 입고
         매입처코드: 매입처코드,
         적요: 적요 || '',
-        details: details.map(item => ({
+        details: details.map((item) => ({
           자재코드: item.자재코드,
           수량: item.수량,
           단가: item.단가,
@@ -1183,12 +1238,14 @@ async function submitPurchaseStatementEdit() {
     const data = await res.json();
 
     if (data.success) {
-      alert('매입전표가 수정되었습니다.\n\n' +
-            '✅ 자재입출내역 업데이트\n' +
-            '✅ 미지급금내역 업데이트\n' +
-            '✅ 회계전표 자동 생성\n\n' +
-            `회계전표번호: ${data.data?.회계전표번호 || '생성됨'}\n` +
-            `미지급금액: ${(data.data?.미지급금지급금액 || 0).toLocaleString()}원`);
+      alert(
+        '매입전표가 수정되었습니다.\n\n' +
+          '✅ 자재입출내역 업데이트\n' +
+          '✅ 미지급금내역 업데이트\n' +
+          '✅ 회계전표 자동 생성\n\n' +
+          `회계전표번호: ${data.data?.회계전표번호 || '생성됨'}\n` +
+          `미지급금액: ${(data.data?.미지급금지급금액 || 0).toLocaleString()}원`,
+      );
       closePurchaseStatementEditModal();
       loadPurchaseStatements();
     } else {

@@ -2096,13 +2096,20 @@ app.post('/api/quotations_add', requireAuth, async (req, res) => {
                 )
             `);
 
+    // ✅ 베이스 시간 생성 (품목별 견적시간을 다르게 부여하기 위해)
+    const baseTime = new Date();
+
     // 디테일 등록
-    for (const detail of details) {
-      const 견적시간 = new Date()
-        .toISOString()
-        .replace(/[-:T]/g, '')
-        .replace(/\..+/, '')
-        .substring(8);
+    for (let index = 0; index < details.length; index++) {
+      const detail = details[index];
+
+      // ✅ 품목별로 견적시간 생성 (밀리초 증가로 입력 순서 보장)
+      const itemTime = new Date(baseTime.getTime() + index);
+      const 견적시간 =
+        itemTime.getHours().toString().padStart(2, '0') +
+        itemTime.getMinutes().toString().padStart(2, '0') +
+        itemTime.getSeconds().toString().padStart(2, '0') +
+        itemTime.getMilliseconds().toString().padStart(3, '0');
 
       await new sql.Request(transaction)
         .input('사업장코드', sql.VarChar(2), 사업장코드)
@@ -2213,13 +2220,17 @@ app.get('/api/quotations/:date/:no/details', async (req, res) => {
       .input('견적일자', sql.VarChar(8), date)
       .input('견적번호', sql.Real, parseFloat(no)).query(`
         SELECT
-          qd.*,
-          (m.분류코드 + m.세부코드) as 자재코드,
+          qd.사업장코드, qd.견적일자, qd.견적번호, qd.견적시간,
+          qd.자재코드,
+          m.분류코드,
+          m.세부코드,
           m.자재명, m.규격, m.단위,
-          s.매입처명,
-          (qd.출고단가 * qd.수량) AS 금액
+          qd.매입처코드, s.매입처명,
+          qd.수량, qd.출고단가, qd.출고부가,
+          (qd.출고단가 * qd.수량) AS 금액,
+          qd.적요, qd.상태코드, qd.사용구분
         FROM 견적내역 qd
-        LEFT JOIN 자재 m ON qd.자재코드 = (m.분류코드 + m.세부코드)
+        INNER JOIN 자재 m ON qd.자재코드 = m.분류코드 + m.세부코드
         LEFT JOIN 매입처 s ON qd.매입처코드 = s.매입처코드
         WHERE qd.견적일자 = @견적일자
           AND qd.견적번호 = @견적번호
@@ -2415,11 +2426,20 @@ app.put('/api/quotations/:date/:no/details', requireAuth, async (req, res) => {
     const now = new Date();
     const 수정일자 = now.toISOString().slice(0, 10).replace(/-/g, '');
 
+    // ✅ 베이스 시간 생성 (품목별 견적시간을 다르게 부여하기 위해)
+    const baseTime = new Date();
+
     // 새로운 내역 삽입
     for (let i = 0; i < details.length; i++) {
       const item = details[i];
-      // 견적시간은 varchar(9)이므로 9자리로 제한 (HHMMSSmmm 형식)
-      const 견적시간 = now.toISOString().replace(/[-:]/g, '').replace('T', '').slice(8, 17);
+
+      // ✅ 품목별로 견적시간 생성 (밀리초 증가로 입력 순서 보장)
+      const itemTime = new Date(baseTime.getTime() + i);
+      const 견적시간 =
+        itemTime.getHours().toString().padStart(2, '0') +
+        itemTime.getMinutes().toString().padStart(2, '0') +
+        itemTime.getSeconds().toString().padStart(2, '0') +
+        itemTime.getMilliseconds().toString().padStart(3, '0');
 
       const insertRequest = new sql.Request(transaction);
       await insertRequest
@@ -2650,7 +2670,7 @@ app.get('/api/materials/:materialCode/order-history/:supplierCode', async (req, 
 // 발주 리스트
 app.get('/api/orders', async (req, res) => {
   try {
-    const { search, 사업장코드, 상태코드, startDate, endDate } = req.query;
+    const { search, 사업장코드, 상태코드, orderStartDate, orderEndDate } = req.query;
 
     let query = `
             SELECT
@@ -2681,9 +2701,16 @@ app.get('/api/orders', async (req, res) => {
       query += ` AND o.상태코드 = @상태코드`;
     }
 
-    if (startDate && endDate) {
-      request.input('startDate', sql.VarChar(8), startDate);
-      request.input('endDate', sql.VarChar(8), endDate);
+    // 날짜 필터링 (빈 문자열이 아니고 8자리 숫자인 경우만)
+    // if (startDate && endDate && startDate.length === 8 && endDate.length === 8) {
+    //   request.input('startDate', sql.VarChar(8), startDate);
+    //   request.input('endDate', sql.VarChar(8), endDate);
+    //   query += ` AND o.발주일자 BETWEEN @startDate AND @endDate`;
+    // }
+
+    if (orderStartDate && orderEndDate) {
+      request.input('startDate', sql.VarChar(8), orderStartDate);
+      request.input('endDate', sql.VarChar(8), orderEndDate);
       query += ` AND o.발주일자 BETWEEN @startDate AND @endDate`;
     }
 
@@ -2692,7 +2719,7 @@ app.get('/api/orders', async (req, res) => {
       query += ` AND (s.매입처명 LIKE @search OR o.제목 LIKE @search)`;
     }
 
-    query += ` ORDER BY o.발주일자 DESC, o.발주번호 DESC`;
+    query += ` ORDER BY o.발주일자 ASC, o.발주번호 ASC`;
 
     const result = await request.query(query);
 
@@ -2733,6 +2760,8 @@ app.get('/api/orders/:date/:no', async (req, res) => {
                     od.발주번호,
                     od.발주시간,
                     od.자재코드,
+                    m.분류코드,
+                    m.세부코드,
                     od.매입처코드,
                     od.발주량,
                     od.입고단가,
@@ -2743,7 +2772,7 @@ app.get('/api/orders/:date/:no', async (req, res) => {
                     m.단위,
                     s.매입처명
                 FROM 발주내역 od
-                LEFT JOIN 자재 m ON od.자재코드 = (m.분류코드 + m.세부코드)
+                INNER JOIN 자재 m ON od.자재코드 = m.분류코드 + m.세부코드
                 LEFT JOIN 매입처 s ON od.매입처코드 = s.매입처코드
                 WHERE od.발주일자 = @발주일자 AND od.발주번호 = @발주번호
                 AND od.사용구분 = 0
@@ -4881,7 +4910,8 @@ app.get('/api/transactions/:date/:no', async (req, res) => {
         LEFT JOIN 사용자 u ON i.사용자코드 = u.사용자코드
         WHERE i.거래일자 = @거래일자
           AND i.거래번호 = @거래번호
-          AND i.입출고구분 = 2 
+          AND i.입출고구분 = 2
+        ORDER BY i.입출고시간 ASC   
       `);
 
     console.log('거래명세서 상세 조회 결과:', result.recordset.length, '건');
@@ -4972,18 +5002,14 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
 
     console.log(`✅ 기존 거래명세서 삭제 완료: ${거래일자}-${거래번호}`);
 
-    // 2. 현재 시간 (HHMMSS + 밀리초 3자리 = 9자)
-    const now = new Date();
-    const 입출고시간 =
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0') +
-      now.getMilliseconds().toString().padStart(3, '0');
-
     const 수정일자 = 거래일자;
 
+    // ✅ 베이스 시간 생성 (품목별 입출고시간을 다르게 부여하기 위해)
+    const baseTime = new Date();
+
     // 3. 새로운 상세내역 INSERT
-    for (const detail of details) {
+    for (let index = 0; index < details.length; index++) {
+      const detail = details[index];
       const { 분류코드, 세부코드, 수량, 단가, 매출처코드 } = detail;
 
       // 자재코드 분리
@@ -4993,6 +5019,14 @@ app.put('/api/transactions/:date/:no', requireAuth, async (req, res) => {
       const 출고수량 = 수량;
       const 출고단가 = 단가;
       const 출고부가 = Math.round(출고수량 * 출고단가 * 0.1);
+
+      // ✅ 품목별로 입출고시간 생성 (밀리초 증가로 입력 순서 보장)
+      const itemTime = new Date(baseTime.getTime() + index);
+      const 입출고시간 =
+        itemTime.getHours().toString().padStart(2, '0') +
+        itemTime.getMinutes().toString().padStart(2, '0') +
+        itemTime.getSeconds().toString().padStart(2, '0') +
+        itemTime.getMilliseconds().toString().padStart(3, '0');
 
       // ✅ CRITICAL FIX: 자재 및 자재원장 레코드 존재 확인 및 자동 생성
       // Step 1: 자재 테이블에 자재가 존재하는지 확인
@@ -5223,22 +5257,18 @@ app.post('/api/transactions', async (req, res) => {
         `);
     }
 
-    // 현재 시간 (HHMMSS + 밀리초 3자리 = 9자)
-    const now = new Date();
-    const 거래시간 =
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0') +
-      now.getMilliseconds().toString().padStart(3, '0');
-
     const 수정일자 = 거래일자;
 
     // 💰 합계금액 계산
     let 총공급가액 = 0;
     let 총부가세 = 0;
 
+    // ✅ 베이스 시간 생성 (품목별 입출고시간을 다르게 부여하기 위해)
+    const baseTime = new Date();
+
     // 각 상세내역을 자재입출내역에 INSERT
-    for (const detail of details) {
+    for (let index = 0; index < details.length; index++) {
+      const detail = details[index];
       const { 자재코드, 수량, 단가 } = detail;
 
       // 자재코드 분리 (분류코드 2자리 + 세부코드 16자리)
@@ -5252,6 +5282,14 @@ app.post('/api/transactions', async (req, res) => {
       // 합계 누적
       총공급가액 += 출고수량 * 출고단가;
       총부가세 += 출고부가;
+
+      // ✅ 품목별로 입출고시간 생성 (밀리초 증가로 입력 순서 보장)
+      const itemTime = new Date(baseTime.getTime() + index);
+      const 입출고시간 =
+        itemTime.getHours().toString().padStart(2, '0') +
+        itemTime.getMinutes().toString().padStart(2, '0') +
+        itemTime.getSeconds().toString().padStart(2, '0') +
+        itemTime.getMilliseconds().toString().padStart(3, '0');
 
       // ✅ CRITICAL FIX: 자재 및 자재원장 레코드 존재 확인 및 자동 생성
       // Step 1: 자재 테이블에 자재가 존재하는지 확인
@@ -5319,7 +5357,7 @@ app.post('/api/transactions', async (req, res) => {
         .input('세부코드', sql.VarChar(18), 세부코드)
         .input('입출고구분', sql.TinyInt, 입출고구분 || 2) // 기본: 출고
         .input('입출고일자', sql.VarChar(8), 거래일자)
-        .input('입출고시간', sql.VarChar(9), 거래시간)
+        .input('입출고시간', sql.VarChar(9), 입출고시간)
         .input('출고수량', sql.Money, 출고수량)
         .input('출고단가', sql.Money, 출고단가)
         .input('출고부가', sql.Money, 출고부가)
@@ -5351,6 +5389,13 @@ app.post('/api/transactions', async (req, res) => {
 
     // 2️⃣ 미수금내역 자동 생성 (거래일자 기준)
     const 미수금입금금액 = 총공급가액 + 총부가세;
+
+    // 거래시간 생성 (미수금내역용 - baseTime 사용)
+    const 거래시간 =
+      baseTime.getHours().toString().padStart(2, '0') +
+      baseTime.getMinutes().toString().padStart(2, '0') +
+      baseTime.getSeconds().toString().padStart(2, '0') +
+      baseTime.getMilliseconds().toString().padStart(3, '0');
 
     await new sql.Request(transaction)
       .input('사업장코드', sql.VarChar(2), 사업장코드)
@@ -6381,7 +6426,7 @@ app.get('/api/purchase-statements', async (req, res) => {
 
     query += `
       GROUP BY t.사업장코드, t.거래일자, t.거래번호, t.입출고구분, t.매입처코드, s.매입처명
-      ORDER BY t.거래일자 DESC, t.거래번호 ASC
+      ORDER BY t.거래일자 ASC, t.거래번호 ASC
     `;
 
     const result = await pool.request().query(query);
@@ -6420,7 +6465,7 @@ app.get('/api/purchase-statements/:date/:no', async (req, res) => {
         WHERE i.거래일자 = @거래일자
           AND i.거래번호 = @거래번호
           AND i.입출고구분 = 1
-        ORDER BY m.자재명
+        ORDER BY i.입출고시간
       `);
 
     console.log('매입전표 상세 조회 결과:', result.recordset.length, '건');
@@ -6600,13 +6645,8 @@ app.post('/api/purchase-statements', async (req, res) => {
         `);
     }
 
-    // 현재 시간
-    const now = new Date();
-    const 거래시간 =
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0') +
-      now.getMilliseconds().toString().padStart(3, '0');
+    // ✅ 베이스 시간 생성 (품목별 입출고시간을 다르게 부여하기 위해)
+    const baseTime = new Date();
 
     const 수정일자 = 거래일자;
 
@@ -6615,7 +6655,8 @@ app.post('/api/purchase-statements', async (req, res) => {
     let 총부가세 = 0;
 
     // 1️⃣ 각 상세내역을 자재입출내역에 INSERT
-    for (const detail of details) {
+    for (let index = 0; index < details.length; index++) {
+      const detail = details[index];
       const { 자재코드, 수량, 단가 } = detail;
 
       const 분류코드 = 자재코드.substring(0, 2);
@@ -6629,13 +6670,21 @@ app.post('/api/purchase-statements', async (req, res) => {
       총공급가액 += 입고수량 * 입고단가;
       총부가세 += 입고부가;
 
+      // ✅ 품목별로 입출고시간 생성 (밀리초 증가로 입력 순서 보장)
+      const itemTime = new Date(baseTime.getTime() + index);
+      const 입출고시간 =
+        itemTime.getHours().toString().padStart(2, '0') +
+        itemTime.getMinutes().toString().padStart(2, '0') +
+        itemTime.getSeconds().toString().padStart(2, '0') +
+        itemTime.getMilliseconds().toString().padStart(3, '0');
+
       await new sql.Request(transaction)
         .input('사업장코드', sql.VarChar(2), 사업장코드)
         .input('분류코드', sql.VarChar(2), 분류코드)
         .input('세부코드', sql.VarChar(18), 세부코드)
         .input('입출고구분', sql.TinyInt, 입출고구분 || 1) // 기본: 입고
         .input('입출고일자', sql.VarChar(8), 거래일자)
-        .input('입출고시간', sql.VarChar(9), 거래시간)
+        .input('입출고시간', sql.VarChar(9), 입출고시간)
         .input('입고수량', sql.Money, 입고수량)
         .input('입고단가', sql.Money, 입고단가)
         .input('입고부가', sql.Money, 입고부가)
@@ -6667,6 +6716,13 @@ app.post('/api/purchase-statements', async (req, res) => {
 
     // 2️⃣ 미지급금내역 자동 생성 (거래일자 기준)
     const 미지급금지급금액 = 총공급가액 + 총부가세;
+
+    // 거래시간 생성 (미지급금내역용)
+    const 거래시간 =
+      baseTime.getHours().toString().padStart(2, '0') +
+      baseTime.getMinutes().toString().padStart(2, '0') +
+      baseTime.getSeconds().toString().padStart(2, '0') +
+      baseTime.getMilliseconds().toString().padStart(3, '0');
 
     await new sql.Request(transaction)
       .input('사업장코드', sql.VarChar(2), 사업장코드)
@@ -6835,13 +6891,8 @@ app.put('/api/purchase-statements/:date/:no', requireAuth, async (req, res) => {
 
     console.log(`✅ 기존 회계전표 삭제 완료: ${거래일자}-${거래번호}`);
 
-    // 4️⃣ 현재 시간
-    const now = new Date();
-    const 입출고시간 =
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0') +
-      now.getMilliseconds().toString().padStart(3, '0');
+    // 4️⃣ 베이스 시간 생성 (품목별 입출고시간을 다르게 부여하기 위해)
+    const baseTime = new Date();
 
     const 수정일자 = 거래일자;
 
@@ -6850,7 +6901,8 @@ app.put('/api/purchase-statements/:date/:no', requireAuth, async (req, res) => {
     let 총부가세 = 0;
 
     // 5️⃣ 새로운 자재입출내역 INSERT
-    for (const detail of details) {
+    for (let index = 0; index < details.length; index++) {
+      const detail = details[index];
       const { 자재코드, 수량, 단가 } = detail;
 
       const 분류코드 = 자재코드.substring(0, 2);
@@ -6863,6 +6915,14 @@ app.put('/api/purchase-statements/:date/:no', requireAuth, async (req, res) => {
       // 합계 누적
       총공급가액 += 입고수량 * 입고단가;
       총부가세 += 입고부가;
+
+      // ✅ 품목별로 입출고시간 생성 (밀리초 증가로 입력 순서 보장)
+      const itemTime = new Date(baseTime.getTime() + index);
+      const 입출고시간 =
+        itemTime.getHours().toString().padStart(2, '0') +
+        itemTime.getMinutes().toString().padStart(2, '0') +
+        itemTime.getSeconds().toString().padStart(2, '0') +
+        itemTime.getMilliseconds().toString().padStart(3, '0');
 
       await new sql.Request(transaction)
         .input('사업장코드', sql.VarChar(2), 사업장코드)
@@ -6903,11 +6963,18 @@ app.put('/api/purchase-statements/:date/:no', requireAuth, async (req, res) => {
     // 6️⃣ 미지급금내역 재생성
     const 미지급금지급금액 = 총공급가액 + 총부가세;
 
+    // 미지급금 시간 생성 (자재입출내역용 baseTime과 동일)
+    const 거래시간 =
+      baseTime.getHours().toString().padStart(2, '0') +
+      baseTime.getMinutes().toString().padStart(2, '0') +
+      baseTime.getSeconds().toString().padStart(2, '0') +
+      baseTime.getMilliseconds().toString().padStart(3, '0');
+
     await new sql.Request(transaction)
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('매입처코드', sql.VarChar(8), 매입처코드)
       .input('미지급금지급일자', sql.VarChar(8), 거래일자)
-      .input('미지급금지급시간', sql.VarChar(9), 입출고시간)
+      .input('미지급금지급시간', sql.VarChar(9), 거래시간)
       .input('미지급금지급금액', sql.Money, 미지급금지급금액)
       .input('결제방법', sql.VarChar(10), '')
       .input('만기일자', sql.VarChar(8), '')

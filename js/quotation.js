@@ -233,11 +233,13 @@ $(document).ready(function () {
         // 2. 순번 (역순: 가장 오래된 데이터 = 1, 최신 데이터 = 마지막 번호)
         {
           data: null,
-          render: function (data, type, row, meta) {
+          className: 'dt-center',
+          /* render: function (data, type, row, meta) {
             const table = $('#quotationTable').DataTable();
             const info = table.page.info();
             return info.recordsDisplay - meta.row;
-          },
+          }, */
+          render: (data, type, row, meta) => meta.row + 1,
         },
         // 3. 견적번호 (일자-번호)
         {
@@ -445,7 +447,7 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
           previous: '이전',
         },
       },
-      order: [[0, 'asc']], // 자재코드 오름차순
+      order: [], // 자재코드 오름차순
       pageLength: 10,
       lengthMenu: [5, 10, 25, 50],
       responsive: true,

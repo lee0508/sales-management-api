@@ -24,13 +24,14 @@ function initMaterialHistoryTable() {
         className: 'dt-center',
         width: '40px',
         render: function (data, type, row) {
-          return `<input type="checkbox" class="material-checkbox" data-code="${row.세부코드}" />`;
+          return `<input type="checkbox" class="material-checkbox" data-code="${
+            row.분류코드 + row.세부코드
+          }" />`;
         },
       },
       {
         data: null,
         className: 'dt-center',
-        width: '60px',
         render: (data, type, row, meta) => meta.row + 1,
       },
       {
@@ -44,7 +45,7 @@ function initMaterialHistoryTable() {
         },
       },
       {
-        data: '자재코드',
+        data: '세부코드',
         render: (data) => {
           // 자재코드에서 사업장코드 + 분류코드 제거하고 순수 세부코드만 표시
           // if (data && data.length >= 2) {
@@ -95,35 +96,38 @@ function initMaterialHistoryTable() {
         orderable: false,
         width: '200px',
         render: function (data, type, row) {
+          const 자재코드 = row.분류코드 + row.세부코드;
+          const uniqueId = `material-history-actions-${자재코드}`;
+
           // 삭제된 자재는 상세 버튼만 표시
           if (row.사용구분 === 9) {
             return `
-              <button class="btn-detail" onclick="viewMaterialDetail('${
-                row.분류코드 + row.세부코드
-              }')"
-                      style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
-                상세
-              </button>
-              <span style="color: #999; font-size: 12px; margin-left: 8px;">삭제된 자재</span>
+              <div id="${uniqueId}" style="display: flex; gap: 4px; justify-content: center; align-items: center;">
+                <button class="btn-detail" onclick="viewMaterialDetail('${자재코드}')"
+                        style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
+                  상세
+                </button>
+                <span style="color: #999; font-size: 12px; margin-left: 8px;">삭제된 자재</span>
+              </div>
             `;
           }
 
-          // 정상 자재는 모든 버튼 표시
+          // 정상 자재 - 기본적으로 상세 버튼만 표시, 수정/삭제는 숨김
           return `
-            <button class="btn-detail" onclick="viewMaterialDetail('${
-              row.분류코드 + row.세부코드
-            }')"
-                    style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; margin-right: 4px;">
-              상세
-            </button>
-            <button class="btn-edit" onclick="editMaterial('${row.분류코드 + row.세부코드}')"
-                    style="padding: 6px 12px; background: #ffc107; color: #333; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; margin-right: 4px;">
-              수정
-            </button>
-            <button class="btn-delete" onclick="deleteMaterial('${row.분류코드 + row.세부코드}')"
-                    style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
-              삭제
-            </button>
+            <div id="${uniqueId}" style="display: flex; gap: 4px; justify-content: center;">
+              <button class="btn-detail" onclick="viewMaterialDetail('${자재코드}')"
+                      style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
+                상세
+              </button>
+              <button class="btn-edit" onclick="editMaterial('${자재코드}')"
+                      style="padding: 6px 12px; background: #ffc107; color: #333; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; display: none;">
+                수정
+              </button>
+              <button class="btn-delete" onclick="deleteMaterial('${자재코드}')"
+                      style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; display: none;">
+                삭제
+              </button>
+            </div>
           `;
         },
       },
@@ -155,9 +159,64 @@ function initMaterialHistoryTable() {
   $('#selectAllMaterials').on('change', function () {
     const isChecked = $(this).prop('checked');
     $('.material-checkbox').prop('checked', isChecked);
+    updateMaterialHistoryButtonStates();
+  });
+
+  // 개별 체크박스 변경 이벤트
+  $('#materialHistoryTable tbody').on('change', '.material-checkbox', function () {
+    updateMaterialHistoryButtonStates();
   });
 
   console.log('✅ 자재 목록 DataTable 초기화 완료');
+}
+
+/**
+ * 체크박스 상태에 따라 버튼 표시/숨김 처리
+ */
+function updateMaterialHistoryButtonStates() {
+  console.log('🔍 updateMaterialHistoryButtonStates 호출됨');
+
+  const checkboxes = document.querySelectorAll('.material-checkbox');
+  const checkedCount = Array.from(checkboxes).filter((cb) => cb.checked).length;
+
+  console.log(`체크된 항목 수: ${checkedCount}`);
+
+  checkboxes.forEach((checkbox, index) => {
+    const isChecked = checkbox.checked;
+    const fullCode = checkbox.getAttribute('data-code'); // 이미 분류코드+세부코드 형태
+    const actionsDivId = `material-history-actions-${fullCode}`;
+    const actionsDiv = document.getElementById(actionsDivId);
+
+    console.log(
+      `체크박스 index=${index}, checked=${isChecked}, actionsDivId=${actionsDivId}, found=${!!actionsDiv}`,
+    );
+
+    if (actionsDiv) {
+      const detailBtn = actionsDiv.querySelector('.btn-detail');
+      const editBtn = actionsDiv.querySelector('.btn-edit');
+      const deleteBtn = actionsDiv.querySelector('.btn-delete');
+
+      console.log(
+        `  버튼 찾기: detailBtn=${!!detailBtn}, editBtn=${!!editBtn}, deleteBtn=${!!deleteBtn}`,
+      );
+
+      if (detailBtn && editBtn && deleteBtn) {
+        if (isChecked && checkedCount === 1) {
+          // 1개만 체크된 경우 → 상세 버튼 숨김, 수정/삭제 버튼 표시
+          detailBtn.style.display = 'none';
+          editBtn.style.display = 'inline-block';
+          deleteBtn.style.display = 'inline-block';
+          console.log('  ✅ 수정/삭제 버튼 표시, 상세 버튼 숨김');
+        } else {
+          // 체크 안됨 또는 2개 이상 체크된 경우 → 상세 버튼만 표시
+          detailBtn.style.display = 'inline-block';
+          editBtn.style.display = 'none';
+          deleteBtn.style.display = 'none';
+          console.log('  ✅ 상세 버튼만 표시');
+        }
+      }
+    }
+  });
 }
 
 /**
@@ -201,24 +260,24 @@ async function loadMaterialList(searchKeyword = '') {
 /**
  * 검색 기능
  */
-function searchMaterialHistory() {
+window.searchMaterialHistory = function searchMaterialHistory() {
   const keyword = document.getElementById('historyListSearchInput').value.trim();
   loadMaterialList(keyword);
-}
+};
 
 /**
  * 검색 초기화
  */
-function resetHistorySearch() {
+window.resetHistorySearch = function resetHistorySearch() {
   document.getElementById('historyListSearchInput').value = '';
   materialHistoryTableInstance.clear().draw();
   console.log('🔄 검색 초기화 완료');
-}
+};
 
 /**
  * 신규 자재 등록 모달 열기
  */
-function openNewHistoryModal() {
+window.openNewHistoryModal = function openNewHistoryModal() {
   // 모달 제목 설정
   const titleElement = document.getElementById('historyModalTitle');
   if (titleElement) {
@@ -236,7 +295,7 @@ function openNewHistoryModal() {
 
   // 모달 표시
   document.getElementById('historyModal').style.display = 'flex';
-}
+};
 
 /**
  * 자재 저장 (신규 등록)
@@ -298,7 +357,7 @@ async function saveMaterial() {
 /**
  * 자재 수정 모달 열기
  */
-async function editMaterial(자재코드) {
+window.editMaterial = async function editMaterial(자재코드) {
   try {
     console.log('✏️ 자재 수정 모달 열기:', 자재코드);
 
@@ -350,7 +409,7 @@ async function editMaterial(자재코드) {
     console.error('❌ 자재 수정 모달 열기 에러:', error);
     alert('자재 정보 조회 중 오류가 발생했습니다.');
   }
-}
+};
 
 /**
  * 자재 업데이트
@@ -408,7 +467,7 @@ async function updateMaterial(자재코드) {
 /**
  * 자재 삭제
  */
-async function deleteMaterial(자재코드) {
+window.deleteMaterial = async function deleteMaterial(자재코드) {
   // 삭제할 자재 정보 표시
   const deleteInfo = document.getElementById('historyDeleteInfo');
   deleteInfo.innerHTML = `
@@ -425,20 +484,20 @@ async function deleteMaterial(자재코드) {
 
   // 모달창 표시
   document.getElementById('historyDeleteModal').style.display = 'flex';
-}
+};
 
 /**
  * 삭제 모달 닫기
  */
-function closeHistoryDeleteModal() {
+window.closeHistoryDeleteModal = function closeHistoryDeleteModal() {
   document.getElementById('historyDeleteModal').style.display = 'none';
   window.materialToDelete = null;
-}
+};
 
 /**
  * 삭제 확인 처리
  */
-async function confirmDeleteHistory() {
+window.confirmDeleteHistory = async function confirmDeleteHistory() {
   if (!window.materialToDelete) {
     return;
   }
@@ -464,12 +523,12 @@ async function confirmDeleteHistory() {
     console.error('❌ 자재 삭제 에러:', error);
     alert('자재 삭제 중 오류가 발생했습니다.');
   }
-}
+};
 
 /**
  * 자재 상세보기 모달 열기
  */
-async function viewMaterialDetail(자재코드) {
+window.viewMaterialDetail = async function viewMaterialDetail(자재코드) {
   try {
     console.log('🔍 자재 상세보기:', 자재코드);
 
@@ -493,7 +552,7 @@ async function viewMaterialDetail(자재코드) {
     console.error('❌ 자재 상세보기 에러:', error);
     alert('자재 상세 정보 조회 중 오류가 발생했습니다.');
   }
-}
+};
 
 /**
  * 자재 상세 정보 모달 표시
@@ -669,26 +728,26 @@ function displayMaterialDetailModal(data) {
 /**
  * 상세보기 모달 닫기
  */
-function closeHistoryDetailModal() {
+window.closeHistoryDetailModal = function closeHistoryDetailModal() {
   document.getElementById('historyDetailModal').style.display = 'none';
-}
+};
 
 /**
  * 등록/수정 모달 닫기
  */
-function closeHistoryModal() {
+window.closeHistoryModal = function closeHistoryModal() {
   document.getElementById('historyModal').style.display = 'none';
   document.getElementById('historyForm').reset();
 
   // readOnly 속성 제거
   document.getElementById('history분류코드').readOnly = false;
   document.getElementById('history세부코드').readOnly = false;
-}
+};
 
 /**
  * Google Sheets 내보내기
  */
-function exportHistoryToGoogleSheets() {
+window.exportHistoryToGoogleSheets = function exportHistoryToGoogleSheets() {
   try {
     console.log('===== Google Sheets로 내보내기 시작 =====');
 
@@ -750,15 +809,18 @@ function exportHistoryToGoogleSheets() {
     console.error('❌ CSV 내보내기 에러:', error);
     alert('CSV 내보내기 중 오류가 발생했습니다.');
   }
-}
+};
 
 // formatDate, formatNumber, formatCurrencyKRW 함수는 common.js에서 정의됨
 
 /**
  * formatCurrency는 common.js의 formatCurrencyKRW를 사용
  * (material-history.js에서는 "원" 단위가 필요하므로 별칭 사용)
+ * Note: formatCurrency가 common.js에서 이미 정의되어 있으면 그것을 사용
  */
-const formatCurrency = formatCurrencyKRW;
+if (typeof formatCurrency === 'undefined') {
+  window.formatCurrency = formatCurrencyKRW;
+}
 
 // 페이지 로드 시 DataTable 초기화
 $(document).ready(function () {
