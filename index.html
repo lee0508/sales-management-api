@@ -20,28 +20,28 @@
   <script src="js/dataTableInit.js" defer></script>
   <script src="js/modal-draggable.js" defer></script>
 
-  <script src="js/customer.js?v=251211_datatable" defer></script>
+  <script src="js/customer.js?v=251211_fix8" defer></script>
   <script src="js/account.js" defer></script>
-  <script src="js/supplier.js?v=251211_datatable" defer></script>
+  <script src="js/supplier.js?v=251211_fix4" defer></script>
   <script src="js/quotation.js?v=251211_datatable" defer></script>
-  <script src="js/order.js?v=251211_datatable" defer></script>
+  <script src="js/order.js?v=251211_fix1" defer></script>
   <script src="js/postoffice.js?v=1031M" defer></script>
   <!-- print.js를 transaction.js, quotation.js보다 먼저 로드하여 각 모듈의 인쇄 함수를 덮어쓸 수 있도록 함 -->
   <script src="js/print.js?v=1114.js" defer></script>
-  <script src="js/transaction.js?v=1113_v2" defer></script>
+  <script src="js/transaction.js?v=251211_fix13" defer></script>
   <script src="js/cash-history.js" defer></script>
   <script src="js/trial-balance.js" defer></script>
   <script src="js/balance-sheet.js" defer></script>
   <script src="js/transaction-price-history.js?v=1101" defer></script>
   <script src="js/purchase.js?v=1031M" defer></script>
-  <script src="js/material-history.js?v=1101" defer></script>
+  <script src="js/material-history.js?v=251211_fix3" defer></script>
   <script src="js/material-inventory.js?v=1101" defer></script>
   <script src="js/material-category.js?v=1101" defer></script>
   <script src="js/taxinvoice.js?v=1113_v4" defer></script>
   <script src="js/accounts-payable.js" defer></script>
   <script src="js/accounts-receivable.js" defer></script>
 
-  <link rel="stylesheet" href="css/onstyles.css?v=5" />
+  <link rel="stylesheet" href="css/onstyles.css?v=251211_fix12" />
   <!-- <link rel="stylesheet" href="css/shadcn-ui.css" /> -->
   <!-- <link rel="stylesheet" href="css/default.css" /> -->
 </head>
@@ -650,9 +650,9 @@
         </div>
 
         <!-- ========================= -->
-        <!-- 매출처 조회 모달 수정 버튼-->
+        <!-- 매출처 조회 모달 (견적서 등에서 사용)-->
         <!-- ========================= -->
-        <div id="customerModal" class="modal hidden">
+        <div id="customerSearchModal" class="modal hidden">
           <div class="modal-content">
             <h3>매출처 조회</h3>
             <input type="text" id="customerSearchSimple" placeholder="매출처명 검색..." />
@@ -674,7 +674,7 @@
               </tbody>
             </table>
             <div style="text-align: right">
-              <button class="btn btn-secondary" onclick="closeCustomerModal()">닫기</button>
+              <button class="btn btn-secondary" onclick="closeCustomerSearchModal()">닫기</button>
             </div>
           </div>
         </div>
@@ -840,7 +840,7 @@
           </div>
         </div>
 
-        <!-- 매출처 신규등록 모달 -->
+        <!-- 매출처 신규등록/수정 모달 (공용) -->
         <div id="customerModal" style="
               display: none;
               position: fixed;
@@ -909,7 +909,7 @@
                       border: 2px solid var(--border);
                       border-radius: 8px;
                       font-size: 14px;
-                    " placeholder="자동생성" />
+                    " placeholder="매출처코드를 입력하세요" />
               </div>
 
               <!-- 2. 매출처명 (전체 너비) -->
@@ -4403,12 +4403,13 @@
                 <tbody></tbody>
                 <tfoot>
                   <tr style="background: #f9fafb; font-weight: bold">
-                    <td colspan="10" style="text-align: right; padding-right: 20px; color: #1f2937">
+                    <td colspan="8" style="text-align: right; padding-right: 20px; color: #1f2937">
                       합계
                     </td>
                     <td id="transactionEditDetailTotal" style="text-align: right; color: #2563eb; font-size: 16px">
                       0
                     </td>
+                    <td></td>
                   </tr>
                 </tfoot>
               </table>
@@ -13249,12 +13250,12 @@
         setLoginDateToToday();
       }
 
-      const customerModal = document.getElementById('customerModal');
+      const customerSearchModal = document.getElementById('customerSearchModal');
       const supplierModal = document.getElementById('supplierModal');
 
-      if (customerModal && customerModal.parentElement !== document.body) {
-        document.body.appendChild(customerModal);
-        console.log('✅ 매출처 모달을 body로 이동 완료');
+      if (customerSearchModal && customerSearchModal.parentElement !== document.body) {
+        document.body.appendChild(customerSearchModal);
+        console.log('✅ 매출처 검색 모달을 body로 이동 완료');
       }
 
       if (supplierModal && supplierModal.parentElement !== document.body) {
@@ -13687,7 +13688,7 @@
     // 오늘의 발주서 로드
     async function loadTodayOrders(today) {
       try {
-        const result = await apiCall(`/orders?startDate=${today}&endDate=${today}`);
+        const result = await apiCall(`/orders?orderStartDate=${today}&orderEndDate=${today}`);
         const countEl = document.getElementById('todayOrderCount');
 
         // 기존 DataTable 파괴
@@ -14439,7 +14440,7 @@
       }
     }
 
-    // 매출처 모달 닫기
+    // 매출처 모달 닫기 (신규/수정 공용)
     function closeCustomerModal() {
       const modal = document.getElementById('customerModal');
       if (modal) {
@@ -14604,9 +14605,9 @@
           modalTitle.textContent = '매출처 신규등록';
         }
 
-        // 5. 자동 생성된 매출처코드 설정
+        // 5. 자동 생성된 매출처코드 설정 (사용자 수정 가능)
         document.getElementById('customerCode').value = newCustomerCode;
-        document.getElementById('customerCode').readOnly = true;
+        document.getElementById('customerCode').readOnly = false;
 
         // 6. 모달 표시
         modal.style.display = 'flex';

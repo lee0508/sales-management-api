@@ -7,10 +7,10 @@ $(document).ready(function () {
     // 기존 인스턴스가 있으면 파괴 후 재생성
     if (table) table.destroy();
 
-    // API URL에 검색 파라미터 추가
-    let apiUrl = API_BASE_URL + '/suppliers';
+    // API URL에 검색 파라미터 추가 (pageSize=10000으로 전체 데이터 조회)
+    let apiUrl = API_BASE_URL + '/suppliers?pageSize=10000';
     if (searchKeyword) {
-      apiUrl += `?search=${encodeURIComponent(searchKeyword)}`;
+      apiUrl += `&search=${encodeURIComponent(searchKeyword)}`;
     }
 
     // ✅ 공통 초기화 함수 사용 (dataTableInit.js)
@@ -90,6 +90,31 @@ $(document).ready(function () {
         },
       },
     ]);
+
+    // ✅ DataTable이 다시 그려질 때마다 전체선택 상태 동기화
+    table.on('draw', function() {
+      const isSelectAllChecked = $('#selectAllSuppliers').prop('checked');
+
+      // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
+      $('.supplierCheckbox').prop('checked', isSelectAllChecked);
+
+      // 각 체크박스 상태에 따라 버튼 표시/숨김 처리
+      $('.supplierCheckbox').each(function() {
+        const supplierCode = $(this).data('code');
+        const isChecked = $(this).prop('checked');
+        const actionDiv = $('#supplier-actions-' + supplierCode);
+
+        if (isChecked) {
+          actionDiv.find('.btn-view').hide();
+          actionDiv.find('.btn-edit').show();
+          actionDiv.find('.btn-delete').show();
+        } else {
+          actionDiv.find('.btn-view').show();
+          actionDiv.find('.btn-edit').hide();
+          actionDiv.find('.btn-delete').hide();
+        }
+      });
+    });
   }
 
   // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)

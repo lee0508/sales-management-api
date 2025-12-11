@@ -11,10 +11,10 @@ $(document).ready(function () {
     // 기존 인스턴스가 있으면 파괴 후 재생성
     if (table) table.destroy();
 
-    // API URL에 검색 파라미터 추가
-    let apiUrl = API_BASE_URL + '/customers';
+    // API URL에 검색 파라미터 추가 (pageSize=10000으로 전체 데이터 조회)
+    let apiUrl = API_BASE_URL + '/customers?pageSize=10000';
     if (searchKeyword) {
-      apiUrl += `?search=${encodeURIComponent(searchKeyword)}`;
+      apiUrl += `&search=${encodeURIComponent(searchKeyword)}`;
     }
 
     // ✅ 공통 초기화 함수 사용 (dataTableInit.js) — server.js의 {data:[...]} 스키마와 호환
@@ -94,6 +94,31 @@ $(document).ready(function () {
         },
       },
     ]);
+
+    // ✅ DataTable이 다시 그려질 때마다 전체선택 상태 동기화
+    table.on('draw', function() {
+      const isSelectAllChecked = $('#selectAllCustomers').prop('checked');
+
+      // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
+      $('.customerCheckbox').prop('checked', isSelectAllChecked);
+
+      // 각 체크박스 상태에 따라 버튼 표시/숨김 처리
+      $('.customerCheckbox').each(function() {
+        const customerCode = $(this).data('code');
+        const isChecked = $(this).prop('checked');
+        const actionDiv = $('#actions-' + customerCode);
+
+        if (isChecked) {
+          actionDiv.find('.btn-view').hide();
+          actionDiv.find('.btn-edit').show();
+          actionDiv.find('.btn-delete').show();
+        } else {
+          actionDiv.find('.btn-view').show();
+          actionDiv.find('.btn-edit').hide();
+          actionDiv.find('.btn-delete').hide();
+        }
+      });
+    });
   }
 
   // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
@@ -269,7 +294,7 @@ $(document).ready(function () {
 
       const data = result.data;
 
-      // 2. 모달 열기
+      // 2. 모달 열기 (신규/수정 공용 모달)
       const modal = document.getElementById('customerModal');
       if (!modal) {
         console.error('매출처 모달을 찾을 수 없습니다.');
@@ -284,6 +309,7 @@ $(document).ready(function () {
 
       // 4. 폼 필드에 데이터 채우기
       document.getElementById('customerCode').value = data.매출처코드;
+      document.getElementById('customerCode').readOnly = true; // 수정 시에는 코드 변경 불가
       document.getElementById('customerName').value = data.매출처명 || '';
       document.getElementById('ceoName').value = data.대표자명 || '';
       document.getElementById('businessNo').value = data.사업자번호 || '';
@@ -374,7 +400,7 @@ $(document).ready(function () {
     }
   };
 
-  // 매출처 모달 닫기
+  // 매출처 모달 닫기 (신규/수정 공용)
   window.closeCustomerModal = function () {
     const modal = document.getElementById('customerModal');
     if (modal) {
@@ -391,6 +417,14 @@ $(document).ready(function () {
       if (modalTitle) {
         modalTitle.textContent = '매출처 신규등록';
       }
+    }
+  };
+
+  // 매출처 검색 모달 닫기 (견적서 등에서 사용)
+  window.closeCustomerSearchModal = function () {
+    const modal = document.getElementById('customerSearchModal');
+    if (modal) {
+      modal.style.display = 'none';
     }
   };
 
@@ -535,9 +569,9 @@ $(document).ready(function () {
         modalTitle.textContent = '매출처 신규등록';
       }
 
-      // 5. 자동 생성된 매출처코드 설정
+      // 5. 자동 생성된 매출처코드 설정 (사용자 수정 가능)
       document.getElementById('customerCode').value = newCustomerCode;
-      document.getElementById('customerCode').readOnly = true;
+      document.getElementById('customerCode').readOnly = false;
 
       // 6. 모달 표시
       modal.style.display = 'flex';

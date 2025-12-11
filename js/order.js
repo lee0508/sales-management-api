@@ -2158,11 +2158,13 @@ function closeOrderDeleteModal() {
 /**
  * 필터링 (상태, 날짜 범위) - 조회 버튼 클릭 시
  */
-function filterOrders() {
+window.filterOrders = function filterOrders() {
   if (orderListTableInstance) {
     orderListTableInstance.ajax.reload();
+  } else {
+    console.warn('⚠️ orderListTableInstance가 초기화되지 않았습니다.');
   }
-}
+};
 
 /**
  * Google Sheets로 내보내기 (임시)

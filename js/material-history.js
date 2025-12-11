@@ -155,6 +155,17 @@ function initMaterialHistoryTable() {
     // dom: '<"top d-flex justify-content-between"<"left"l><"right"f>>rt<"bottom"ip>',
   });
 
+  // ✅ DataTable이 다시 그려질 때마다 전체선택 상태 동기화
+  materialHistoryTableInstance.on('draw', function() {
+    const isSelectAllChecked = $('#selectAllMaterials').prop('checked');
+
+    // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
+    $('.material-checkbox').prop('checked', isSelectAllChecked);
+
+    // 버튼 상태 업데이트
+    updateMaterialHistoryButtonStates();
+  });
+
   // 체크박스 전체 선택/해제
   $('#selectAllMaterials').on('change', function () {
     const isChecked = $(this).prop('checked');

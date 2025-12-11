@@ -2,7 +2,7 @@
 // 최초 1회만 호출
 
 let transactionTableInstance = null;
-let isSelectAllMode = false; // 전체선택 모드 플래그
+let isTransactionSelectAllMode = false; // 전체선택 모드 플래그
 
 function initTransactionDates() {
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -203,9 +203,9 @@ async function loadTransactions() {
         console.log(`✅ 체크 상태: ${isChecked ? '전체 선택' : '전체 해제'}`);
 
         // 전체선택 모드 플래그 설정
-        isSelectAllMode = true;
+        isTransactionSelectAllMode = true;
         $('.transactionCheckbox').prop('checked', isChecked).trigger('change');
-        isSelectAllMode = false;
+        isTransactionSelectAllMode = false;
 
         console.log('✅ 전체선택 처리 완료');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -225,10 +225,10 @@ async function loadTransactions() {
         console.log(`📅 거래일자: ${transactionDate}`);
         console.log(`🔢 거래번호: ${transactionNo}`);
         console.log(`✅ 체크 상태: ${isChecked ? '선택됨' : '해제됨'}`);
-        console.log(`🎯 전체선택 모드: ${isSelectAllMode ? 'ON' : 'OFF'}`);
+        console.log(`🎯 전체선택 모드: ${isTransactionSelectAllMode ? 'ON' : 'OFF'}`);
 
         // 개별 선택 모드일 때만 단일 선택 로직 실행
-        if (!isSelectAllMode && isChecked) {
+        if (!isTransactionSelectAllMode && isChecked) {
           // 체크된 경우: 다른 모든 체크박스 해제
           console.log('🔄 개별 선택 모드 - 다른 체크박스 해제 시작');
 
@@ -312,7 +312,7 @@ function renderTransactionStatus(statusCode) {
 }
 
 // ✅ 필터 적용 (상태 + 기간)
-function filterTransactions() {
+window.filterTransactions = function filterTransactions() {
   loadTransactions();
 }
 
@@ -439,7 +439,7 @@ async function openTransactionDetailModal(transactionNo) {
 let newTransactionDetails = [];
 
 // ✅ 거래명세서 작성 모달 열기
-function openNewTransactionModal() {
+window.openNewTransactionModal = function openNewTransactionModal() {
   // 폼 초기화
   document.getElementById('transactionCreateForm').reset();
 
@@ -488,7 +488,7 @@ function openNewTransactionModal() {
 }
 
 // ✅ 거래명세서 작성 모달 닫기
-function closeTransactionCreateModal() {
+window.closeTransactionCreateModal = function closeTransactionCreateModal() {
   document.getElementById('transactionCreateModal').style.display = 'none';
   newTransactionDetails = [];
 }
@@ -901,14 +901,14 @@ async function submitTransactionCreate(event) {
 }
 
 // ✅ 거래명세서 상세 닫기
-function closeTransactionDetailModal() {
+window.closeTransactionDetailModal = function closeTransactionDetailModal() {
   const modal = document.getElementById('transactionDetailModal');
   modal.style.display = 'none';
   modal.classList.add('hidden');
 }
 
 // ✅ CSV 내보내기 (Google Sheets용)
-function exportTransactionsToExcel() {
+window.exportTransactionsToExcel = function exportTransactionsToExcel() {
   if (!window.transactionTableInstance) {
     alert('내보낼 데이터가 없습니다.');
     return;
@@ -957,7 +957,7 @@ function exportTransactionsToExcel() {
 }
 
 // ✅ 거래명세서 수정 함수
-async function editTransaction(transactionDate, transactionNo) {
+window.editTransaction = async function editTransaction(transactionDate, transactionNo) {
   console.log(`✅ 거래명세서 수정: ${transactionDate}-${transactionNo}`);
 
   try {
@@ -994,57 +994,72 @@ async function editTransaction(transactionDate, transactionNo) {
     };
 
     // DataTable 초기화 - 기존 인스턴스 정리
-    if (window.transactionEditDetailTableInstance) {
-      window.transactionEditDetailTableInstance.destroy();
-      window.transactionEditDetailTableInstance = null;
+    if ($.fn.DataTable.isDataTable('#transactionEditDetailTable')) {
+      $('#transactionEditDetailTable').DataTable().clear().destroy();
     }
+    window.transactionEditDetailTableInstance = null;
 
     // 테이블 tbody 초기화
     $('#transactionEditDetailTable tbody').empty();
 
+    // DataTable 초기화
     window.transactionEditDetailTableInstance = $('#transactionEditDetailTable').DataTable({
       data: details,
       columns: [
         {
           data: null,
+          orderable: false,
+          className: 'dt-center',
           render: (data, type, row, meta) => meta.row + 1,
         },
         {
           data: '자재코드',
           defaultContent: '-',
-          // visible: false, // 칼럼 숨김
+          className: 'dt-center',
           render: (d) => {
             if (!d) return '-';
-            // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
             return d.length > 2 ? d.substring(2) : d;
           },
         },
-        { data: '자재명', defaultContent: '-' },
-        { data: '규격', defaultContent: '-' },
+        {
+          data: '자재명',
+          defaultContent: '-',
+          className: 'dt-left'
+        },
+        {
+          data: '규격',
+          defaultContent: '-',
+          className: 'dt-left'
+        },
         {
           data: '수량',
-          render: (d) => (d ? d.toLocaleString() : '0'),
+          defaultContent: '0',
           className: 'dt-right',
+          render: (d) => (d ? d.toLocaleString() : '0'),
         },
         {
           data: '단가',
-          render: (d) => (d ? d.toLocaleString() : '0'),
+          defaultContent: '0',
           className: 'dt-right',
+          render: (d) => (d ? d.toLocaleString() : '0'),
         },
         {
           data: '공급가액',
-          render: (d) => (d ? d.toLocaleString() : '0'),
+          defaultContent: '0',
           className: 'dt-right',
+          render: (d) => (d ? d.toLocaleString() : '0'),
         },
         {
           data: '부가세',
-          render: (d) => (d ? d.toLocaleString() : '0'),
+          defaultContent: '0',
           className: 'dt-right',
+          render: (d) => (d ? d.toLocaleString() : '0'),
         },
         {
           data: '합계금액',
-          render: (d) => (d ? d.toLocaleString() : '0'),
+          defaultContent: '0',
           className: 'dt-right',
+          render: (d) => (d ? d.toLocaleString() : '0'),
         },
         {
           data: null,
@@ -1095,24 +1110,25 @@ async function editTransaction(transactionDate, transactionNo) {
 }
 
 // ✅ 거래명세서 수정 모달 닫기
-function closeTransactionEditModal() {
+window.closeTransactionEditModal = function closeTransactionEditModal() {
   const modal = document.getElementById('transactionEditModal');
   modal.style.display = 'none';
 
   // DataTable 정리
-  if (window.transactionEditDetailTableInstance) {
-    window.transactionEditDetailTableInstance.destroy();
-    window.transactionEditDetailTableInstance = null;
-    // 테이블 tbody 초기화
-    $('#transactionEditDetailTable tbody').empty();
+  if ($.fn.DataTable.isDataTable('#transactionEditDetailTable')) {
+    $('#transactionEditDetailTable').DataTable().clear().destroy();
   }
+  window.transactionEditDetailTableInstance = null;
+
+  // 테이블 tbody 초기화
+  $('#transactionEditDetailTable tbody').empty();
 
   // 전역 변수 초기화
   window.currentEditingTransaction = null;
 }
 
 // ✅ 거래명세서 수정 제출
-async function submitTransactionEdit() {
+window.submitTransactionEdit = async function submitTransactionEdit() {
   if (!window.currentEditingTransaction) {
     alert('수정할 거래명세서 정보가 없습니다.');
     return;
@@ -1195,12 +1211,10 @@ function updateTransactionEditTotal() {
 }
 
 // ✅ 거래명세서 상세 행 추가 - 자재 검색 모달 열기
-function addTransactionDetailRow() {
+window.addTransactionDetailRow = function addTransactionDetailRow() {
   // 선택된 자재 정보 초기화
   window.selectedTransactionMaterial = null;
-  document.getElementById('transactionMaterialSearchCode').value = '';
-  document.getElementById('transactionMaterialSearchName').value = '';
-  document.getElementById('transactionMaterialSearchSpec').value = '';
+  document.getElementById('transactionMaterialSearchInput').value = '';
   document.getElementById('transactionSelectedMaterialInfo').style.display = 'none';
   document.getElementById('transactionMaterialSearchResults').style.display = 'none';
   document.getElementById('transactionAddDetailQuantity').value = '1';
@@ -1216,30 +1230,22 @@ function addTransactionDetailRow() {
 }
 
 // ✅ 자재 검색 함수
-async function searchTransactionMaterials() {
+window.searchTransactionMaterials = async function searchTransactionMaterials() {
   try {
-    // 각 필드의 검색어 가져오기
-    const searchCode = document.getElementById('transactionMaterialSearchCode').value.trim();
-    const searchName = document.getElementById('transactionMaterialSearchName').value.trim();
-    const searchSpec = document.getElementById('transactionMaterialSearchSpec').value.trim();
+    // 검색어 가져오기
+    const searchKeyword = document.getElementById('transactionMaterialSearchInput').value.trim();
 
-    // 최소 1개 이상의 검색어 입력 확인
-    if (!searchCode && !searchName && !searchSpec) {
-      alert('최소 1개 이상의 검색 조건을 입력해주세요.');
+    // 검색어 입력 확인
+    if (!searchKeyword) {
+      alert('검색어를 입력해주세요.');
       return;
     }
 
-    console.log('🔍 거래명세서 자재 검색:', {
-      자재코드: searchCode,
-      자재명: searchName,
-      규격: searchSpec,
-    });
+    console.log('🔍 거래명세서 자재 검색:', { 검색어: searchKeyword });
 
-    // 검색 조건을 쿼리 파라미터로 전달
+    // 검색 조건을 쿼리 파라미터로 전달 (자재명으로 검색)
     const params = new URLSearchParams();
-    if (searchCode) params.append('searchCode', searchCode);
-    if (searchName) params.append('searchName', searchName);
-    if (searchSpec) params.append('searchSpec', searchSpec);
+    params.append('searchName', searchKeyword);
 
     const response = await fetch(`/api/materials?${params.toString()}`);
     const result = await response.json();
@@ -1300,7 +1306,7 @@ async function searchTransactionMaterials() {
 }
 
 // ✅ 자재 선택 함수
-function selectTransactionMaterial(material) {
+window.selectTransactionMaterial = function selectTransactionMaterial(material) {
   window.selectedTransactionMaterial = material;
 
   // 선택된 자재 정보 표시 (견적서와 동일한 구조)
@@ -1322,7 +1328,7 @@ function selectTransactionMaterial(material) {
 }
 
 // ✅ 공급가액 자동 계산 (추가 모달)
-function calculateTransactionDetailAmount() {
+window.calculateTransactionDetailAmount = function calculateTransactionDetailAmount() {
   const quantity = parseFloat(document.getElementById('transactionAddDetailQuantity').value) || 0;
   const price = parseFloat(document.getElementById('transactionAddDetailPrice').value) || 0;
   const amount = quantity * price;
@@ -1331,7 +1337,7 @@ function calculateTransactionDetailAmount() {
 }
 
 // ✅ 자재 추가 확인
-function confirmTransactionDetailAdd() {
+window.confirmTransactionDetailAdd = function confirmTransactionDetailAdd() {
   if (!window.selectedTransactionMaterial) {
     alert('자재를 선택해주세요.');
     return;
@@ -1380,7 +1386,7 @@ function confirmTransactionDetailAdd() {
 }
 
 // ✅ 선택된 자재 취소
-function clearSelectedTransactionMaterial() {
+window.clearSelectedTransactionMaterial = function clearSelectedTransactionMaterial() {
   window.selectedTransactionMaterial = null;
   document.getElementById('transactionSelectedMaterialInfo').style.display = 'none';
   document.getElementById('transactionMaterialSearchResults').style.display = 'none';
@@ -1391,9 +1397,9 @@ function clearSelectedTransactionMaterial() {
 }
 
 // ✅ 자재 추가 모달 닫기
-function closeTransactionDetailAddModal() {
+window.closeTransactionDetailAddModal = function closeTransactionDetailAddModal() {
   document.getElementById('transactionDetailAddModal').style.display = 'none';
-  clearSelectedTransactionMaterial();
+  window.clearSelectedTransactionMaterial();
 }
 
 // ✅ 거래명세서 상세 행 수정 - 수정 모달 열기
@@ -1683,11 +1689,9 @@ async function approveTransaction(transactionDate, transactionNo) {
 // ========================================
 
 // ✅ 자재 추가 모달 열기
-function openNewTransactionDetailAddModal() {
+window.openNewTransactionDetailAddModal = function openNewTransactionDetailAddModal() {
   window.newSelectedTransactionMaterial = null;
-  document.getElementById('newTransactionMaterialSearchCode').value = '';
-  document.getElementById('newTransactionMaterialSearchName').value = '';
-  document.getElementById('newTransactionMaterialSearchSpec').value = '';
+  document.getElementById('newTransactionMaterialSearchInput').value = '';
   document.getElementById('newTransactionSelectedMaterialInfo').style.display = 'none';
   document.getElementById('newTransactionMaterialSearchResults').style.display = 'none';
   document.getElementById('newTransactionAddDetailQuantity').value = '1';
@@ -1702,36 +1706,28 @@ function openNewTransactionDetailAddModal() {
 }
 
 // ✅ 자재 추가 모달 닫기
-function closeNewTransactionDetailAddModal() {
+window.closeNewTransactionDetailAddModal = function closeNewTransactionDetailAddModal() {
   document.getElementById('newTransactionDetailAddModal').style.display = 'none';
   console.log('✅ 거래명세서 작성 - 자재 추가 모달 닫기');
 }
 
 // ✅ 자재 검색 (거래명세서 작성용)
-async function searchNewTransactionMaterials() {
+window.searchNewTransactionMaterials = async function searchNewTransactionMaterials() {
   try {
-    // 각 필드의 검색어 가져오기
-    const searchCode = document.getElementById('newTransactionMaterialSearchCode').value.trim();
-    const searchName = document.getElementById('newTransactionMaterialSearchName').value.trim();
-    const searchSpec = document.getElementById('newTransactionMaterialSearchSpec').value.trim();
+    // 검색어 가져오기
+    const searchKeyword = document.getElementById('newTransactionMaterialSearchInput').value.trim();
 
-    // 최소 1개 이상의 검색어 입력 확인
-    if (!searchCode && !searchName && !searchSpec) {
-      alert('최소 1개 이상의 검색 조건을 입력해주세요.');
+    // 검색어 입력 확인
+    if (!searchKeyword) {
+      alert('검색어를 입력해주세요.');
       return;
     }
 
-    console.log('🔍 신규 거래명세서 자재 검색:', {
-      자재코드: searchCode,
-      자재명: searchName,
-      규격: searchSpec,
-    });
+    console.log('🔍 신규 거래명세서 자재 검색:', { 검색어: searchKeyword });
 
-    // 검색 조건을 쿼리 파라미터로 전달
+    // 검색 조건을 쿼리 파라미터로 전달 (자재명으로 검색)
     const params = new URLSearchParams();
-    if (searchCode) params.append('searchCode', searchCode);
-    if (searchName) params.append('searchName', searchName);
-    if (searchSpec) params.append('searchSpec', searchSpec);
+    params.append('searchName', searchKeyword);
 
     const response = await fetch(`/api/materials?${params.toString()}`);
     const result = await response.json();
