@@ -686,6 +686,53 @@ app.get('/api/customers/:code', async (req, res) => {
   }
 });
 
+// 매출처 거래내역 조회 (자재입출내역)
+app.get('/api/customers/:code/transaction-history', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('매출처코드', sql.VarChar(8), code).query(`
+        SELECT
+          k.입출고일자,
+          k.거래번호,
+          k.입출고구분,
+          k.분류코드,
+          k.세부코드,
+          g.자재명,
+          g.규격,
+          g.단위,
+          k.입고수량,
+          k.출고수량,
+          k.입고단가,
+          k.출고단가,
+          k.매입처코드,
+          m.매입처명
+        FROM [YmhDB].[dbo].[자재입출내역] k
+        LEFT JOIN [YmhDB].[dbo].[자재] g
+          ON k.분류코드 = g.분류코드
+          AND k.세부코드 = g.세부코드
+        LEFT JOIN [YmhDB].[dbo].[매입처] m
+          ON k.매입처코드 = m.매입처코드
+          AND k.사업장코드 = m.사업장코드
+        WHERE k.사업장코드 = @사업장코드
+          AND k.매출처코드 = @매출처코드
+        ORDER BY k.입출고일자 DESC, k.거래번호 DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error('매출처 거래내역 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
 // 매출처 신규 등록
 app.post('/api/customers', requireAuth, async (req, res) => {
   try {
@@ -1928,10 +1975,10 @@ app.get('/api/quotations', async (req, res) => {
             SELECT
                 q.사업장코드, q.견적일자, q.견적번호, q.매출처코드,
                 c.매출처명, q.출고희망일자, q.제목, q.적요, q.상태코드,
-                q.수정일자, u.사용자명,
+                q.수정일자, u.사용자명 as 담당자,
                 (SELECT SUM(ISNULL(수량,0) * ISNULL(출고단가,0) + ISNULL(출고부가,0))
                  FROM 견적내역 qd
-                 WHERE qd.견적일자 = q.견적일자 AND qd.견적번호 = q.견적번호) AS 합계금액
+                 WHERE qd.견적일자 = q.견적일자 AND qd.견적번호 = q.견적번호) AS 견적금액
             FROM 견적 q
             LEFT JOIN 매출처 c ON q.매출처코드 = c.매출처코드
             LEFT JOIN 사용자 u ON q.사용자코드 = u.사용자코드
@@ -2000,8 +2047,11 @@ app.get('/api/quotations/:date/:no', async (req, res) => {
                 SELECT
                     qd.견적일자, qd.견적번호, qd.견적시간,
                     qd.자재코드,
-                    qd.수량, qd.출고단가, qd.출고부가,
-                    (qd.수량 * qd.출고단가) as 금액,
+                    qd.수량,
+                    qd.출고단가 as 단가,
+                    qd.출고부가 as 부가세,
+                    (qd.수량 * qd.출고단가) as 공급가액,
+                    (qd.수량 * qd.출고단가 + qd.출고부가) as 합계금액,
                     m.자재명, m.규격, m.단위,
                     s.매입처명
                 FROM 견적내역 qd
@@ -2017,7 +2067,7 @@ app.get('/api/quotations/:date/:no', async (req, res) => {
         success: true,
         data: {
           master: master.recordset[0],
-          detail: detail.recordset,
+          details: detail.recordset,  // detail -> details로 변경
         },
       });
     } else {
@@ -2590,13 +2640,21 @@ app.get('/api/materials/:materialCode/purchase-price-history/:supplierCode', asy
     const 분류코드 = materialCode.substring(0, 2);
     const 세부코드 = materialCode.substring(2);
 
-    // 자재입출내역 테이블에서 입고 이력 조회 (최근 10건)
+    // 1년 전 날짜 계산 (YYYYMMDD 형식)
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const 기준일자 = oneYearAgo.toISOString().slice(0, 10).replace(/-/g, '');
+
+    console.log(`🔍 자재입출내역 조회 - 자재코드: ${materialCode}, 매입처: ${supplierCode}, 기준일자: ${기준일자} 이후`);
+
+    // 자재입출내역 테이블에서 입고 이력 조회 (1년 이내 데이터)
     const result = await pool
       .request()
       .input('분류코드', sql.VarChar(2), 분류코드)
       .input('세부코드', sql.VarChar(18), 세부코드)
-      .input('매입처코드', sql.VarChar(8), supplierCode).query(`
-        SELECT TOP 10
+      .input('매입처코드', sql.VarChar(8), supplierCode)
+      .input('기준일자', sql.VarChar(8), 기준일자).query(`
+        SELECT
           입출고일자,
           입출고시간,
           입고수량,
@@ -2611,6 +2669,7 @@ app.get('/api/materials/:materialCode/purchase-price-history/:supplierCode', asy
           AND 입출고구분 = 1
           AND 입고수량 > 0
           AND 사용구분 = 0
+          AND 입출고일자 >= @기준일자
         ORDER BY 입출고일자 DESC, 입출고시간 DESC
       `);
 
@@ -2633,12 +2692,20 @@ app.get('/api/materials/:materialCode/order-history/:supplierCode', async (req, 
   try {
     const { materialCode, supplierCode } = req.params;
 
-    // 발주내역 + 발주 테이블에서 발주 이력 조회 (최근 10건)
+    // 1년 전 날짜 계산 (YYYYMMDD 형식)
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const 기준일자 = oneYearAgo.toISOString().slice(0, 10).replace(/-/g, '');
+
+    console.log(`🔍 발주내역 조회 - 자재코드: ${materialCode}, 매입처: ${supplierCode}, 기준일자: ${기준일자} 이후`);
+
+    // 발주내역 + 발주 테이블에서 발주 이력 조회 (1년 이내 데이터)
     const result = await pool
       .request()
       .input('자재코드', sql.VarChar(18), materialCode)
-      .input('매입처코드', sql.VarChar(8), supplierCode).query(`
-        SELECT TOP 10
+      .input('매입처코드', sql.VarChar(8), supplierCode)
+      .input('기준일자', sql.VarChar(8), 기준일자).query(`
+        SELECT
           o.발주일자,
           o.발주번호,
           od.입고단가,
@@ -2651,6 +2718,7 @@ app.get('/api/materials/:materialCode/order-history/:supplierCode', async (req, 
           AND o.매입처코드 = @매입처코드
           AND od.사용구분 = 0
           AND o.사용구분 = 0
+          AND o.발주일자 >= @기준일자
         ORDER BY o.발주일자 DESC, o.발주번호 DESC
       `);
 
@@ -2734,6 +2802,114 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
+// ✅ 발주 데이터 진단 API (2025-11-01 ~ 2025-12-03) - 반드시 :date/:no 라우트보다 앞에 위치
+app.get('/api/orders-diagnose', async (req, res) => {
+  try {
+    const diagnostics = [];
+
+    // 1. 발주 마스터에는 있지만 발주내역이 없는 경우
+    const orphanOrders = await pool.request().query(`
+      SELECT o.발주일자, o.발주번호, o.제목, o.매입처코드,
+             (SELECT COUNT(*) FROM 발주내역 od
+              WHERE od.발주일자 = o.발주일자 AND od.발주번호 = o.발주번호 AND od.사용구분 = 0) AS 내역수
+      FROM 발주 o
+      WHERE o.발주일자 BETWEEN '20251101' AND '20251203'
+        AND o.사용구분 = 0
+        AND NOT EXISTS (
+          SELECT 1 FROM 발주내역 od
+          WHERE od.발주일자 = o.발주일자 AND od.발주번호 = o.발주번호 AND od.사용구분 = 0
+        )
+      ORDER BY o.발주일자, o.발주번호
+    `);
+
+    // 2. 발주내역에는 있지만 발주 마스터가 없는 경우
+    const orphanDetails = await pool.request().query(`
+      SELECT DISTINCT od.발주일자, od.발주번호, od.자재코드
+      FROM 발주내역 od
+      WHERE od.발주일자 BETWEEN '20251101' AND '20251203'
+        AND od.사용구분 = 0
+        AND NOT EXISTS (
+          SELECT 1 FROM 발주 o
+          WHERE o.발주일자 = od.발주일자 AND o.발주번호 = od.발주번호 AND o.사용구분 = 0
+        )
+      ORDER BY od.발주일자, od.발주번호
+    `);
+
+    // 3. 매입처코드가 없거나 잘못된 경우
+    const invalidSupplier = await pool.request().query(`
+      SELECT o.발주일자, o.발주번호, o.매입처코드, o.제목
+      FROM 발주 o
+      WHERE o.발주일자 BETWEEN '20251101' AND '20251203'
+        AND o.사용구분 = 0
+        AND (o.매입처코드 IS NULL
+             OR NOT EXISTS (SELECT 1 FROM 매입처 s WHERE s.매입처코드 = o.매입처코드))
+      ORDER BY o.발주일자, o.발주번호
+    `);
+
+    // 4. 자재코드가 없거나 잘못된 경우
+    const invalidMaterial = await pool.request().query(`
+      SELECT od.발주일자, od.발주번호, od.자재코드
+      FROM 발주내역 od
+      WHERE od.발주일자 BETWEEN '20251101' AND '20251203'
+        AND od.사용구분 = 0
+        AND (od.자재코드 IS NULL
+             OR NOT EXISTS (SELECT 1 FROM 자재 m WHERE m.분류코드 + m.세부코드 = od.자재코드))
+      ORDER BY od.발주일자, od.발주번호
+    `);
+
+    // 5. 금액이 음수이거나 발주량이 NULL/음수인 경우 (입고단가 0원은 정상 - 단가 미확정 상태)
+    const invalidAmount = await pool.request().query(`
+      SELECT od.발주일자, od.발주번호, od.자재코드, od.발주량, od.입고단가,
+             (od.발주량 * od.입고단가) AS 금액
+      FROM 발주내역 od
+      WHERE od.발주일자 BETWEEN '20251101' AND '20251203'
+        AND od.사용구분 = 0
+        AND (od.발주량 IS NULL OR od.발주량 <= 0
+             OR od.입고단가 IS NULL OR od.입고단가 < 0)
+      ORDER BY od.발주일자, od.발주번호
+    `);
+
+    // 6. 전체 발주 목록 (정상 데이터 확인용)
+    const allOrders = await pool.request().query(`
+      SELECT o.발주일자, o.발주번호, o.제목, o.매입처코드, s.매입처명, o.상태코드,
+             (SELECT COUNT(*) FROM 발주내역 od
+              WHERE od.발주일자 = o.발주일자 AND od.발주번호 = o.발주번호 AND od.사용구분 = 0) AS 내역수,
+             (SELECT SUM(ISNULL(발주량,0) * ISNULL(입고단가,0))
+              FROM 발주내역 od
+              WHERE od.발주일자 = o.발주일자 AND od.발주번호 = o.발주번호) AS 합계금액
+      FROM 발주 o
+      LEFT JOIN 매입처 s ON o.매입처코드 = s.매입처코드
+      WHERE o.발주일자 BETWEEN '20251101' AND '20251203'
+        AND o.사용구분 = 0
+      ORDER BY o.발주일자, o.발주번호
+    `);
+
+    res.json({
+      success: true,
+      period: '2025-11-01 ~ 2025-12-03',
+      summary: {
+        총발주건수: allOrders.recordset.length,
+        마스터없는내역: orphanDetails.recordset.length,
+        내역없는마스터: orphanOrders.recordset.length,
+        잘못된매입처: invalidSupplier.recordset.length,
+        잘못된자재: invalidMaterial.recordset.length,
+        잘못된금액: invalidAmount.recordset.length,
+      },
+      errors: {
+        orphanOrders: orphanOrders.recordset,
+        orphanDetails: orphanDetails.recordset,
+        invalidSupplier: invalidSupplier.recordset,
+        invalidMaterial: invalidMaterial.recordset,
+        invalidAmount: invalidAmount.recordset,
+      },
+      allOrders: allOrders.recordset,
+    });
+  } catch (err) {
+    console.error('발주 진단 에러:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // 발주 상세 조회
 app.get('/api/orders/:date/:no', async (req, res) => {
   try {
@@ -2808,7 +2984,7 @@ app.post('/api/orders', async (req, res) => {
 
     console.log('📝 발주서 저장 요청 받음:', { master, details });
 
-    // 세션 검증 - 견적서와 동일하게 처리
+    // ✅ 1. 세션 검증
     const 사용자코드 = req.session?.user?.사용자코드;
     const 사업장코드 = req.session?.user?.사업장코드;
 
@@ -2818,6 +2994,73 @@ app.post('/api/orders', async (req, res) => {
         message: '로그인이 필요합니다.',
       });
     }
+
+    // ✅ 2. 마스터 데이터 유효성 검증
+    if (!master.발주일자 || master.발주일자.length !== 8) {
+      return res.status(400).json({
+        success: false,
+        message: '발주일자가 올바르지 않습니다.',
+      });
+    }
+
+    if (!master.매입처코드) {
+      return res.status(400).json({
+        success: false,
+        message: '매입처를 선택해주세요.',
+      });
+    }
+
+    if (!master.제목 || master.제목.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: '제목을 입력해주세요.',
+      });
+    }
+
+    // ✅ 3. 품목 데이터 유효성 검증
+    if (!details || details.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '발주 품목을 1개 이상 추가해주세요.',
+      });
+    }
+
+    // 각 품목 검증
+    for (let i = 0; i < details.length; i++) {
+      const detail = details[i];
+
+      if (!detail.자재코드) {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 품목: 자재코드가 누락되었습니다.`,
+        });
+      }
+
+      if (detail.발주량 === null || detail.발주량 === undefined || detail.발주량 <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 품목 (${detail.자재코드}): 발주량은 0보다 커야 합니다.`,
+        });
+      }
+
+      // 입고단가는 0 이상 (0원은 허용 - 단가 미확정 상태)
+      if (detail.입고단가 === null || detail.입고단가 === undefined || detail.입고단가 < 0) {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 품목 (${detail.자재코드}): 입고단가는 음수일 수 없습니다.`,
+        });
+      }
+
+      // 출고단가는 0 이상
+      if (detail.출고단가 === null || detail.출고단가 === undefined || detail.출고단가 < 0) {
+        return res.status(400).json({
+          success: false,
+          message: `${i + 1}번째 품목 (${detail.자재코드}): 출고단가는 음수일 수 없습니다.`,
+        });
+      }
+    }
+
+    console.log('✅ 유효성 검증 통과');
 
     // 트랜잭션 시작
     await transaction.begin();
@@ -2989,6 +3232,62 @@ app.put('/api/orders/:date/:no', requireAuth, async (req, res) => {
       상태코드,
       품목수: details?.length,
     });
+
+    // ✅ 유효성 검증
+    if (!제목 || 제목.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: '제목을 입력해주세요.',
+      });
+    }
+
+    // 품목 데이터 유효성 검증
+    if (details && Array.isArray(details)) {
+      if (details.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '발주 품목을 1개 이상 추가해주세요.',
+        });
+      }
+
+      // 각 품목 검증
+      for (let i = 0; i < details.length; i++) {
+        const detail = details[i];
+        const 자재코드 = Array.isArray(detail.자재코드) ? detail.자재코드[0] : detail.자재코드;
+
+        if (!자재코드) {
+          return res.status(400).json({
+            success: false,
+            message: `${i + 1}번째 품목: 자재코드가 누락되었습니다.`,
+          });
+        }
+
+        if (detail.발주량 === null || detail.발주량 === undefined || detail.발주량 <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: `${i + 1}번째 품목 (${자재코드}): 발주량은 0보다 커야 합니다.`,
+          });
+        }
+
+        // 입고단가는 0 이상 (0원은 허용 - 단가 미확정 상태)
+        if (detail.입고단가 === null || detail.입고단가 === undefined || detail.입고단가 < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `${i + 1}번째 품목 (${자재코드}): 입고단가는 음수일 수 없습니다.`,
+          });
+        }
+
+        // 출고단가는 0 이상
+        if (detail.출고단가 === null || detail.출고단가 === undefined || detail.출고단가 < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `${i + 1}번째 품목 (${자재코드}): 출고단가는 음수일 수 없습니다.`,
+          });
+        }
+      }
+    }
+
+    console.log('✅ 유효성 검증 통과');
 
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const 발주시간기본 = Date.now().toString().slice(-9); // 타임스탬프 마지막 9자리
@@ -3176,7 +3475,8 @@ app.delete('/api/orders/:date/:no', requireAuth, async (req, res) => {
 // 자재 리스트
 app.get('/api/materials', async (req, res) => {
   try {
-    const { search, 분류코드, includeDeleted } = req.query;
+    const { search, 분류코드, includeDeleted, searchByCode, searchByName, searchBySpec, searchCode, searchName, searchSpec } =
+      req.query;
     const 사업장코드 = req.session?.user?.사업장코드 || '01';
 
     // includeDeleted=true면 사용구분 0과 9 모두 조회, 아니면 0만 조회
@@ -3202,9 +3502,61 @@ app.get('/api/materials', async (req, res) => {
       query += ` AND m.분류코드 = @분류코드`;
     }
 
-    if (search) {
+    // 새로운 방식: 개별 필드 검색 (searchCode, searchName, searchSpec)
+    if (searchCode || searchName || searchSpec) {
+      const searchConditions = [];
+
+      if (searchCode) {
+        request.input('searchCode', sql.NVarChar, `%${searchCode}%`);
+        searchConditions.push('(m.분류코드+m.세부코드) LIKE @searchCode');
+      }
+      if (searchName) {
+        request.input('searchName', sql.NVarChar, `%${searchName}%`);
+        searchConditions.push('m.자재명 LIKE @searchName');
+      }
+      if (searchSpec) {
+        request.input('searchSpec', sql.NVarChar, `%${searchSpec}%`);
+        searchConditions.push('m.규격 LIKE @searchSpec');
+      }
+
+      query += ` AND (${searchConditions.join(' AND ')})`;
+      console.log(`🔍 자재 개별 필드 검색:`, {
+        자재코드: searchCode || '',
+        자재명: searchName || '',
+        규격: searchSpec || '',
+      });
+    }
+    // 기존 방식: 단일 검색어 + 체크박스 (하위 호환성)
+    else if (search) {
       request.input('search', sql.NVarChar, `%${search}%`);
-      query += ` AND (m.자재명 LIKE @search OR m.규격 LIKE @search)`;
+
+      // 검색 조건이 명시된 경우 (체크박스 사용)
+      if (searchByCode !== undefined || searchByName !== undefined || searchBySpec !== undefined) {
+        const searchConditions = [];
+
+        if (searchByCode === 'true') {
+          searchConditions.push('(m.분류코드+m.세부코드) LIKE @search');
+        }
+        if (searchByName === 'true') {
+          searchConditions.push('m.자재명 LIKE @search');
+        }
+        if (searchBySpec === 'true') {
+          searchConditions.push('m.규격 LIKE @search');
+        }
+
+        if (searchConditions.length > 0) {
+          query += ` AND (${searchConditions.join(' OR ')})`;
+          console.log(`🔍 자재 검색 조건:`, {
+            검색어: search,
+            자재코드: searchByCode === 'true',
+            자재명: searchByName === 'true',
+            규격: searchBySpec === 'true',
+          });
+        }
+      } else {
+        // 기본 검색 (하위 호환성 - 자재명과 규격만)
+        query += ` AND (m.자재명 LIKE @search OR m.규격 LIKE @search)`;
+      }
     }
 
     query += ` ORDER BY m.분류코드, m.세부코드`;
@@ -3697,6 +4049,233 @@ app.get('/api/materials/:code/detail', async (req, res) => {
     });
   } catch (err) {
     console.error('자재 상세 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// ================================================================
+// 자재 분석 API (자재코드_재고정보_포함_조회.sql 기반)
+// ================================================================
+
+// 1. 자재 재고 분석 API
+app.get('/api/materials/:code/inventory-analysis', async (req, res) => {
+  const { code } = req.params;
+  const 분류코드 = code.substring(0, 2);
+  const 세부코드 = code.substring(2);
+  const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+  try {
+
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드).query(`
+        WITH 자재별통계 AS (
+          SELECT
+            k.[사업장코드],
+            k.[분류코드],
+            k.[세부코드],
+            COUNT(CASE WHEN k.[입출고구분] = '1' THEN 1 END) AS 매입건수,
+            SUM(CASE WHEN k.[입출고구분] = '1' THEN ISNULL(k.[입고수량], 0) ELSE 0 END) AS 총매입수량,
+            MAX(CASE WHEN k.[입출고구분] = '1' THEN k.[입출고일자] END) AS 최근매입일자,
+            MAX(CASE WHEN k.[입출고구분] = '1' THEN k.[입고단가] END) AS 최근매입단가,
+            COUNT(CASE WHEN k.[입출고구분] = '2' THEN 1 END) AS 매출건수,
+            SUM(CASE WHEN k.[입출고구분] = '2' THEN ISNULL(k.[출고수량], 0) ELSE 0 END) AS 총매출수량,
+            SUM(CASE WHEN k.[입출고구분] = '1' THEN ISNULL(k.[입고수량], 0) ELSE 0 END) -
+            SUM(CASE WHEN k.[입출고구분] = '2' THEN ISNULL(k.[출고수량], 0) ELSE 0 END) AS 현재재고_추정,
+            (SELECT TOP 1 m.매입처명
+             FROM [YmhDB].[dbo].[자재입출내역] i
+             INNER JOIN [YmhDB].[dbo].[매입처] m
+               ON i.매입처코드 = m.매입처코드
+               AND i.사업장코드 = m.사업장코드
+             WHERE i.분류코드 = k.분류코드
+               AND i.세부코드 = k.세부코드
+               AND i.사업장코드 = k.사업장코드
+               AND i.입출고구분 = '1'
+               AND i.매입처코드 IS NOT NULL
+               AND i.매입처코드 != ''
+             GROUP BY m.매입처명
+             ORDER BY COUNT(*) DESC) AS 주요매입처
+          FROM [YmhDB].[dbo].[자재입출내역] AS k
+          WHERE k.[사업장코드] = @사업장코드
+            AND k.[분류코드] = @분류코드
+            AND k.[세부코드] = @세부코드
+          GROUP BY k.[사업장코드], k.[분류코드], k.[세부코드]
+        )
+        SELECT
+          (g.[분류코드] + g.[세부코드]) AS 자재코드,
+          g.[분류코드],
+          g.[세부코드],
+          g.[자재명],
+          g.[규격],
+          g.[단위],
+          ISNULL(s.매입건수, 0) AS 매입건수,
+          ISNULL(s.총매입수량, 0) AS 총매입수량,
+          s.최근매입일자,
+          s.최근매입단가,
+          ISNULL(s.매출건수, 0) AS 매출건수,
+          ISNULL(s.총매출수량, 0) AS 총매출수량,
+          ISNULL(s.현재재고_추정, 0) AS 현재재고,
+          s.주요매입처,
+          CASE
+            WHEN ISNULL(s.현재재고_추정, 0) > 0
+            THEN 2000 + ISNULL(s.매입건수, 0) * 10
+            WHEN s.최근매입일자 >= CONVERT(VARCHAR(8), DATEADD(MONTH, -3, GETDATE()), 112)
+            THEN 1000 + ISNULL(s.매입건수, 0) * 10
+            WHEN s.최근매입일자 >= CONVERT(VARCHAR(8), DATEADD(YEAR, -1, GETDATE()), 112)
+            THEN 500 + ISNULL(s.매입건수, 0) * 5
+            WHEN s.매입건수 > 0
+            THEN 100 + ISNULL(s.매입건수, 0)
+            ELSE 0
+          END AS 우선순위점수,
+          CASE
+            WHEN ISNULL(s.현재재고_추정, 0) > 0 AND s.매입건수 > 0
+            THEN '★★ 재고 있음 (동일 코드 사용 권장)'
+            WHEN s.최근매입일자 >= CONVERT(VARCHAR(8), DATEADD(MONTH, -3, GETDATE()), 112)
+            THEN '★ 최근 매입 자재'
+            WHEN s.매입건수 >= 10
+            THEN '자주 매입하는 자재'
+            WHEN s.매입건수 > 0
+            THEN '매입 이력 있음'
+            ELSE ''
+          END AS 권장태그
+        FROM [YmhDB].[dbo].[자재] g
+        LEFT JOIN 자재별통계 s
+          ON g.분류코드 = s.분류코드
+          AND g.세부코드 = s.세부코드
+        WHERE g.[분류코드] = @분류코드
+          AND g.[세부코드] = @세부코드
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset[0] || null,
+    });
+  } catch (err) {
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error('❌ 자재 재고 분석 API 에러');
+    console.error('자재코드:', req.params.code);
+    console.error('분류코드:', 분류코드);
+    console.error('세부코드:', 세부코드);
+    console.error('에러 메시지:', err.message);
+    console.error('에러 스택:', err.stack);
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// 2. 자재 가격 비교 분석 API (매입처별)
+app.get('/api/materials/:code/price-comparison', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const 분류코드 = code.substring(0, 2);
+    const 세부코드 = code.substring(2);
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드).query(`
+        SELECT
+          m.매입처코드,
+          m.매입처명,
+          COUNT(CASE WHEN k.입출고구분='1' THEN 1 END) AS 매입건수,
+          SUM(CASE WHEN k.입출고구분='1' THEN ISNULL(k.입고수량,0) ELSE 0 END) AS 총입고수량,
+          AVG(CASE WHEN k.입출고구분='1' AND k.입고단가 > 0 THEN k.입고단가 END) AS 평균입고단가,
+          MIN(CASE WHEN k.입출고구분='1' AND k.입고단가 > 0 THEN k.입고단가 END) AS 최저입고단가,
+          MAX(CASE WHEN k.입출고구분='1' AND k.입고단가 > 0 THEN k.입고단가 END) AS 최고입고단가,
+          MAX(CASE WHEN k.입출고구분='1' THEN k.입출고일자 END) AS 최근매입일자,
+          SUM(CASE WHEN k.입출고구분='1' THEN ISNULL(k.입고수량,0) * ISNULL(k.입고단가,0) ELSE 0 END) AS 총매입금액
+        FROM [YmhDB].[dbo].[자재입출내역] AS k
+        INNER JOIN [YmhDB].[dbo].[매입처] AS m
+          ON k.매입처코드 = m.매입처코드
+          AND k.사업장코드 = m.사업장코드
+        WHERE k.사업장코드 = @사업장코드
+          AND k.분류코드 = @분류코드
+          AND k.세부코드 = @세부코드
+          AND k.입출고구분 = '1'
+          AND k.매입처코드 IS NOT NULL
+        GROUP BY m.매입처코드, m.매입처명
+        ORDER BY 총입고수량 DESC, 총매입금액 DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error('자재 가격 비교 분석 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// 3. 자재 일관성 검사 API (같은 자재명의 다른 코드 검색)
+app.get('/api/materials/:code/consistency-check', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const 분류코드 = code.substring(0, 2);
+    const 세부코드 = code.substring(2);
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    // 1. 현재 자재의 자재명과 규격 가져오기
+    const materialInfo = await pool
+      .request()
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드).query(`
+        SELECT 자재명, 규격
+        FROM [YmhDB].[dbo].[자재]
+        WHERE 분류코드 = @분류코드
+          AND 세부코드 = @세부코드
+      `);
+
+    if (materialInfo.recordset.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const { 자재명, 규격 } = materialInfo.recordset[0];
+
+    // 2. 같은 자재명/규격을 가진 다른 자재코드 검색
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('자재명', sql.VarChar(30), 자재명)
+      .input('규격', sql.VarChar(30), 규격 || '')
+      .input('현재분류코드', sql.VarChar(2), 분류코드)
+      .input('현재세부코드', sql.VarChar(16), 세부코드).query(`
+        SELECT
+          (g.분류코드 + g.세부코드) AS 자재코드,
+          g.분류코드,
+          g.세부코드,
+          g.자재명,
+          g.규격,
+          g.단위,
+          COUNT(CASE WHEN k.입출고구분='1' THEN 1 END) AS 매입건수,
+          SUM(CASE WHEN k.입출고구분='1' THEN ISNULL(k.입고수량,0) ELSE 0 END) AS 총입고수량,
+          COUNT(CASE WHEN k.입출고구분='2' THEN 1 END) AS 매출건수,
+          SUM(CASE WHEN k.입출고구분='2' THEN ISNULL(k.출고수량,0) ELSE 0 END) AS 총출고수량,
+          SUM(CASE WHEN k.입출고구분='1' THEN ISNULL(k.입고수량,0) ELSE 0 END) -
+          SUM(CASE WHEN k.입출고구분='2' THEN ISNULL(k.출고수량,0) ELSE 0 END) AS 현재재고
+        FROM [YmhDB].[dbo].[자재] AS g
+        LEFT JOIN [YmhDB].[dbo].[자재입출내역] AS k
+          ON g.분류코드 = k.분류코드
+          AND g.세부코드 = k.세부코드
+          AND k.사업장코드 = @사업장코드
+        WHERE g.자재명 = @자재명
+          AND g.규격 = @규격
+          AND NOT (g.분류코드 = @현재분류코드 AND g.세부코드 = @현재세부코드)
+        GROUP BY g.분류코드, g.세부코드, g.자재명, g.규격, g.단위
+        ORDER BY 현재재고 DESC, 매입건수 DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      currentMaterial: { 자재명, 규격 },
+    });
+  } catch (err) {
+    console.error('자재 일관성 검사 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
   }
 });

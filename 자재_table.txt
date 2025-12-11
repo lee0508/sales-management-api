@@ -13,3 +13,8 @@ YmhDB	dbo	자재	사용구분	10	(0)	NO	tinyint	NULL	NULL	3	10	0	NULL	NULL	NULL	
 YmhDB	dbo	자재	수정일자	11	('')	NO	varchar	8	8	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
 YmhDB	dbo	자재	사용자코드	12	('')	NO	varchar	4	4	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
 
+인덱스명	인덱스타입	유니크여부	기본키여부	인덱스컬럼
+PK_자재	CLUSTERED	1	1	분류코드, 세부코드
+IX_자재명	NONCLUSTERED	0	0	자재명
+IX_바코드	NONCLUSTERED	0	0	자재명
+IX_규격	NONCLUSTERED	0	0	규격

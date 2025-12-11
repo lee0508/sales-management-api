@@ -715,11 +715,60 @@ function displayMaterialDetailModal(data) {
 
   transactionsHtml += `</div>`;
 
+  // 탭 UI와 탭 컨텐츠 생성
+  const tabsHtml = `
+    <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid #e0e0e0; padding-bottom: 0;">
+      <button class="material-detail-tab active" data-tab="basic" onclick="switchMaterialTab('basic')"
+        style="padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 8px 8px 0 0; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+        📦 기본정보
+      </button>
+      <button class="material-detail-tab" data-tab="inventory" onclick="switchMaterialTab('inventory')"
+        style="padding: 12px 20px; background: #f8f9fa; color: #333; border: none; border-radius: 8px 8px 0 0; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+        📊 재고분석
+      </button>
+      <button class="material-detail-tab" data-tab="price" onclick="switchMaterialTab('price')"
+        style="padding: 12px 20px; background: #f8f9fa; color: #333; border: none; border-radius: 8px 8px 0 0; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+        💰 가격비교
+      </button>
+      <button class="material-detail-tab" data-tab="consistency" onclick="switchMaterialTab('consistency')"
+        style="padding: 12px 20px; background: #f8f9fa; color: #333; border: none; border-radius: 8px 8px 0 0; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+        🔍 일관성검사
+      </button>
+    </div>
+  `;
+
+  const tabContentHtml = `
+    <div id="tab-basic" class="material-tab-content" style="display: block;">
+      ${basicInfoHtml}
+      ${pricesHtml}
+      ${ledgerHtml}
+      ${transactionsHtml}
+    </div>
+    <div id="tab-inventory" class="material-tab-content" style="display: none;">
+      <div style="text-align: center; padding: 40px; color: #999;">
+        <p>로딩 중...</p>
+      </div>
+    </div>
+    <div id="tab-price" class="material-tab-content" style="display: none;">
+      <div style="text-align: center; padding: 40px; color: #999;">
+        <p>로딩 중...</p>
+      </div>
+    </div>
+    <div id="tab-consistency" class="material-tab-content" style="display: none;">
+      <div style="text-align: center; padding: 40px; color: #999;">
+        <p>로딩 중...</p>
+      </div>
+    </div>
+  `;
+
   // 모달에 HTML 삽입
   const detailContent = document.getElementById('historyDetailContent');
   if (detailContent) {
-    detailContent.innerHTML = basicInfoHtml + pricesHtml + ledgerHtml + transactionsHtml;
+    detailContent.innerHTML = tabsHtml + tabContentHtml;
   }
+
+  // 자재코드 저장 (탭 전환 시 사용)
+  window.currentMaterialCode = material.분류코드 + material.세부코드;
 
   // 모달 표시
   document.getElementById('historyDetailModal').style.display = 'flex';
@@ -820,6 +869,372 @@ window.exportHistoryToGoogleSheets = function exportHistoryToGoogleSheets() {
  */
 if (typeof formatCurrency === 'undefined') {
   window.formatCurrency = formatCurrencyKRW;
+}
+
+// ================================================================
+// 자재 상세 모달 - 탭 전환 및 데이터 로딩 기능
+// ================================================================
+
+/**
+ * 탭 전환 함수
+ */
+window.switchMaterialTab = async function switchMaterialTab(tabName) {
+  // 모든 탭 버튼 비활성화
+  document.querySelectorAll('.material-detail-tab').forEach((btn) => {
+    btn.style.background = '#f8f9fa';
+    btn.style.color = '#333';
+    btn.classList.remove('active');
+  });
+
+  // 모든 탭 컨텐츠 숨기기
+  document.querySelectorAll('.material-tab-content').forEach((content) => {
+    content.style.display = 'none';
+  });
+
+  // 선택한 탭 활성화
+  const selectedTab = document.querySelector(`.material-detail-tab[data-tab="${tabName}"]`);
+  if (selectedTab) {
+    selectedTab.style.background = '#007bff';
+    selectedTab.style.color = 'white';
+    selectedTab.classList.add('active');
+  }
+
+  // 선택한 탭 컨텐츠 표시
+  const selectedContent = document.getElementById(`tab-${tabName}`);
+  if (selectedContent) {
+    selectedContent.style.display = 'block';
+  }
+
+  // 탭별 데이터 로딩
+  if (tabName === 'inventory') {
+    await loadInventoryAnalysis();
+  } else if (tabName === 'price') {
+    await loadPriceComparison();
+  } else if (tabName === 'consistency') {
+    await loadConsistencyCheck();
+  }
+};
+
+/**
+ * 재고분석 탭 데이터 로딩
+ */
+async function loadInventoryAnalysis() {
+  const 자재코드 = window.currentMaterialCode;
+  if (!자재코드) return;
+
+  try {
+    const response = await fetch(`/api/materials/${자재코드}/inventory-analysis`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) throw new Error('재고 분석 데이터 조회 실패');
+
+    const result = await response.json();
+    const data = result.data;
+
+    if (!data) {
+      document.getElementById('tab-inventory').innerHTML = `
+        <div style="text-align: center; padding: 40px; color: #999;">
+          <p>재고 분석 데이터가 없습니다.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // 재고 분석 HTML 생성
+    const html = `
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
+        <h3 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700;">📊 재고 및 거래 분석</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+          <div style="background: rgba(255,255,255,0.2); padding: 16px; border-radius: 8px; backdrop-filter: blur(10px);">
+            <div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">현재재고 (추정)</div>
+            <div style="font-size: 28px; font-weight: 700;">${formatNumber(data.현재재고 || 0)}</div>
+            <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">${data.단위 || ''}</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.2); padding: 16px; border-radius: 8px; backdrop-filter: blur(10px);">
+            <div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">총 매입수량</div>
+            <div style="font-size: 28px; font-weight: 700;">${formatNumber(data.총매입수량 || 0)}</div>
+            <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">${data.단위 || ''}</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.2); padding: 16px; border-radius: 8px; backdrop-filter: blur(10px);">
+            <div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">총 매출수량</div>
+            <div style="font-size: 28px; font-weight: 700;">${formatNumber(data.총매출수량 || 0)}</div>
+            <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">${data.단위 || ''}</div>
+          </div>
+        </div>
+      </div>
+
+      ${
+        data.권장태그
+          ? `
+      <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+        <div style="font-size: 16px; font-weight: 600; color: #856404;">
+          ${data.권장태그}
+        </div>
+      </div>
+      `
+          : ''
+      }
+
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 16px;">
+        <h4 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 700; color: #333;">📈 거래 통계</h4>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+          <div style="background: white; padding: 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="font-size: 13px; color: #666; margin-bottom: 8px;">매입 정보</div>
+            <div style="margin-bottom: 12px;">
+              <strong>매입건수:</strong> ${formatNumber(data.매입건수 || 0)}건
+            </div>
+            <div style="margin-bottom: 12px;">
+              <strong>최근매입일:</strong> ${data.최근매입일자 ? data.최근매입일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '-'}
+            </div>
+            <div>
+              <strong>최근매입단가:</strong> ${formatCurrency(data.최근매입단가 || 0)}
+            </div>
+          </div>
+          <div style="background: white; padding: 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="font-size: 13px; color: #666; margin-bottom: 8px;">매출 정보</div>
+            <div style="margin-bottom: 12px;">
+              <strong>매출건수:</strong> ${formatNumber(data.매출건수 || 0)}건
+            </div>
+            <div style="margin-bottom: 12px;">
+              <strong>주요매입처:</strong> ${data.주요매입처 || '-'}
+            </div>
+            <div>
+              <strong>우선순위점수:</strong> ${formatNumber(data.우선순위점수 || 0)}점
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background: #e7f3ff; padding: 16px; border-radius: 8px;">
+        <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 700; color: #333;">💡 우선순위 점수 설명</h4>
+        <div style="font-size: 13px; line-height: 1.6; color: #555;">
+          <ul style="margin: 0; padding-left: 20px;">
+            <li><strong>2000점 이상:</strong> 재고 있음 (동일 코드 사용 권장)</li>
+            <li><strong>1000~1999점:</strong> 최근 3개월 이내 매입 자재</li>
+            <li><strong>500~999점:</strong> 최근 1년 이내 매입 자재</li>
+            <li><strong>100~499점:</strong> 매입 이력 있음</li>
+            <li><strong>0점:</strong> 거래 이력 없음</li>
+          </ul>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('tab-inventory').innerHTML = html;
+  } catch (error) {
+    console.error('재고 분석 로딩 에러:', error);
+    document.getElementById('tab-inventory').innerHTML = `
+      <div style="text-align: center; padding: 40px; color: #dc3545;">
+        <p>재고 분석 데이터를 불러오는 중 오류가 발생했습니다.</p>
+      </div>
+    `;
+  }
+}
+
+/**
+ * 가격비교 탭 데이터 로딩
+ */
+async function loadPriceComparison() {
+  const 자재코드 = window.currentMaterialCode;
+  if (!자재코드) return;
+
+  try {
+    const response = await fetch(`/api/materials/${자재코드}/price-comparison`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) throw new Error('가격 비교 데이터 조회 실패');
+
+    const result = await response.json();
+    const data = result.data;
+
+    if (!data || data.length === 0) {
+      document.getElementById('tab-price').innerHTML = `
+        <div style="text-align: center; padding: 40px; color: #999;">
+          <p>가격 비교 데이터가 없습니다.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // 가격 비교 HTML 생성
+    let html = `
+      <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
+        <h3 style="margin: 0; font-size: 22px; font-weight: 700;">💰 매입처별 가격 비교</h3>
+        <p style="margin: 8px 0 0 0; opacity: 0.9; font-size: 14px;">총 ${data.length}개 매입처</p>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <thead style="background: #f8f9fa;">
+            <tr>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: left; font-weight: 600;">순위</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: left; font-weight: 600;">매입처</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 600;">매입건수</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 600;">총입고수량</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 600;">평균단가</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 600;">최저단가</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 600;">최고단가</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: center; font-weight: 600;">최근매입일</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    data.forEach((row, index) => {
+      const rowStyle =
+        index === 0
+          ? 'background: #fff3cd;'
+          : index % 2 === 0
+            ? 'background: #f8f9fa;'
+            : 'background: white;';
+
+      html += `
+        <tr style="${rowStyle}">
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: left;">
+            ${index === 0 ? '<span style="background: #ffc107; color: white; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 12px;">🥇 최우선</span>' : index + 1}
+          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: 500;">${row.매입처명 || '-'}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: right;">${formatNumber(row.매입건수 || 0)}건</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: right; font-weight: 600;">${formatNumber(row.총입고수량 || 0)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: right;">${formatCurrency(row.평균입고단가 || 0)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: right; color: #28a745; font-weight: 600;">${formatCurrency(row.최저입고단가 || 0)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: right; color: #dc3545;">${formatCurrency(row.최고입고단가 || 0)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: center;">${row.최근매입일자 ? row.최근매입일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '-'}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+
+      <div style="background: #e7f3ff; padding: 16px; border-radius: 8px; margin-top: 20px;">
+        <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 700; color: #333;">💡 가격 비교 정보</h4>
+        <div style="font-size: 13px; line-height: 1.6; color: #555;">
+          <p style="margin: 0 0 8px 0;">• <strong>최우선 매입처:</strong> 총 입고수량이 가장 많은 매입처입니다.</p>
+          <p style="margin: 0;">• <strong>최저단가:</strong> 녹색으로 표시된 가격이 가장 저렴한 매입 단가입니다.</p>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('tab-price').innerHTML = html;
+  } catch (error) {
+    console.error('가격 비교 로딩 에러:', error);
+    document.getElementById('tab-price').innerHTML = `
+      <div style="text-align: center; padding: 40px; color: #dc3545;">
+        <p>가격 비교 데이터를 불러오는 중 오류가 발생했습니다.</p>
+      </div>
+    `;
+  }
+}
+
+/**
+ * 일관성검사 탭 데이터 로딩
+ */
+async function loadConsistencyCheck() {
+  const 자재코드 = window.currentMaterialCode;
+  if (!자재코드) return;
+
+  try {
+    const response = await fetch(`/api/materials/${자재코드}/consistency-check`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) throw new Error('일관성 검사 데이터 조회 실패');
+
+    const result = await response.json();
+    const data = result.data;
+    const currentMaterial = result.currentMaterial;
+
+    if (!data || data.length === 0) {
+      document.getElementById('tab-consistency').innerHTML = `
+        <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 20px; border-radius: 8px;">
+          <h4 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #155724;">✅ 일관성 검사 통과</h4>
+          <p style="margin: 0; color: #155724; font-size: 14px;">같은 자재명/규격을 사용하는 다른 자재코드가 없습니다.</p>
+          <p style="margin: 8px 0 0 0; color: #155724; font-size: 13px; opacity: 0.8;">자재코드가 중복 없이 잘 관리되고 있습니다.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // 일관성 검사 HTML 생성
+    let html = `
+      <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
+        <h3 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700;">⚠️ 자재코드 중복 발견</h3>
+        <p style="margin: 0; opacity: 0.9; font-size: 14px;">
+          <strong>${currentMaterial.자재명}</strong> / <strong>${currentMaterial.규격 || '-'}</strong> 자재가 ${data.length}개의 다른 코드로 등록되어 있습니다.
+        </p>
+      </div>
+
+      <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="font-size: 14px; font-weight: 600; color: #856404; margin-bottom: 8px;">💡 권장사항</div>
+        <div style="font-size: 13px; color: #856404; line-height: 1.6;">
+          재고가 있는 자재코드를 계속 사용하는 것이 좋습니다. 여러 코드를 사용하면 재고 관리가 복잡해집니다.
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <thead style="background: #f8f9fa;">
+            <tr>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: left; font-weight: 600;">자재코드</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: left; font-weight: 600;">자재명</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: left; font-weight: 600;">규격</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 600;">매입건수</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 600;">매출건수</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 600;">현재재고</th>
+              <th style="padding: 14px; border-bottom: 2px solid #dee2e6; text-align: center; font-weight: 600;">권장</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    data.forEach((row, index) => {
+      const hasStock = row.현재재고 > 0;
+      const rowStyle = hasStock
+        ? 'background: #d4edda;'
+        : index % 2 === 0
+          ? 'background: #f8f9fa;'
+          : 'background: white;';
+
+      html += `
+        <tr style="${rowStyle}">
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-family: monospace; font-weight: 600;">${row.자재코드 || '-'}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${row.자재명 || '-'}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${row.규격 || '-'}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: right;">${formatNumber(row.매입건수 || 0)}건</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: right;">${formatNumber(row.매출건수 || 0)}건</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: right; font-weight: 600; color: ${hasStock ? '#28a745' : '#6c757d'};">
+            ${formatNumber(row.현재재고 || 0)} ${row.단위 || ''}
+          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; text-align: center;">
+            ${
+              hasStock
+                ? '<span style="background: #28a745; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">★ 우선 사용</span>'
+                : '<span style="color: #999; font-size: 12px;">-</span>'
+            }
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    document.getElementById('tab-consistency').innerHTML = html;
+  } catch (error) {
+    console.error('일관성 검사 로딩 에러:', error);
+    document.getElementById('tab-consistency').innerHTML = `
+      <div style="text-align: center; padding: 40px; color: #dc3545;">
+        <p>일관성 검사 데이터를 불러오는 중 오류가 발생했습니다.</p>
+      </div>
+    `;
+  }
 }
 
 // 페이지 로드 시 DataTable 초기화

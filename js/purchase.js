@@ -7,31 +7,32 @@
 let selectedPurchaseStatementForDelete = null;
 let newPurchaseStatementDetails = []; // 신규 작성 시 품목 목록
 
+// ✅ 날짜 초기화 함수 (최초 1회만 호출)
+function initPurchaseStatementDates() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const start = document.getElementById('purchaseStatementStartDate');
+  const end = document.getElementById('purchaseStatementEndDate');
+  const create = document.getElementById('purchaseStatementCreateDate');
+
+  if (start && !start.value) start.value = todayStr;
+  if (end && !end.value) end.value = todayStr;
+  if (create && !create.value) create.value = todayStr;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  // 날짜 초기화 (최초 1회만)
+  initPurchaseStatementDates();
+
   // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
   window.loadPurchaseStatements = loadPurchaseStatements;
 });
 
 // ✅ 매입전표 목록 불러오기
 async function loadPurchaseStatements() {
-  // 날짜 필드가 비어있을 때만 오늘 날짜로 초기화 (최초 1회만)
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-
-  const startDateInput = document.getElementById('purchaseStatementStartDate');
-  const endDateInput = document.getElementById('purchaseStatementEndDate');
-  const createDateInput = document.getElementById('purchaseStatementCreateDate');
-
-  // 값이 비어있을 때만 오늘 날짜로 설정 (사용자가 선택한 날짜 유지)
-  if (startDateInput && !startDateInput.value) {
-    startDateInput.value = todayStr;
-  }
-  if (endDateInput && !endDateInput.value) {
-    endDateInput.value = todayStr;
-  }
-  if (createDateInput && !createDateInput.value) {
-    createDateInput.value = todayStr;
-  }
+  // ✅ 다른 페이지의 체크박스 이벤트 핸들러 제거
+  $(document).off('change.quotationPage');
+  $(document).off('change.orderPage');
+  $(document).off('change.transactionPage');
   try {
     const startDate = document.getElementById('purchaseStatementStartDate').value;
     const endDate = document.getElementById('purchaseStatementEndDate').value;
@@ -62,7 +63,7 @@ async function loadPurchaseStatements() {
         {
           data: null,
           render: (data, type, row, meta) =>
-            `<input type="checkbox" class="purchaseStatementCheckbox" data-date="${row.거래일자}" data-no="${row.거래번호}">`,
+            `<input type="checkbox" class="purchaseStatementCheckbox" data-date="${row.거래일자}" data-no="${row.거래번호}" />`,
           orderable: false,
         },
         {
@@ -153,31 +154,70 @@ async function loadPurchaseStatements() {
         });
       },
     });
+
+    // ✅ 전체선택 체크박스 이벤트 핸들러 등록
+    $(document).off('change', '#selectAllPurchaseStatements').on('change', '#selectAllPurchaseStatements', function () {
+      const isChecked = $(this).prop('checked');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('💰 [매입전표관리] 전체선택 체크박스 클릭');
+      console.log(`✅ 체크 상태: ${isChecked ? '전체 선택' : '전체 해제'}`);
+
+      $('.purchaseStatementCheckbox').prop('checked', isChecked).trigger('change');
+
+      console.log('✅ 전체선택 처리 완료');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    });
+
+    // ✅ 개별 체크박스 이벤트 핸들러 등록
+    $(document).off('change', '.purchaseStatementCheckbox').on('change', '.purchaseStatementCheckbox', function () {
+      const purchaseDate = String($(this).data('date'));
+      const purchaseNo = String($(this).data('no'));
+      const isChecked = $(this).prop('checked');
+
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('💰 [매입전표관리] 체크박스 이벤트 발생');
+      console.log(`📅 거래일자: ${purchaseDate}`);
+      console.log(`🔢 거래번호: ${purchaseNo}`);
+      console.log(`✅ 체크 상태: ${isChecked ? '선택됨' : '해제됨'}`);
+
+      // 전체 선택 체크박스 상태 업데이트
+      const totalCheckboxes = $('.purchaseStatementCheckbox').length;
+      const checkedCheckboxes = $('.purchaseStatementCheckbox:checked').length;
+      $('#selectAllPurchaseStatements').prop('checked', totalCheckboxes === checkedCheckboxes);
+
+      // 현재 행의 버튼 표시/숨김 처리
+      const actionDiv = $('#purchase-actions-' + purchaseDate + '_' + purchaseNo);
+
+      if (isChecked) {
+        // 체크됨: 보기 버튼 숨기고 수정/삭제 버튼 표시
+        actionDiv.find('.btn-view').hide();
+        actionDiv.find('.btn-edit').show();
+        actionDiv.find('.btn-delete').show();
+
+        console.log('🔘 표시된 버튼:');
+        console.log('   ❌ [보기] 버튼 - 숨김');
+        console.log('   ✅ [수정] 버튼 - 표시');
+        console.log('   ✅ [삭제] 버튼 - 표시');
+      } else {
+        // 체크 해제: 수정/삭제 버튼 숨기고 보기 버튼 표시
+        actionDiv.find('.btn-view').show();
+        actionDiv.find('.btn-edit').hide();
+        actionDiv.find('.btn-delete').hide();
+
+        console.log('🔘 표시된 버튼:');
+        console.log('   ✅ [보기] 버튼 - 표시');
+        console.log('   ❌ [수정] 버튼 - 숨김');
+        console.log('   ❌ [삭제] 버튼 - 숨김');
+      }
+
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    });
+
   } catch (err) {
     console.error('❌ 매입전표 조회 에러:', err);
     alert('매입전표 조회 중 오류가 발생했습니다.');
   }
 }
-
-// ✅ 체크박스 이벤트 핸들러
-$(document)
-  .off('change', '.purchaseStatementCheckbox')
-  .on('change', '.purchaseStatementCheckbox', function () {
-    const purchaseDate = String($(this).data('date'));
-    const purchaseNo = String($(this).data('no'));
-    const isChecked = $(this).prop('checked');
-    const actionDiv = $('#purchase-actions-' + purchaseDate + '_' + purchaseNo);
-
-    if (isChecked) {
-      actionDiv.find('.btn-view').hide();
-      actionDiv.find('.btn-edit').show();
-      actionDiv.find('.btn-delete').show();
-    } else {
-      actionDiv.find('.btn-view').show();
-      actionDiv.find('.btn-edit').hide();
-      actionDiv.find('.btn-delete').hide();
-    }
-  });
 
 // ✅ 상태 렌더링 함수
 function renderPurchaseStatementStatus(status) {
@@ -288,6 +328,10 @@ function openNewPurchaseStatementModal() {
   document.getElementById('purchaseStatementCreateSupplierName').value = '';
   document.getElementById('purchaseStatementCreateRemark').value = '';
 
+  // 드롭다운 숨김
+  document.getElementById('purchaseStatementSupplierCodeDropdown').style.display = 'none';
+  document.getElementById('purchaseStatementSupplierNameDropdown').style.display = 'none';
+
   // 오늘 날짜로 설정
   const today = new Date().toISOString().slice(0, 10);
   document.getElementById('purchaseStatementCreateDate').value = today;
@@ -302,6 +346,38 @@ function openNewPurchaseStatementModal() {
   if (typeof makeModalDraggable === 'function' && !window.purchaseStatementCreateModalDraggable) {
     makeModalDraggable('purchaseStatementCreateModal', 'purchaseStatementCreateModalHeader');
     window.purchaseStatementCreateModalDraggable = true;
+  }
+
+  // ✅ 자동완성 이벤트 리스너 등록 (최초 1회만)
+  if (!window.purchaseSupplierAutocompleteInitialized) {
+    const codeInput = document.getElementById('purchaseStatementCreateSupplierCode');
+    const nameInput = document.getElementById('purchaseStatementCreateSupplierName');
+
+    // 매입처 코드 입력 이벤트
+    codeInput.addEventListener('input', (e) => {
+      searchPurchaseSupplierByCode(e.target.value);
+    });
+
+    // 매입처 명 입력 이벤트
+    nameInput.addEventListener('input', (e) => {
+      searchPurchaseSupplierByName(e.target.value);
+    });
+
+    // 포커스 아웃 시 드롭다운 숨김 (약간의 딜레이로 클릭 이벤트 먼저 처리)
+    codeInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        document.getElementById('purchaseStatementSupplierCodeDropdown').style.display = 'none';
+      }, 200);
+    });
+
+    nameInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        document.getElementById('purchaseStatementSupplierNameDropdown').style.display = 'none';
+      }, 200);
+    });
+
+    window.purchaseSupplierAutocompleteInitialized = true;
+    console.log('✅ 매입처 자동완성 이벤트 리스너 등록 완료');
   }
 }
 
@@ -363,7 +439,9 @@ function updateNewPurchaseStatementDetailsTable() {
 // ✅ 신규 매입전표 자재 추가 모달 열기
 function openNewPurchaseStatementDetailAddModal() {
   document.getElementById('purchaseStatementMaterialSearchModal').style.display = 'block';
-  document.getElementById('purchaseStatementMaterialSearchInput').value = '';
+  document.getElementById('purchaseStatementMaterialSearchCode').value = '';
+  document.getElementById('purchaseStatementMaterialSearchName').value = '';
+  document.getElementById('purchaseStatementMaterialSearchSpec').value = '';
   console.log('✅ 자재 검색 모달 열기 (매입전표용)');
 
   // 드래그 기능 활성화 (최초 1회만 실행)
@@ -381,21 +459,67 @@ function openNewPurchaseStatementDetailAddModal() {
 
 // ✅ 자재 검색 모달 닫기
 function closePurchaseStatementMaterialSearchModal() {
-  document.getElementById('purchaseStatementMaterialSearchModal').style.display = 'none';
+  console.log('🔍 closePurchaseStatementMaterialSearchModal 호출됨');
+
+  try {
+    const modal = document.getElementById('purchaseStatementMaterialSearchModal');
+    console.log('🔍 모달 요소:', modal);
+
+    if (modal) {
+      modal.style.display = 'none';
+      console.log('✅ 모달 display를 none으로 설정 완료');
+      console.log('🔍 설정 후 모달 display 값:', modal.style.display);
+    } else {
+      console.error('❌ purchaseStatementMaterialSearchModal 요소를 찾을 수 없습니다!');
+    }
+
+    // 입력 필드 초기화 (에러가 발생해도 모달은 닫힘)
+    try {
+      document.getElementById('purchaseStatementMaterialSearchCode').value = '';
+      document.getElementById('purchaseStatementMaterialSearchName').value = '';
+      document.getElementById('purchaseStatementMaterialSearchSpec').value = '';
+      document.getElementById('purchaseStatementAddDetailQuantity').value = 1;
+      document.getElementById('purchaseStatementAddDetailPrice').value = 0;
+      document.getElementById('purchaseStatementAddDetailAmount').value = '0';
+      document.getElementById('purchaseStatementMaterialSearchResults').style.display = 'none';
+      document.getElementById('purchaseStatementSelectedMaterialInfo').style.display = 'none';
+      window.selectedPurchaseStatementMaterial = null;
+      console.log('✅ 입력 필드 초기화 완료');
+    } catch (initError) {
+      console.error('⚠️ 입력 필드 초기화 중 오류 (무시):', initError);
+    }
+  } catch (error) {
+    console.error('❌ 모달 닫기 중 오류:', error);
+  }
 }
 
 // ✅ 자재 검색 (매입전표 작성 모달용)
 async function searchPurchaseStatementMaterials() {
-  const searchKeyword = document
-    .getElementById('purchaseStatementMaterialSearchInput')
-    .value.trim();
-  if (!searchKeyword) {
-    alert('검색어를 입력해주세요.');
-    return;
-  }
-
   try {
-    const response = await fetch(`/api/materials?search=${encodeURIComponent(searchKeyword)}`);
+    // 각 필드의 검색어 가져오기
+    const searchCode = document.getElementById('purchaseStatementMaterialSearchCode').value.trim();
+    const searchName = document.getElementById('purchaseStatementMaterialSearchName').value.trim();
+    const searchSpec = document.getElementById('purchaseStatementMaterialSearchSpec').value.trim();
+
+    // 최소 1개 이상의 검색어 입력 확인
+    if (!searchCode && !searchName && !searchSpec) {
+      alert('최소 1개 이상의 검색 조건을 입력해주세요.');
+      return;
+    }
+
+    console.log('🔍 매입전표 자재 검색:', {
+      자재코드: searchCode,
+      자재명: searchName,
+      규격: searchSpec,
+    });
+
+    // 검색 조건을 쿼리 파라미터로 전달
+    const params = new URLSearchParams();
+    if (searchCode) params.append('searchCode', searchCode);
+    if (searchName) params.append('searchName', searchName);
+    if (searchSpec) params.append('searchSpec', searchSpec);
+
+    const response = await fetch(`/api/materials?${params.toString()}`);
     const result = await response.json();
 
     if (!result.success) {
@@ -556,15 +680,19 @@ function confirmPurchaseStatementDetailAdd() {
 
   updateNewPurchaseStatementDetailsTable();
 
-  // 모달 닫기 및 초기화
-  clearSelectedPurchaseStatementMaterial();
-  closePurchaseStatementMaterialSearchModal();
-
   console.log(
     '✅ 자재 추가 완료 (신규 등록):',
     material.자재명,
     `수량: ${quantity}, 단가: ${price}`,
   );
+
+  // 모달 닫기 및 초기화
+  console.log('🔍 모달 닫기 시작...');
+
+  // clearSelectedPurchaseStatementMaterial 대신 직접 초기화 (closePurchaseStatementMaterialSearchModal에서 처리)
+  closePurchaseStatementMaterialSearchModal();
+
+  console.log('✅ 모달 닫기 완료');
 }
 
 // ✅ 이전 단가 보기 (TODO: 구현 예정)
@@ -673,6 +801,108 @@ function selectPurchaseStatementSupplier(supplier) {
   document.getElementById('purchaseStatementCreateSupplierName').value = supplier.매입처명;
   closePurchaseStatementSupplierSearchModal();
   console.log('✅ 매입처 선택:', supplier.매입처명);
+}
+
+// ✅ 매입처 코드로 자동완성 검색
+let purchaseSupplierCodeSearchTimeout;
+async function searchPurchaseSupplierByCode(searchValue) {
+  clearTimeout(purchaseSupplierCodeSearchTimeout);
+
+  if (!searchValue || searchValue.trim().length === 0) {
+    document.getElementById('purchaseStatementSupplierCodeDropdown').style.display = 'none';
+    return;
+  }
+
+  purchaseSupplierCodeSearchTimeout = setTimeout(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers?searchCode=${encodeURIComponent(searchValue)}`);
+      const data = await response.json();
+
+      const dropdown = document.getElementById('purchaseStatementSupplierCodeDropdown');
+      dropdown.innerHTML = '';
+
+      if (data.success && data.data && data.data.length > 0) {
+        data.data.forEach((supplier) => {
+          const item = document.createElement('div');
+          item.style.cssText = `
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+          `;
+          item.innerHTML = `
+            <div style="font-weight: 500;">${supplier.매입처코드}</div>
+            <div style="font-size: 12px; color: #666; margin-top: 2px;">${supplier.매입처명}</div>
+          `;
+          item.onmouseover = () => (item.style.background = '#f0f7ff');
+          item.onmouseout = () => (item.style.background = 'white');
+          item.onclick = () => {
+            document.getElementById('purchaseStatementCreateSupplierCode').value = supplier.매입처코드;
+            document.getElementById('purchaseStatementCreateSupplierName').value = supplier.매입처명;
+            dropdown.style.display = 'none';
+            console.log('✅ 매입처 자동완성 선택 (코드):', supplier.매입처명);
+          };
+          dropdown.appendChild(item);
+        });
+        dropdown.style.display = 'block';
+      } else {
+        dropdown.style.display = 'none';
+      }
+    } catch (err) {
+      console.error('❌ 매입처 코드 검색 오류:', err);
+    }
+  }, 300);
+}
+
+// ✅ 매입처 명으로 자동완성 검색
+let purchaseSupplierNameSearchTimeout;
+async function searchPurchaseSupplierByName(searchValue) {
+  clearTimeout(purchaseSupplierNameSearchTimeout);
+
+  if (!searchValue || searchValue.trim().length === 0) {
+    document.getElementById('purchaseStatementSupplierNameDropdown').style.display = 'none';
+    return;
+  }
+
+  purchaseSupplierNameSearchTimeout = setTimeout(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers?searchName=${encodeURIComponent(searchValue)}`);
+      const data = await response.json();
+
+      const dropdown = document.getElementById('purchaseStatementSupplierNameDropdown');
+      dropdown.innerHTML = '';
+
+      if (data.success && data.data && data.data.length > 0) {
+        data.data.forEach((supplier) => {
+          const item = document.createElement('div');
+          item.style.cssText = `
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+          `;
+          item.innerHTML = `
+            <div style="font-weight: 500;">${supplier.매입처명}</div>
+            <div style="font-size: 12px; color: #666; margin-top: 2px;">${supplier.매입처코드}</div>
+          `;
+          item.onmouseover = () => (item.style.background = '#f0f7ff');
+          item.onmouseout = () => (item.style.background = 'white');
+          item.onclick = () => {
+            document.getElementById('purchaseStatementCreateSupplierCode').value = supplier.매입처코드;
+            document.getElementById('purchaseStatementCreateSupplierName').value = supplier.매입처명;
+            dropdown.style.display = 'none';
+            console.log('✅ 매입처 자동완성 선택 (명):', supplier.매입처명);
+          };
+          dropdown.appendChild(item);
+        });
+        dropdown.style.display = 'block';
+      } else {
+        dropdown.style.display = 'none';
+      }
+    } catch (err) {
+      console.error('❌ 매입처 명 검색 오류:', err);
+    }
+  }, 300);
 }
 
 // ✅ 매입전표 작성 제출
@@ -904,7 +1134,9 @@ function addPurchaseStatementDetailRow() {
   document.getElementById('purchaseStatementDetailAddModal').style.display = 'block';
 
   // 입력 필드 초기화
-  document.getElementById('purchaseStatementEditMaterialSearchInput').value = '';
+  document.getElementById('purchaseStatementEditMaterialSearchCode').value = '';
+  document.getElementById('purchaseStatementEditMaterialSearchName').value = '';
+  document.getElementById('purchaseStatementEditMaterialSearchSpec').value = '';
   document.getElementById('purchaseStatementEditDetailQuantity').value = 1;
   document.getElementById('purchaseStatementEditDetailPrice').value = 0;
   document.getElementById('purchaseStatementEditDetailAmount').value = '0';
@@ -920,16 +1152,37 @@ function closePurchaseStatementDetailAddModal() {
 
 // ✅ 매입전표 수정 - 자재 검색
 async function searchPurchaseStatementEditMaterials() {
-  const searchKeyword = document
-    .getElementById('purchaseStatementEditMaterialSearchInput')
-    .value.trim();
-  if (!searchKeyword) {
-    alert('검색어를 입력해주세요.');
-    return;
-  }
-
   try {
-    const response = await fetch(`/api/materials?search=${encodeURIComponent(searchKeyword)}`);
+    // 각 필드의 검색어 가져오기
+    const searchCode = document
+      .getElementById('purchaseStatementEditMaterialSearchCode')
+      .value.trim();
+    const searchName = document
+      .getElementById('purchaseStatementEditMaterialSearchName')
+      .value.trim();
+    const searchSpec = document
+      .getElementById('purchaseStatementEditMaterialSearchSpec')
+      .value.trim();
+
+    // 최소 1개 이상의 검색어 입력 확인
+    if (!searchCode && !searchName && !searchSpec) {
+      alert('최소 1개 이상의 검색 조건을 입력해주세요.');
+      return;
+    }
+
+    console.log('🔍 매입전표 수정 자재 검색:', {
+      자재코드: searchCode,
+      자재명: searchName,
+      규격: searchSpec,
+    });
+
+    // 검색 조건을 쿼리 파라미터로 전달
+    const params = new URLSearchParams();
+    if (searchCode) params.append('searchCode', searchCode);
+    if (searchName) params.append('searchName', searchName);
+    if (searchSpec) params.append('searchSpec', searchSpec);
+
+    const response = await fetch(`/api/materials?${params.toString()}`);
     const result = await response.json();
 
     if (!result.success) {
@@ -1094,25 +1347,20 @@ function editPurchaseStatementDetailRow(rowIndex) {
 
   window.currentEditingPurchaseStatementDetailIndex = rowIndex;
 
-  document.getElementById('purchaseStatementEditItemName').value = item.자재명 || '';
+  // 품목 정보 표시 (읽기 전용 박스)
+  document.getElementById('purchaseStatementEditDetailCode').textContent = item.자재코드 ? item.자재코드.substring(4) : '-';
+  document.getElementById('purchaseStatementEditDetailName').textContent = item.자재명 || '-';
+  document.getElementById('purchaseStatementEditDetailSpec').textContent = item.규격 || '-';
+
+  // 수정 가능한 필드
   document.getElementById('purchaseStatementEditItemQuantity').value = item.수량 || 0;
   document.getElementById('purchaseStatementEditItemPrice').value = item.단가 || 0;
 
   calculatePurchaseStatementEditItemAmount();
 
-  document.getElementById('purchaseStatementDetailEditModal').style.display = 'flex';
+  document.getElementById('purchaseStatementDetailEditModal').style.display = 'block';
 
-  // 드래그 기능 활성화 (최초 1회만 실행)
-  if (
-    typeof makeModalDraggable === 'function' &&
-    !window.purchaseStatementDetailEditModalDraggable
-  ) {
-    makeModalDraggable(
-      'purchaseStatementDetailEditModal',
-      'purchaseStatementDetailEditModalHeader',
-    );
-    window.purchaseStatementDetailEditModalDraggable = true;
-  }
+  // 드래그 기능 제거 (헤더에서 cursor: move 제거됨)
 }
 
 // ✅ 매입전표 수정 - 품목 수정 모달 닫기

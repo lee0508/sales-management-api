@@ -528,10 +528,7 @@ body {
   background: #e9ecef;
 }
 
-#selectAllCustomers {
-  transform: scale(1.2);
-  cursor: pointer;
-}
+/* Removed: #selectAllCustomers transform scale - now using consistent 18px sizing at line 1393 */
 
 /*
 .table-container {

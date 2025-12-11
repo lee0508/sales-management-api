@@ -2,6 +2,7 @@
 // 최초 1회만 호출
 
 let transactionTableInstance = null;
+let isSelectAllMode = false; // 전체선택 모드 플래그
 
 function initTransactionDates() {
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -37,6 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ✅ 거래명세서 목록 불러오기
 async function loadTransactions() {
+  // ✅ 다른 페이지의 체크박스 이벤트 핸들러 제거
+  $(document).off('change.quotationPage');
+  $(document).off('change.orderPage');
+  $(document).off('change.purchasePage');
+
   // 페이지가 표시될 때마다 날짜를 오늘 날짜(로그인 날짜)로 초기화
   // const today = new Date();
   // const todayStr = today.toISOString().slice(0, 10);
@@ -158,6 +164,12 @@ async function loadTransactions() {
       responsive: true,
       autoWidth: false,
       drawCallback: function () {
+        // 전체선택 체크박스 상태 확인
+        const isSelectAllChecked = $('#selectAllTransactions').prop('checked');
+
+        // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
+        $('.transactionCheckbox').prop('checked', isSelectAllChecked);
+
         // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
         $('.transactionCheckbox').each(function () {
           const $checkbox = $(this);
@@ -181,48 +193,97 @@ async function loadTransactions() {
       },
     });
 
-    // ✅ 개별 체크박스 이벤트 (DataTable 초기화 후 등록)
+    // ✅ 전체선택 체크박스 이벤트 핸들러 등록
+    $(document)
+      .off('change', '#selectAllTransactions')
+      .on('change', '#selectAllTransactions', function () {
+        const isChecked = $(this).prop('checked');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📄 [거래명세서관리] 전체선택 체크박스 클릭');
+        console.log(`✅ 체크 상태: ${isChecked ? '전체 선택' : '전체 해제'}`);
+
+        // 전체선택 모드 플래그 설정
+        isSelectAllMode = true;
+        $('.transactionCheckbox').prop('checked', isChecked).trigger('change');
+        isSelectAllMode = false;
+
+        console.log('✅ 전체선택 처리 완료');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      });
+
+    // ✅ 개별 체크박스 이벤트 핸들러 등록
     $(document)
       .off('change', '.transactionCheckbox')
       .on('change', '.transactionCheckbox', function () {
-        const transactionDate = String($(this).data('date'));
-        const transactionNo = String($(this).data('no'));
-        const isChecked = $(this).prop('checked');
+        const $currentCheckbox = $(this);
+        const transactionDate = String($currentCheckbox.data('date'));
+        const transactionNo = String($currentCheckbox.data('no'));
+        const isChecked = $currentCheckbox.prop('checked');
+
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📄 [거래명세서관리] 체크박스 이벤트 발생');
+        console.log(`📅 거래일자: ${transactionDate}`);
+        console.log(`🔢 거래번호: ${transactionNo}`);
+        console.log(`✅ 체크 상태: ${isChecked ? '선택됨' : '해제됨'}`);
+        console.log(`🎯 전체선택 모드: ${isSelectAllMode ? 'ON' : 'OFF'}`);
+
+        // 개별 선택 모드일 때만 단일 선택 로직 실행
+        if (!isSelectAllMode && isChecked) {
+          // 체크된 경우: 다른 모든 체크박스 해제
+          console.log('🔄 개별 선택 모드 - 다른 체크박스 해제 시작');
+
+          $('.transactionCheckbox').not($currentCheckbox).each(function() {
+            const $otherCheckbox = $(this);
+            const otherDate = String($otherCheckbox.data('date'));
+            const otherNo = String($otherCheckbox.data('no'));
+
+            $otherCheckbox.prop('checked', false);
+
+            const otherActionDiv = $('#transaction-actions-' + otherDate + '_' + otherNo);
+            otherActionDiv.find('.btn-view').show();
+            otherActionDiv.find('.btn-edit').hide();
+            otherActionDiv.find('.btn-delete').hide();
+            otherActionDiv.find('.btn-approve').hide();
+          });
+
+          console.log('✅ 다른 체크박스 해제 완료');
+        }
+
+        // 전체 선택 체크박스 상태 업데이트
+        const totalCheckboxes = $('.transactionCheckbox').length;
+        const checkedCheckboxes = $('.transactionCheckbox:checked').length;
+        $('#selectAllTransactions').prop('checked', totalCheckboxes === checkedCheckboxes);
+
+        // 현재 행의 버튼 표시/숨김 처리
         const actionDiv = $('#transaction-actions-' + transactionDate + '_' + transactionNo);
 
-        console.log('✅ 체크박스 변경:', {
-          transactionDate,
-          transactionNo,
-          isChecked,
-          actionDiv: actionDiv.length,
-          btnView: actionDiv.find('.btn-view').length,
-          btnEdit: actionDiv.find('.btn-edit').length,
-          btnDelete: actionDiv.find('.btn-delete').length,
-        });
-
         if (isChecked) {
-          // 체크됨: 상세 버튼 숨기고 수정/삭제/확정 버튼 표시
+          // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
           actionDiv.find('.btn-view').hide();
           actionDiv.find('.btn-edit').show();
           actionDiv.find('.btn-delete').show();
           actionDiv.find('.btn-approve').show();
-          console.log('✅ 버튼 표시 완료 - 수정/삭제/확정 버튼 visible');
+
+          console.log('🔘 표시된 버튼:');
+          console.log('   ❌ [상세보기] 버튼 - 숨김');
+          console.log('   ✅ [수정] 버튼 - 표시');
+          console.log('   ✅ [삭제] 버튼 - 표시');
+          console.log('   ✅ [확정] 버튼 - 표시');
         } else {
-          // 체크 해제: 수정/삭제/확정 버튼 숨기고 상세 버튼 표시
+          // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
           actionDiv.find('.btn-view').show();
           actionDiv.find('.btn-edit').hide();
           actionDiv.find('.btn-delete').hide();
           actionDiv.find('.btn-approve').hide();
-          console.log('✅ 버튼 표시 완료 - 상세 버튼 visible');
-        }
-      });
 
-    // ✅ 전체 체크박스 선택/해제 이벤트
-    $('#selectAllTransactions')
-      .off('change')
-      .on('change', function () {
-        const isChecked = $(this).prop('checked');
-        $('.transactionCheckbox').prop('checked', isChecked).trigger('change');
+          console.log('🔘 표시된 버튼:');
+          console.log('   ✅ [상세보기] 버튼 - 표시');
+          console.log('   ❌ [수정] 버튼 - 숨김');
+          console.log('   ❌ [삭제] 버튼 - 숨김');
+          console.log('   ❌ [확정] 버튼 - 숨김');
+        }
+
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       });
 
     if (data.data.length === 0) {
@@ -932,10 +993,14 @@ async function editTransaction(transactionDate, transactionNo) {
       details: details,
     };
 
-    // DataTable 초기화
+    // DataTable 초기화 - 기존 인스턴스 정리
     if (window.transactionEditDetailTableInstance) {
       window.transactionEditDetailTableInstance.destroy();
+      window.transactionEditDetailTableInstance = null;
     }
+
+    // 테이블 tbody 초기화
+    $('#transactionEditDetailTable tbody').empty();
 
     window.transactionEditDetailTableInstance = $('#transactionEditDetailTable').DataTable({
       data: details,
@@ -945,23 +1010,14 @@ async function editTransaction(transactionDate, transactionNo) {
           render: (data, type, row, meta) => meta.row + 1,
         },
         {
-          data: '분류코드',
+          data: '자재코드',
           defaultContent: '-',
-          visible: false, // 칼럼 숨김
-          // render: (d) => {
-          //   if (!d) return '-';
-          //   // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
-          //   return d.length > 2 ? d.substring(2) : d;
-          // },
-        },
-        {
-          data: '세부코드',
-          defaultContent: '-',
-          // render: (d) => {
-          //   if (!d) return '-';
-          //   // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
-          //   return d.length > 2 ? d.substring(2) : d;
-          // },
+          // visible: false, // 칼럼 숨김
+          render: (d) => {
+            if (!d) return '-';
+            // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
+            return d.length > 2 ? d.substring(2) : d;
+          },
         },
         { data: '자재명', defaultContent: '-' },
         { data: '규격', defaultContent: '-' },
@@ -1047,6 +1103,8 @@ function closeTransactionEditModal() {
   if (window.transactionEditDetailTableInstance) {
     window.transactionEditDetailTableInstance.destroy();
     window.transactionEditDetailTableInstance = null;
+    // 테이블 tbody 초기화
+    $('#transactionEditDetailTable tbody').empty();
   }
 
   // 전역 변수 초기화
@@ -1140,7 +1198,9 @@ function updateTransactionEditTotal() {
 function addTransactionDetailRow() {
   // 선택된 자재 정보 초기화
   window.selectedTransactionMaterial = null;
-  document.getElementById('transactionMaterialSearchInput').value = '';
+  document.getElementById('transactionMaterialSearchCode').value = '';
+  document.getElementById('transactionMaterialSearchName').value = '';
+  document.getElementById('transactionMaterialSearchSpec').value = '';
   document.getElementById('transactionSelectedMaterialInfo').style.display = 'none';
   document.getElementById('transactionMaterialSearchResults').style.display = 'none';
   document.getElementById('transactionAddDetailQuantity').value = '1';
@@ -1158,14 +1218,30 @@ function addTransactionDetailRow() {
 // ✅ 자재 검색 함수
 async function searchTransactionMaterials() {
   try {
-    const searchKeyword = document.getElementById('transactionMaterialSearchInput').value.trim();
+    // 각 필드의 검색어 가져오기
+    const searchCode = document.getElementById('transactionMaterialSearchCode').value.trim();
+    const searchName = document.getElementById('transactionMaterialSearchName').value.trim();
+    const searchSpec = document.getElementById('transactionMaterialSearchSpec').value.trim();
 
-    if (!searchKeyword) {
-      alert('검색어를 입력해주세요.');
+    // 최소 1개 이상의 검색어 입력 확인
+    if (!searchCode && !searchName && !searchSpec) {
+      alert('최소 1개 이상의 검색 조건을 입력해주세요.');
       return;
     }
 
-    const response = await fetch(`/api/materials?search=${encodeURIComponent(searchKeyword)}`);
+    console.log('🔍 거래명세서 자재 검색:', {
+      자재코드: searchCode,
+      자재명: searchName,
+      규격: searchSpec,
+    });
+
+    // 검색 조건을 쿼리 파라미터로 전달
+    const params = new URLSearchParams();
+    if (searchCode) params.append('searchCode', searchCode);
+    if (searchName) params.append('searchName', searchName);
+    if (searchSpec) params.append('searchSpec', searchSpec);
+
+    const response = await fetch(`/api/materials?${params.toString()}`);
     const result = await response.json();
 
     if (!result.success || !result.data) {
@@ -1609,7 +1685,9 @@ async function approveTransaction(transactionDate, transactionNo) {
 // ✅ 자재 추가 모달 열기
 function openNewTransactionDetailAddModal() {
   window.newSelectedTransactionMaterial = null;
-  document.getElementById('newTransactionMaterialSearchInput').value = '';
+  document.getElementById('newTransactionMaterialSearchCode').value = '';
+  document.getElementById('newTransactionMaterialSearchName').value = '';
+  document.getElementById('newTransactionMaterialSearchSpec').value = '';
   document.getElementById('newTransactionSelectedMaterialInfo').style.display = 'none';
   document.getElementById('newTransactionMaterialSearchResults').style.display = 'none';
   document.getElementById('newTransactionAddDetailQuantity').value = '1';
@@ -1631,14 +1709,31 @@ function closeNewTransactionDetailAddModal() {
 
 // ✅ 자재 검색 (거래명세서 작성용)
 async function searchNewTransactionMaterials() {
-  const searchKeyword = document.getElementById('newTransactionMaterialSearchInput').value.trim();
-  if (!searchKeyword) {
-    alert('검색어를 입력해주세요.');
-    return;
-  }
-
   try {
-    const response = await fetch(`/api/materials?search=${encodeURIComponent(searchKeyword)}`);
+    // 각 필드의 검색어 가져오기
+    const searchCode = document.getElementById('newTransactionMaterialSearchCode').value.trim();
+    const searchName = document.getElementById('newTransactionMaterialSearchName').value.trim();
+    const searchSpec = document.getElementById('newTransactionMaterialSearchSpec').value.trim();
+
+    // 최소 1개 이상의 검색어 입력 확인
+    if (!searchCode && !searchName && !searchSpec) {
+      alert('최소 1개 이상의 검색 조건을 입력해주세요.');
+      return;
+    }
+
+    console.log('🔍 신규 거래명세서 자재 검색:', {
+      자재코드: searchCode,
+      자재명: searchName,
+      규격: searchSpec,
+    });
+
+    // 검색 조건을 쿼리 파라미터로 전달
+    const params = new URLSearchParams();
+    if (searchCode) params.append('searchCode', searchCode);
+    if (searchName) params.append('searchName', searchName);
+    if (searchSpec) params.append('searchSpec', searchSpec);
+
+    const response = await fetch(`/api/materials?${params.toString()}`);
     const result = await response.json();
 
     if (!result.success) {

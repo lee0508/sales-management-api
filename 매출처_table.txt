@@ -27,31 +27,6 @@ YmhDB	dbo	매출처	사용자코드	23	('')	NO	varchar	4	4	NULL	NULL	NULL	NULL	N
 YmhDB	dbo	매출처	비고란	24	('')	NO	varchar	100	100	NULL	NULL	NULL	NULL	NULL	NULL	cp949	NULL	NULL	Korean_Wansung_CI_AS	NULL	NULL	NULL
 YmhDB	dbo	매출처	단가구분	25	(1)	NO	tinyint	NULL	NULL	3	10	0	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
 
-SELECT [사업장코드]
-      ,[매출처코드]
-      ,[매출처명]
-      ,[사업자번호]
-      ,[법인번호]
-      ,[대표자명]
-      ,[대표자주민번호]
-      ,[개업일자]
-      ,[우편번호]
-      ,[주소]
-      ,[번지]
-      ,[업태]
-      ,[업종]
-      ,[전화번호]
-      ,[팩스번호]
-      ,[은행코드]
-      ,[계좌번호]
-      ,[계산서발행여부]
-      ,[계산서발행율]
-      ,[담당자명]
-      ,[사용구분]
-      ,[수정일자]
-      ,[사용자코드]
-      ,[비고란]
-      ,[단가구분]
-  FROM [YmhDB].[dbo].[매출처]
-  WHERE [사업장코드] = '01'
-  AND [매출처명] LIKE '%전기%'
+-- 매출처 테이블 인덱스 정보
+인덱스명	인덱스타입	유니크여부	기본키여부	인덱스컬럼
+PK_매출처	CLUSTERED	1	1	사업장코드, 매출처코드
