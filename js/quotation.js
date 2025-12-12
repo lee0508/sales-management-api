@@ -32,16 +32,16 @@ window.selectQuotationCustomer = function selectQuotationCustomer(customer) {
     }
 
     // 모달 닫기
-    window.closeCustomerSearchModal();
+    window.closeQuotationCustomerSearchModal();
   } catch (err) {
     console.error('❌ selectQuotationCustomer 에러:', err);
     alert('매출처 선택 중 오류가 발생했습니다: ' + err.message);
   }
 };
 
-// 매출처 검색 모달 닫기 함수
-window.closeCustomerSearchModal = function closeCustomerSearchModal() {
-  const modal = document.getElementById('customerSearchModal');
+// 견적서 작성용 매출처 검색 모달 닫기 함수
+window.closeQuotationCustomerSearchModal = function closeQuotationCustomerSearchModal() {
+  const modal = document.getElementById('quotationCustomerSearchModal');
   if (modal) {
     modal.style.display = 'none';
   }
@@ -1805,12 +1805,12 @@ function closeQuotationModal() {
   newQuotationDetails = [];
 }
 
-// ✅ 매출처 검색 모달 열기
-function openCustomerSearchModal() {
+// ✅ 견적서 작성용 매출처 검색 모달 열기
+function openQuotationCustomerSearchModal() {
   // 입력 필드의 값을 검색 모달로 가져가기
   const searchValue = document.getElementById('selectedCustomerName').value.trim();
 
-  document.getElementById('customerSearchModal').style.display = 'block';
+  document.getElementById('quotationCustomerSearchModal').style.display = 'block';
   document.getElementById('quotationCustomerSearchInput').value = searchValue;
 
   // 값이 있으면 자동으로 검색 실행
@@ -1820,7 +1820,9 @@ function openCustomerSearchModal() {
 }
 
 // ✅ 전역으로 노출 (HTML에서 호출할 수 있도록)
-window.openCustomerSearchModal = openCustomerSearchModal;
+window.openQuotationCustomerSearchModal = openQuotationCustomerSearchModal;
+// 하위 호환성을 위한 별칭 (추후 제거 예정)
+window.openCustomerSearchModal = openQuotationCustomerSearchModal;
 
 // ✅ 견적서용 매출처 검색
 async function searchQuotationCustomers() {

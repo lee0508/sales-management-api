@@ -86,9 +86,9 @@ $(document).ready(function () {
         render: function (data, type, row) {
           return `
             <div class="action-buttons" id="customerActions-${row.매출처코드}">
-              <button class="btn-icon btn-view" onclick="viewCustomerDetail('${row.매출처코드}')">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editCustomer('${row.매출처코드}')">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteCustomer('${row.매출처코드}')">삭제</button>
+              <button class="btn-icon customerBtnView" onclick="viewCustomerDetail('${row.매출처코드}')">상세</button>
+              <button class="btn-icon customerBtnEdit" style="display: none;" onclick="editCustomer('${row.매출처코드}')">수정</button>
+              <button class="btn-icon customerBtnDelete" style="display: none;" onclick="deleteCustomer('${row.매출처코드}')">삭제</button>
             </div>
           `;
         },
@@ -109,13 +109,13 @@ $(document).ready(function () {
         const actionDiv = $('#customerActions-' + customerCode);
 
         if (isChecked) {
-          actionDiv.find('.btn-view').hide();
-          actionDiv.find('.btn-edit').show();
-          actionDiv.find('.btn-delete').show();
+          actionDiv.find('.customerBtnView').hide();
+          actionDiv.find('.customerBtnEdit').show();
+          actionDiv.find('.customerBtnDelete').show();
         } else {
-          actionDiv.find('.btn-view').show();
-          actionDiv.find('.btn-edit').hide();
-          actionDiv.find('.btn-delete').hide();
+          actionDiv.find('.customerBtnView').show();
+          actionDiv.find('.customerBtnEdit').hide();
+          actionDiv.find('.customerBtnDelete').hide();
         }
       });
     });
@@ -127,44 +127,50 @@ $(document).ready(function () {
   // 새로고침 버튼 (현재 HTML에 없음 - 필요시 추가)
   // $('#customerBtnReload').on('click', () => table.ajax.reload(null, false));
 
-  // 전체 선택 체크박스
-  $(document).on('change', '#customerSelectAll', function () {
-    const isChecked = $(this).prop('checked');
-    $('.customerRowCheck').prop('checked', isChecked).trigger('change');
-  });
+  // 전체 선택 체크박스 (이벤트 네임스페이스 적용)
+  $(document)
+    .off('change.customerPage', '#customerSelectAll')
+    .on('change.customerPage', '#customerSelectAll', function () {
+      const isChecked = $(this).prop('checked');
+      $('.customerRowCheck').prop('checked', isChecked).trigger('change');
+    });
 
-  // 개별 체크박스 변경 시
-  $(document).on('change', '.customerRowCheck', function () {
-    // 전체 선택 체크박스 상태 업데이트
-    const totalCheckboxes = $('.customerRowCheck').length;
-    const checkedCheckboxes = $('.customerRowCheck:checked').length;
-    $('#customerSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
+  // 개별 체크박스 변경 시 (이벤트 네임스페이스 적용)
+  $(document)
+    .off('change.customerPage', '.customerRowCheck')
+    .on('change.customerPage', '.customerRowCheck', function () {
+      // 전체 선택 체크박스 상태 업데이트
+      const totalCheckboxes = $('.customerRowCheck').length;
+      const checkedCheckboxes = $('.customerRowCheck:checked').length;
+      $('#customerSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
 
-    // 현재 행의 버튼 표시/숨김 처리
-    const customerCode = $(this).data('code');
-    const isChecked = $(this).prop('checked');
-    const actionDiv = $('#customerActions-' + customerCode);
+      // 현재 행의 버튼 표시/숨김 처리
+      const customerCode = $(this).data('code');
+      const isChecked = $(this).prop('checked');
+      const actionDiv = $('#customerActions-' + customerCode);
 
-    if (isChecked) {
-      // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
-      actionDiv.find('.btn-view').hide();
-      actionDiv.find('.btn-edit').show();
-      actionDiv.find('.btn-delete').show();
-    } else {
-      // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
-      actionDiv.find('.btn-view').show();
-      actionDiv.find('.btn-edit').hide();
-      actionDiv.find('.btn-delete').hide();
-    }
-  });
+      if (isChecked) {
+        // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
+        actionDiv.find('.customerBtnView').hide();
+        actionDiv.find('.customerBtnEdit').show();
+        actionDiv.find('.customerBtnDelete').show();
+      } else {
+        // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
+        actionDiv.find('.customerBtnView').show();
+        actionDiv.find('.customerBtnEdit').hide();
+        actionDiv.find('.customerBtnDelete').hide();
+      }
+    });
 
-  // Enter 키 이벤트 처리
-  $('#customerSearchInput').on('keypress', function (e) {
-    if (e.which === 13) { // Enter key
-      e.preventDefault();
-      searchCustomers();
-    }
-  });
+  // Enter 키 이벤트 처리 (이벤트 네임스페이스 적용)
+  $('#customerSearchInput')
+    .off('keypress.customerPage')
+    .on('keypress.customerPage', function (e) {
+      if (e.which === 13) { // Enter key
+        e.preventDefault();
+        searchCustomers();
+      }
+    });
 
   // 검색 함수를 전역으로 노출
   window.searchCustomers = function () {
