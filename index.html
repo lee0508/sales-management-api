@@ -2293,10 +2293,10 @@
               <input type="date" id="quotationStartDate" class="form-control" style="width: 150px" />
               <span>~</span>
               <input type="date" id="quotationEndDate" class="form-control" style="width: 150px" />
-              <button class="btn btn-secondary" onclick="filterQuotations()">조회</button>
+              <button id="quotationBtnFilter" class="btn btn-secondary" onclick="filterQuotations()">조회</button>
             </div>
             <div class="toolbar-right">
-              <button class="btn btn-success" onclick="openNewQuotationModal()" style="
+              <button id="quotationBtnNew" class="btn btn-success" onclick="openNewQuotationModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -2308,7 +2308,7 @@
                   ">
                 <span style="font-size: 18px; margin-right: 4px">+</span> 견적서 작성
               </button>
-              <button class="btn btn-secondary" onclick="exportQuotationsToExcel()" style="
+              <button id="quotationBtnExport" class="btn btn-secondary" onclick="exportQuotationsToExcel()" style="
                     padding: 10px 20px;
                     background: #6c757d;
                     color: white;
@@ -4089,11 +4089,11 @@
               <input type="date" id="transactionStartDate" class="form-control" style="width: 150px" />
               <span>~</span>
               <input type="date" id="transactionEndDate" class="form-control" style="width: 150px" />
-              <button class="btn btn-secondary" onclick="filterTransactions()">조회</button>
+              <button id="transactionBtnFilter" class="btn btn-secondary" onclick="filterTransactions()">조회</button>
             </div>
 
             <div class="toolbar-right">
-              <button class="btn btn-success" onclick="openNewTransactionModal()" style="
+              <button id="transactionBtnNew" class="btn btn-success" onclick="openNewTransactionModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -4105,7 +4105,7 @@
                   ">
                 <span style="font-size: 18px; margin-right: 4px">+</span> 거래명세서 작성
               </button>
-              <button class="btn btn-secondary" onclick="exportTransactionsToExcel()" style="
+              <button id="transactionBtnExport" class="btn btn-secondary" onclick="exportTransactionsToExcel()" style="
                     padding: 10px 20px;
                     background: #6c757d;
                     color: white;
