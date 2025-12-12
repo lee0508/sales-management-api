@@ -241,7 +241,7 @@ $(document).ready(function () {
         },
         // 7. 견적금액
         {
-          data: '합계금액',
+          data: '견적금액',
           render: function (data) {
             if (!data) return '0원';
             return data.toLocaleString() + '원';
@@ -249,7 +249,7 @@ $(document).ready(function () {
         },
         // 8. 담당자
         {
-          data: '사용자명',
+          data: '담당자',
           defaultContent: '-',
         },
         // 9. 상태 (배지)
