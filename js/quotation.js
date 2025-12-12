@@ -200,7 +200,7 @@ $(document).ready(function () {
           data: null,
           orderable: false,
           render: function (data, type, row) {
-            return `<input type="checkbox" class="quotationCheckbox" data-date="${row.견적일자}" data-no="${row.견적번호}" />`;
+            return `<input type="checkbox" class="quotationRowCheck" data-date="${row.견적일자}" data-no="${row.견적번호}" />`;
           },
         },
         // 2. 순번 (역순: 가장 오래된 데이터 = 1, 최신 데이터 = 마지막 번호)
@@ -272,7 +272,7 @@ $(document).ready(function () {
           render: function (data, type, row) {
             const quotationKey = `${row.견적일자}-${row.견적번호}`;
             return `
-              <div class="action-buttons" id="actions-${quotationKey.replace('-', '_')}">
+              <div class="action-buttons" id="quotationActions-${quotationKey.replace('-', '_')}">
                 <button class="btn-icon btn-view" onclick="viewQuotationDetail('${row.견적일자}', ${
               row.견적번호
             })" title="상세보기">상세</button>
@@ -313,18 +313,18 @@ $(document).ready(function () {
       autoWidth: false,
       drawCallback: function () {
         // 전체선택 체크박스 상태 확인
-        const isSelectAllChecked = $('#selectAllQuotations').prop('checked');
+        const isSelectAllChecked = $('#quotationSelectAll').prop('checked');
 
         // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
-        $('.quotationCheckbox').prop('checked', isSelectAllChecked);
+        $('.quotationRowCheck').prop('checked', isSelectAllChecked);
 
         // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
-        $('.quotationCheckbox').each(function () {
+        $('.quotationRowCheck').each(function () {
           const $checkbox = $(this);
           const quotationDate = $checkbox.data('date');
           const quotationNo = $checkbox.data('no');
           const isChecked = $checkbox.prop('checked');
-          const actionDiv = $(`#actions-${quotationDate}_${quotationNo}`);
+          const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
 
           if (isChecked) {
             actionDiv.find('.btn-view').hide();
@@ -342,20 +342,20 @@ $(document).ready(function () {
     });
 
     // ✅ 전체선택 체크박스 이벤트 핸들러 등록
-    $(document).off('change', '#selectAllQuotations').on('change', '#selectAllQuotations', function () {
+    $(document).off('change', '#quotationSelectAll').on('change', '#quotationSelectAll', function () {
       const isChecked = $(this).prop('checked');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('📋 [견적관리] 전체선택 체크박스 클릭');
       console.log(`✅ 체크 상태: ${isChecked ? '전체 선택' : '전체 해제'}`);
 
-      $('.quotationCheckbox').prop('checked', isChecked).trigger('change');
+      $('.quotationRowCheck').prop('checked', isChecked).trigger('change');
 
       console.log('✅ 전체선택 처리 완료');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     });
 
     // ✅ 개별 체크박스 이벤트 핸들러 등록
-    $(document).off('change', '.quotationCheckbox').on('change', '.quotationCheckbox', function () {
+    $(document).off('change', '.quotationRowCheck').on('change', '.quotationRowCheck', function () {
       const quotationDate = $(this).data('date');
       const quotationNo = $(this).data('no');
       const isChecked = $(this).prop('checked');
@@ -367,12 +367,12 @@ $(document).ready(function () {
       console.log(`✅ 체크 상태: ${isChecked ? '선택됨' : '해제됨'}`);
 
       // 전체 선택 체크박스 상태 업데이트
-      const totalCheckboxes = $('.quotationCheckbox').length;
-      const checkedCheckboxes = $('.quotationCheckbox:checked').length;
-      $('#selectAllQuotations').prop('checked', totalCheckboxes === checkedCheckboxes);
+      const totalCheckboxes = $('.quotationRowCheck').length;
+      const checkedCheckboxes = $('.quotationRowCheck:checked').length;
+      $('#quotationSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
 
       // 현재 행의 버튼 표시/숨김 처리
-      const actionDiv = $(`#actions-${quotationDate}_${quotationNo}`);
+      const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
 
       if (isChecked) {
         // 체크됨: 상세 버튼 숨기고 수정/삭제/승인 버튼 표시
@@ -548,13 +548,13 @@ function closeQuotationDetailModal() {
   }
 
   // 체크박스 초기화
-  $('.quotationCheckbox').prop('checked', false);
+  $('.quotationRowCheck').prop('checked', false);
 
   // 버튼 상태도 초기화
-  $('.quotationCheckbox').each(function () {
+  $('.quotationRowCheck').each(function () {
     const quotationDate = $(this).data('date');
     const quotationNo = $(this).data('no');
-    const actionDiv = $(`#actions-${quotationDate}_${quotationNo}`);
+    const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
 
     actionDiv.find('.btn-view').show();
     actionDiv.find('.btn-edit').hide();
@@ -769,12 +769,12 @@ function closeQuotationEditModal() {
   }
 
   // 체크박스 초기화
-  $('.quotationCheckbox').prop('checked', false);
+  $('.quotationRowCheck').prop('checked', false);
   // 버튼 상태도 초기화
-  $('.quotationCheckbox').each(function () {
+  $('.quotationRowCheck').each(function () {
     const quotationDate = $(this).data('date');
     const quotationNo = $(this).data('no');
-    const actionDiv = $(`#actions-${quotationDate}_${quotationNo}`);
+    const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
 
     actionDiv.find('.btn-view').show();
     actionDiv.find('.btn-edit').hide();
@@ -1790,13 +1790,13 @@ function openNewQuotationModal() {
 function closeQuotationModal() {
   document.getElementById('quotationModal').style.display = 'none';
   // 견적 체크박스만 초기화
-  $('#selectAllQuotations').prop('checked', false);
-  $('.quotationCheckbox').prop('checked', false);
+  $('#quotationSelectAll').prop('checked', false);
+  $('.quotationRowCheck').prop('checked', false);
   // 버튼 상태도 초기화
-  $('.quotationCheckbox').each(function () {
+  $('.quotationRowCheck').each(function () {
     const quotationDate = $(this).data('date');
     const quotationNo = $(this).data('no');
-    const actionDiv = $(`#actions-${quotationDate}_${quotationNo}`);
+    const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
 
     actionDiv.find('.btn-view').show();
     actionDiv.find('.btn-edit').hide();

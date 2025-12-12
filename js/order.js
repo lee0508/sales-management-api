@@ -115,7 +115,7 @@ async function loadOrderList() {
         data: null,
         orderable: false,
         render: function (data, type, row) {
-          return `<input type="checkbox" class="order-checkbox" data-order-date="${row.발주일자}" data-order-no="${row.발주번호}" />`;
+          return `<input type="checkbox" class="orderRowCheck" data-order-date="${row.발주일자}" data-order-no="${row.발주번호}" />`;
         },
       },
       // 2. 순번
@@ -182,7 +182,7 @@ async function loadOrderList() {
         render: function (data, type, row) {
           const orderKey = `${row.발주일자}_${row.발주번호}`;
           return `
-            <div class="action-buttons" id="actions-${orderKey}">
+            <div class="action-buttons" id="orderActions-${orderKey}">
               <button class="btn-icon btn-view" onclick="viewOrderDetail('${row.발주일자}', ${row.발주번호})" title="상세보기">상세</button>
               <button class="btn-icon btn-edit" style="display: none;" onclick="editOrder('${row.발주일자}', ${row.발주번호})" title="수정">수정</button>
               <button class="btn-icon btn-delete" style="display: none;" onclick="deleteOrder('${row.발주일자}', ${row.발주번호})" title="삭제">삭제</button>
@@ -212,18 +212,18 @@ async function loadOrderList() {
     autoWidth: false,
     drawCallback: function (settings) {
       // 전체선택 체크박스 상태 확인
-      const isSelectAllChecked = $('#selectAllOrders').prop('checked');
+      const isSelectAllChecked = $('#orderSelectAll').prop('checked');
 
       // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
-      $('.order-checkbox').prop('checked', isSelectAllChecked);
+      $('.orderRowCheck').prop('checked', isSelectAllChecked);
 
       // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
-      $('.order-checkbox').each(function () {
+      $('.orderRowCheck').each(function () {
         const $checkbox = $(this);
         const orderDate = $checkbox.data('order-date');
         const orderNo = $checkbox.data('order-no');
         const isChecked = $checkbox.prop('checked');
-        const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
+        const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
         if (isChecked) {
           actionDiv.find('.btn-view').hide();
@@ -239,7 +239,7 @@ async function loadOrderList() {
   });
 
   // ✅ 전체선택 체크박스 이벤트 핸들러 등록
-  $(document).off('change', '#selectAllOrders').on('change', '#selectAllOrders', function () {
+  $(document).off('change', '#orderSelectAll').on('change', '#orderSelectAll', function () {
     const isChecked = $(this).prop('checked');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📦 [발주관리] 전체선택 체크박스 클릭');
@@ -247,7 +247,7 @@ async function loadOrderList() {
 
     // 전체선택 모드 플래그 설정
     isSelectAllMode = true;
-    $('.order-checkbox').prop('checked', isChecked).trigger('change');
+    $('.orderRowCheck').prop('checked', isChecked).trigger('change');
     isSelectAllMode = false;
 
     console.log('✅ 전체선택 처리 완료');
@@ -255,7 +255,7 @@ async function loadOrderList() {
   });
 
   // ✅ 개별 체크박스 이벤트 핸들러 등록
-  $(document).off('change', '.order-checkbox').on('change', '.order-checkbox', function () {
+  $(document).off('change', '.orderRowCheck').on('change', '.orderRowCheck', function () {
     const $currentCheckbox = $(this);
     const orderDate = $currentCheckbox.data('order-date');
     const orderNo = $currentCheckbox.data('order-no');
@@ -271,7 +271,7 @@ async function loadOrderList() {
     // 개별 선택 모드일 때만 단일 선택 로직 실행
     if (!isSelectAllMode && isChecked) {
       // 체크된 경우: 다른 모든 체크박스 해제
-      $('.order-checkbox').not($currentCheckbox).each(function() {
+      $('.orderRowCheck').not($currentCheckbox).each(function() {
         const $otherCheckbox = $(this);
         const otherDate = $otherCheckbox.data('order-date');
         const otherNo = $otherCheckbox.data('order-no');
@@ -280,7 +280,7 @@ async function loadOrderList() {
         $otherCheckbox.prop('checked', false);
 
         // 다른 행의 버튼 숨김 처리
-        const otherActionDiv = $(`#actions-${otherDate}_${otherNo}`);
+        const otherActionDiv = $(`#orderActions-${otherDate}_${otherNo}`);
         otherActionDiv.find('.btn-view').show();
         otherActionDiv.find('.btn-edit').hide();
         otherActionDiv.find('.btn-delete').hide();
@@ -291,15 +291,15 @@ async function loadOrderList() {
 
     // 개별 선택 모드일 때만 전체 선택 체크박스 해제
     if (!isSelectAllMode) {
-      $('#selectAllOrders').prop('checked', false);
+      $('#orderSelectAll').prop('checked', false);
     }
 
     // 현재 행의 버튼 표시/숨김 처리
-    const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
-    console.log(`🔍 찾을 액션 DIV ID: #actions-${orderDate}_${orderNo}`);
+    const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
+    console.log(`🔍 찾을 액션 DIV ID: #orderActions-${orderDate}_${orderNo}`);
     console.log(`🔍 actionDiv 발견됨: ${actionDiv.length > 0 ? '예' : '아니오'}`);
     if (actionDiv.length === 0) {
-      console.error(`❌ 액션 DIV를 찾을 수 없습니다! ID: #actions-${orderDate}_${orderNo}`);
+      console.error(`❌ 액션 DIV를 찾을 수 없습니다! ID: #orderActions-${orderDate}_${orderNo}`);
       console.log('🔍 현재 페이지의 모든 액션 DIV:');
       $('.action-buttons').each(function() {
         console.log(`  - ${$(this).attr('id')}`);
@@ -568,14 +568,14 @@ function closeOrderDetailModal() {
   }
 
   // 발주 체크박스만 초기화
-  $('#selectAllOrders').prop('checked', false);
-  $('.order-checkbox').prop('checked', false);
+  $('#orderSelectAll').prop('checked', false);
+  $('.orderRowCheck').prop('checked', false);
 
   // 버튼 상태도 초기화
-  $('.order-checkbox').each(function () {
+  $('.orderRowCheck').each(function () {
     const orderDate = $(this).data('order-date');
     const orderNo = $(this).data('order-no');
-    const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
+    const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
     actionDiv.find('.btn-view').show();
     actionDiv.find('.btn-edit').hide();
@@ -666,13 +666,13 @@ async function openOrderModal() {
 function closeOrderModal() {
   document.getElementById('orderModal').style.display = 'none';
   // 발주 체크박스만 초기화
-  $('#selectAllOrders').prop('checked', false);
-  $('.order-checkbox').prop('checked', false);
+  $('#orderSelectAll').prop('checked', false);
+  $('.orderRowCheck').prop('checked', false);
   // 버튼 상태도 초기화
-  $('.order-checkbox').each(function () {
+  $('.orderRowCheck').each(function () {
     const orderDate = $(this).data('order-date');
     const orderNo = $(this).data('order-no');
-    const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
+    const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
     actionDiv.find('.btn-view').show();
     actionDiv.find('.btn-edit').hide();
@@ -2223,14 +2223,14 @@ function openNewOrderModal() {
 function closeOrderModal() {
   document.getElementById('newOrderModal').style.display = 'none';
   // 발주 체크박스만 초기화
-  $('#selectAllOrders').prop('checked', false);
-  $('.order-checkbox').prop('checked', false);
+  $('#orderSelectAll').prop('checked', false);
+  $('.orderRowCheck').prop('checked', false);
 
   // 버튼 상태도 초기화
-  $('.order-checkbox').each(function () {
+  $('.orderRowCheck').each(function () {
     const orderDate = $(this).data('order-date');
     const orderNo = $(this).data('order-no');
-    const actionDiv = $(`#actions-${orderDate}_${orderNo}`);
+    const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
     actionDiv.find('.btn-view').show();
     actionDiv.find('.btn-edit').hide();

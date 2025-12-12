@@ -21,7 +21,7 @@ $(document).ready(function () {
         orderable: false,
         className: 'text-center',
         render: function (data, type, row) {
-          return '<input type="checkbox" class="supplierCheckbox" data-code="' + row.매입처코드 + '" />';
+          return '<input type="checkbox" class="supplierRowCheck" data-code="' + row.매입처코드 + '" />';
         },
       },
       {
@@ -81,7 +81,7 @@ $(document).ready(function () {
         className: 'text-center',
         render: function (data, type, row) {
           return `
-            <div class="action-buttons" id="supplier-actions-${row.매입처코드}">
+            <div class="action-buttons" id="supplierActions-${row.매입처코드}">
               <button class="btn-icon btn-view" onclick="viewSupplierDetail('${row.매입처코드}')">상세</button>
               <button class="btn-icon btn-edit" style="display: none;" onclick="editSupplier('${row.매입처코드}')">수정</button>
               <button class="btn-icon btn-delete" style="display: none;" onclick="deleteSupplier('${row.매입처코드}')">삭제</button>
@@ -93,16 +93,16 @@ $(document).ready(function () {
 
     // ✅ DataTable이 다시 그려질 때마다 전체선택 상태 동기화
     table.on('draw', function() {
-      const isSelectAllChecked = $('#selectAllSuppliers').prop('checked');
+      const isSelectAllChecked = $('#supplierSelectAll').prop('checked');
 
       // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
-      $('.supplierCheckbox').prop('checked', isSelectAllChecked);
+      $('.supplierRowCheck').prop('checked', isSelectAllChecked);
 
       // 각 체크박스 상태에 따라 버튼 표시/숨김 처리
-      $('.supplierCheckbox').each(function() {
+      $('.supplierRowCheck').each(function() {
         const supplierCode = $(this).data('code');
         const isChecked = $(this).prop('checked');
-        const actionDiv = $('#supplier-actions-' + supplierCode);
+        const actionDiv = $('#supplierActions-' + supplierCode);
 
         if (isChecked) {
           actionDiv.find('.btn-view').hide();
@@ -120,26 +120,26 @@ $(document).ready(function () {
   // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
   window.loadSuppliers = loadSuppliers;
 
-  // 새로고침 버튼
-  $('#btnReloadSupplier').on('click', () => table.ajax.reload(null, false));
+  // 새로고침 버튼 (현재 HTML에 없음 - 필요시 추가)
+  // $('#supplierBtnReload').on('click', () => table.ajax.reload(null, false));
 
   // 전체 선택 체크박스
-  $(document).on('change', '#selectAllSuppliers', function () {
+  $(document).on('change', '#supplierSelectAll', function () {
     const isChecked = $(this).prop('checked');
-    $('.supplierCheckbox').prop('checked', isChecked).trigger('change');
+    $('.supplierRowCheck').prop('checked', isChecked).trigger('change');
   });
 
   // 개별 체크박스 변경 시
-  $(document).on('change', '.supplierCheckbox', function () {
+  $(document).on('change', '.supplierRowCheck', function () {
     // 전체 선택 체크박스 상태 업데이트
-    const totalCheckboxes = $('.supplierCheckbox').length;
-    const checkedCheckboxes = $('.supplierCheckbox:checked').length;
-    $('#selectAllSuppliers').prop('checked', totalCheckboxes === checkedCheckboxes);
+    const totalCheckboxes = $('.supplierRowCheck').length;
+    const checkedCheckboxes = $('.supplierRowCheck:checked').length;
+    $('#supplierSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
 
     // 현재 행의 버튼 표시/숨김 처리
     const supplierCode = $(this).data('code');
     const isChecked = $(this).prop('checked');
-    const actionDiv = $('#supplier-actions-' + supplierCode);
+    const actionDiv = $('#supplierActions-' + supplierCode);
 
     if (isChecked) {
       // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
@@ -155,7 +155,7 @@ $(document).ready(function () {
   });
 
   // Enter 키 이벤트 처리
-  $('#supplierListSearchInput').on('keypress', function (e) {
+  $('#supplierSearchInput').on('keypress', function (e) {
     if (e.which === 13) { // Enter key
       e.preventDefault();
       searchSuppliers();
@@ -164,7 +164,7 @@ $(document).ready(function () {
 
   // 검색 함수를 전역으로 노출
   window.searchSuppliers = function () {
-    const keyword = $('#supplierListSearchInput').val().trim();
+    const keyword = $('#supplierSearchInput').val().trim();
     console.log('🔍 매입처 검색:', keyword);
     currentSearchKeyword = keyword;
     loadSuppliers(keyword);
@@ -173,7 +173,7 @@ $(document).ready(function () {
   // 검색 초기화 함수를 전역으로 노출
   window.resetSupplierSearch = function () {
     console.log('🔄 매입처 검색 초기화');
-    $('#supplierListSearchInput').val('');
+    $('#supplierSearchInput').val('');
     currentSearchKeyword = '';
     loadSuppliers('');
   };

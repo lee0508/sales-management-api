@@ -18,30 +18,28 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTransactions(); // 필요시 초기 로드
   // window.loadTransactions = loadTransactions;
 
-  // ✅ 수정 모달 닫기 버튼 이벤트
-  $(document).on('click', '#closeTransactionEditModalBtn', () => {
+  // ✅ 수정 모달 닫기 버튼 이벤트 (네임스페이스 사용)
+  $(document).on('click.transactionPage', '#closeTransactionEditModalBtn', () => {
     closeTransactionEditModal();
   });
 
-  // ✅ 수정 모달 배경 클릭시 닫기
-  $(document).on('click', '#transactionEditModal', function (e) {
+  // ✅ 수정 모달 배경 클릭시 닫기 (네임스페이스 사용)
+  $(document).on('click.transactionPage', '#transactionEditModal', function (e) {
     if (e.target.id === 'transactionEditModal') {
       closeTransactionEditModal();
     }
   });
 
-  // ✅ 품목 수정 모달 닫기 버튼 이벤트
-  $(document).on('click', '#closeTransactionDetailEditModalBtn', () => {
+  // ✅ 품목 수정 모달 닫기 버튼 이벤트 (네임스페이스 사용)
+  $(document).on('click.transactionPage', '#closeTransactionDetailEditModalBtn', () => {
     closeTransactionDetailEditModal();
   });
 });
 
 // ✅ 거래명세서 목록 불러오기
 async function loadTransactions() {
-  // ✅ 다른 페이지의 체크박스 이벤트 핸들러 제거
-  $(document).off('change.quotationPage');
-  $(document).off('change.orderPage');
-  $(document).off('change.purchasePage');
+  // ✅ transaction 페이지의 이벤트만 제거 (네임스페이스 사용)
+  $(document).off('.transactionPage');
 
   // 페이지가 표시될 때마다 날짜를 오늘 날짜(로그인 날짜)로 초기화
   // const today = new Date();
@@ -165,7 +163,7 @@ async function loadTransactions() {
       autoWidth: false,
       drawCallback: function () {
         // 전체선택 체크박스 상태 확인
-        const isSelectAllChecked = $('#selectAllTransactions').prop('checked');
+        const isSelectAllChecked = $('#transactionSelectAll').prop('checked');
 
         // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
         $('.transactionCheckbox').prop('checked', isSelectAllChecked);
@@ -193,10 +191,10 @@ async function loadTransactions() {
       },
     });
 
-    // ✅ 전체선택 체크박스 이벤트 핸들러 등록
+    // ✅ 전체선택 체크박스 이벤트 핸들러 등록 (네임스페이스 사용)
     $(document)
-      .off('change', '#selectAllTransactions')
-      .on('change', '#selectAllTransactions', function () {
+      .off('change.transactionPage', '#transactionSelectAll')
+      .on('change.transactionPage', '#transactionSelectAll', function () {
         const isChecked = $(this).prop('checked');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('📄 [거래명세서관리] 전체선택 체크박스 클릭');
@@ -211,10 +209,10 @@ async function loadTransactions() {
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       });
 
-    // ✅ 개별 체크박스 이벤트 핸들러 등록
+    // ✅ 개별 체크박스 이벤트 핸들러 등록 (네임스페이스 사용)
     $(document)
-      .off('change', '.transactionCheckbox')
-      .on('change', '.transactionCheckbox', function () {
+      .off('change.transactionPage', '.transactionCheckbox')
+      .on('change.transactionPage', '.transactionCheckbox', function () {
         const $currentCheckbox = $(this);
         const transactionDate = String($currentCheckbox.data('date'));
         const transactionNo = String($currentCheckbox.data('no'));
@@ -252,7 +250,7 @@ async function loadTransactions() {
         // 전체 선택 체크박스 상태 업데이트
         const totalCheckboxes = $('.transactionCheckbox').length;
         const checkedCheckboxes = $('.transactionCheckbox:checked').length;
-        $('#selectAllTransactions').prop('checked', totalCheckboxes === checkedCheckboxes);
+        $('#transactionSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
 
         // 현재 행의 버튼 표시/숨김 처리
         const actionDiv = $('#transaction-actions-' + transactionDate + '_' + transactionNo);
@@ -349,13 +347,13 @@ async function openTransactionDetailModal(transactionNo) {
     };
 
     // 기본 정보 표시
-    document.getElementById('detailTransactionNo').textContent = transactionNo;
-    document.getElementById('detailTransactionDate').textContent = date.replace(
+    document.getElementById('transactionDetailTransactionNo').textContent = transactionNo;
+    document.getElementById('transactionDetailTransactionDate').textContent = date.replace(
       /(\d{4})(\d{2})(\d{2})/,
       '$1-$2-$3',
     );
-    document.getElementById('detailCustomerName').textContent = firstDetail.매출처명 || '-';
-    document.getElementById('detailUserName').textContent = firstDetail.사용자명 || '-';
+    document.getElementById('transactionDetailCustomerName').textContent = firstDetail.매출처명 || '-';
+    document.getElementById('transactionDetailUserName').textContent = firstDetail.사용자명 || '-';
 
     // ✅ 상세 DataTable 초기화
     if (window.transactionDetailTableInstance) {
@@ -1608,7 +1606,7 @@ function deleteTransaction(transactionDate, transactionNo) {
 
   // 삭제 확인 모달에 정보 표시
   const transactionNoText = `${transactionDate}-${transactionNo}`;
-  document.getElementById('deleteTransactionInfo').textContent = `명세서번호: ${transactionNoText}`;
+  document.getElementById('transactionDeleteTransactionInfo').textContent = `명세서번호: ${transactionNoText}`;
 
   // 모달 열기
   const modal = document.getElementById('transactionDeleteModal');
