@@ -56,14 +56,14 @@ async function loadPurchaseStatements() {
       window.purchaseStatementTableInstance.destroy();
     }
 
-    // ✅ DataTable 초기화 (purchase-actions- prefix 사용)
+    // ✅ DataTable 초기화 (purchaseActions- prefix 사용)
     window.purchaseStatementTableInstance = $('#purchaseStatementTable').DataTable({
       data: tableData,
       columns: [
         {
           data: null,
           render: (data, type, row, meta) =>
-            `<input type="checkbox" class="purchaseStatementCheckbox" data-date="${row.거래일자}" data-no="${row.거래번호}" />`,
+            `<input type="checkbox" class="purchaseRowCheck" data-date="${row.거래일자}" data-no="${row.거래번호}" />`,
           orderable: false,
         },
         {
@@ -105,7 +105,7 @@ async function loadPurchaseStatements() {
           data: null,
           render: (data, type, row) => {
             return `
-              <div id="purchase-actions-${row.거래일자}_${row.거래번호}" style="display: flex; gap: 4px; justify-content: center;">
+              <div id="purchaseActions-${row.거래일자}_${row.거래번호}" style="display: flex; gap: 4px; justify-content: center;">
                 <button class="btn-icon btn-view" onclick="openPurchaseStatementDetailModal('${row.전표번호}')" title="보기">보기</button>
                 <button class="btn-icon btn-edit" style="display: none;" onclick="editPurchaseStatement('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon btn-delete" style="display: none;" onclick="openPurchaseStatementDeleteModal('${row.거래일자}', ${row.거래번호}, '${row.전표번호}')" title="삭제">삭제</button>
@@ -135,12 +135,12 @@ async function loadPurchaseStatements() {
       autoWidth: false,
       drawCallback: function (settings) {
         // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
-        $('.purchaseStatementCheckbox').each(function () {
+        $('.purchaseRowCheck').each(function () {
           const $checkbox = $(this);
           const purchaseDate = String($checkbox.data('date'));
           const purchaseNo = String($checkbox.data('no'));
           const isChecked = $checkbox.prop('checked');
-          const actionDiv = $('#purchase-actions-' + purchaseDate + '_' + purchaseNo);
+          const actionDiv = $('#purchaseActions-' + purchaseDate + '_' + purchaseNo);
 
           if (isChecked) {
             actionDiv.find('.btn-view').hide();
@@ -156,20 +156,20 @@ async function loadPurchaseStatements() {
     });
 
     // ✅ 전체선택 체크박스 이벤트 핸들러 등록
-    $(document).off('change', '#selectAllPurchaseStatements').on('change', '#selectAllPurchaseStatements', function () {
+    $(document).off('change', '#purchaseSelectAll').on('change', '#purchaseSelectAll', function () {
       const isChecked = $(this).prop('checked');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('💰 [매입전표관리] 전체선택 체크박스 클릭');
       console.log(`✅ 체크 상태: ${isChecked ? '전체 선택' : '전체 해제'}`);
 
-      $('.purchaseStatementCheckbox').prop('checked', isChecked).trigger('change');
+      $('.purchaseRowCheck').prop('checked', isChecked).trigger('change');
 
       console.log('✅ 전체선택 처리 완료');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     });
 
     // ✅ 개별 체크박스 이벤트 핸들러 등록
-    $(document).off('change', '.purchaseStatementCheckbox').on('change', '.purchaseStatementCheckbox', function () {
+    $(document).off('change', '.purchaseRowCheck').on('change', '.purchaseRowCheck', function () {
       const purchaseDate = String($(this).data('date'));
       const purchaseNo = String($(this).data('no'));
       const isChecked = $(this).prop('checked');
@@ -181,12 +181,12 @@ async function loadPurchaseStatements() {
       console.log(`✅ 체크 상태: ${isChecked ? '선택됨' : '해제됨'}`);
 
       // 전체 선택 체크박스 상태 업데이트
-      const totalCheckboxes = $('.purchaseStatementCheckbox').length;
-      const checkedCheckboxes = $('.purchaseStatementCheckbox:checked').length;
-      $('#selectAllPurchaseStatements').prop('checked', totalCheckboxes === checkedCheckboxes);
+      const totalCheckboxes = $('.purchaseRowCheck').length;
+      const checkedCheckboxes = $('.purchaseRowCheck:checked').length;
+      $('#purchaseSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
 
       // 현재 행의 버튼 표시/숨김 처리
-      const actionDiv = $('#purchase-actions-' + purchaseDate + '_' + purchaseNo);
+      const actionDiv = $('#purchaseActions-' + purchaseDate + '_' + purchaseNo);
 
       if (isChecked) {
         // 체크됨: 보기 버튼 숨기고 수정/삭제 버튼 표시
