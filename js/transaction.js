@@ -133,10 +133,10 @@ async function loadTransactions() {
           render: (data, type, row) => {
             return `
               <div id="transaction-actions-${row.거래일자}_${row.거래번호}" style="display: flex; gap: 4px; justify-content: center;">
-                <button class="btn-icon btn-view" onclick="openTransactionDetailModal('${row.명세서번호}')" title="보기">상세</button>
-                <button class="btn-icon btn-edit" style="display: none;" onclick="editTransaction('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
-                <button class="btn-icon btn-delete" style="display: none;" onclick="deleteTransaction('${row.거래일자}', ${row.거래번호})" title="삭제">삭제</button>
-                <!--<button class="btn-icon btn-approve" style="display: none;" onclick="approveTransaction('${row.거래일자}', ${row.거래번호})" title="확정">확정</button>-->
+                <button class="btn-icon transactionBtnView" onclick="openTransactionDetailModal('${row.명세서번호}')" title="보기">상세</button>
+                <button class="btn-icon transactionBtnEdit" style="display: none;" onclick="editTransaction('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
+                <button class="btn-icon transactionBtnDelete" style="display: none;" onclick="deleteTransaction('${row.거래일자}', ${row.거래번호})" title="삭제">삭제</button>
+                <!--<button class="btn-icon transactionBtnApprove" style="display: none;" onclick="approveTransaction('${row.거래일자}', ${row.거래번호})" title="확정">확정</button>-->
               </div>
             `;
           },
@@ -177,15 +177,15 @@ async function loadTransactions() {
           const actionDiv = $('#transaction-actions-' + transactionDate + '_' + transactionNo);
 
           if (isChecked) {
-            actionDiv.find('.btn-view').hide();
-            actionDiv.find('.btn-edit').show();
-            actionDiv.find('.btn-delete').show();
-            actionDiv.find('.btn-approve').show();
+            actionDiv.find('.transactionBtnView').hide();
+            actionDiv.find('.transactionBtnEdit').show();
+            actionDiv.find('.transactionBtnDelete').show();
+            actionDiv.find('.transactionBtnApprove').show();
           } else {
-            actionDiv.find('.btn-view').show();
-            actionDiv.find('.btn-edit').hide();
-            actionDiv.find('.btn-delete').hide();
-            actionDiv.find('.btn-approve').hide();
+            actionDiv.find('.transactionBtnView').show();
+            actionDiv.find('.transactionBtnEdit').hide();
+            actionDiv.find('.transactionBtnDelete').hide();
+            actionDiv.find('.transactionBtnApprove').hide();
           }
         });
       },
@@ -238,10 +238,10 @@ async function loadTransactions() {
             $otherCheckbox.prop('checked', false);
 
             const otherActionDiv = $('#transaction-actions-' + otherDate + '_' + otherNo);
-            otherActionDiv.find('.btn-view').show();
-            otherActionDiv.find('.btn-edit').hide();
-            otherActionDiv.find('.btn-delete').hide();
-            otherActionDiv.find('.btn-approve').hide();
+            otherActionDiv.find('.transactionBtnView').show();
+            otherActionDiv.find('.transactionBtnEdit').hide();
+            otherActionDiv.find('.transactionBtnDelete').hide();
+            otherActionDiv.find('.transactionBtnApprove').hide();
           });
 
           console.log('✅ 다른 체크박스 해제 완료');
@@ -257,10 +257,10 @@ async function loadTransactions() {
 
         if (isChecked) {
           // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
-          actionDiv.find('.btn-view').hide();
-          actionDiv.find('.btn-edit').show();
-          actionDiv.find('.btn-delete').show();
-          actionDiv.find('.btn-approve').show();
+          actionDiv.find('.transactionBtnView').hide();
+          actionDiv.find('.transactionBtnEdit').show();
+          actionDiv.find('.transactionBtnDelete').show();
+          actionDiv.find('.transactionBtnApprove').show();
 
           console.log('🔘 표시된 버튼:');
           console.log('   ❌ [상세보기] 버튼 - 숨김');
@@ -269,10 +269,10 @@ async function loadTransactions() {
           console.log('   ✅ [확정] 버튼 - 표시');
         } else {
           // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
-          actionDiv.find('.btn-view').show();
-          actionDiv.find('.btn-edit').hide();
-          actionDiv.find('.btn-delete').hide();
-          actionDiv.find('.btn-approve').hide();
+          actionDiv.find('.transactionBtnView').show();
+          actionDiv.find('.transactionBtnEdit').hide();
+          actionDiv.find('.transactionBtnDelete').hide();
+          actionDiv.find('.transactionBtnApprove').hide();
 
           console.log('🔘 표시된 버튼:');
           console.log('   ✅ [상세보기] 버튼 - 표시');
