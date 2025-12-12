@@ -745,6 +745,59 @@ body {
   box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
 }
 
+/* ===== 페이지별 전용 버튼 클래스 (기존 스타일 상속) ===== */
+/* 매출처관리 */
+.customerBtnView { background: var(--primary); }
+.customerBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.customerBtnEdit { background: #28a745; }
+.customerBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.customerBtnDelete { background: #dc3545; }
+.customerBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+
+/* 거래명세서관리 */
+.transactionBtnView { background: var(--primary); }
+.transactionBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.transactionBtnEdit { background: #28a745; }
+.transactionBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.transactionBtnDelete { background: #dc3545; }
+.transactionBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.transactionBtnApprove { background: #28a745; }
+.transactionBtnApprove:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+
+/* 견적관리 */
+.quotationBtnView { background: var(--primary); }
+.quotationBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.quotationBtnEdit { background: #28a745; }
+.quotationBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.quotationBtnDelete { background: #dc3545; }
+.quotationBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.quotationBtnApprove { background: #28a745; }
+.quotationBtnApprove:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+
+/* 매입처관리 */
+.supplierBtnView { background: var(--primary); }
+.supplierBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.supplierBtnEdit { background: #28a745; }
+.supplierBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.supplierBtnDelete { background: #dc3545; }
+.supplierBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+
+/* 매입전표관리 */
+.purchaseBtnView { background: var(--primary); }
+.purchaseBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.purchaseBtnEdit { background: #28a745; }
+.purchaseBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.purchaseBtnDelete { background: #dc3545; }
+.purchaseBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+
+/* 발주관리 */
+.orderBtnView { background: var(--primary); }
+.orderBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.orderBtnEdit { background: #28a745; }
+.orderBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.orderBtnDelete { background: #dc3545; }
+.orderBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+
 /* 버튼 클릭 효과 */
 .btn-icon:active {
   transform: translateY(0);
