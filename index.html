@@ -504,7 +504,7 @@
                     width: 280px;
                     outline: none;
                   " />
-              <button class="btn btn-primary" onclick="searchCustomers()" style="
+              <button id="customerBtnSearch" class="btn btn-primary" onclick="searchCustomers()" style="
                     padding: 10px 20px;
                     background: #007bff;
                     color: white;
@@ -516,7 +516,7 @@
                   ">
                 🔍 검색
               </button>
-              <button class="btn btn-light" onclick="resetCustomerSearch()" style="
+              <button id="customerBtnReset" class="btn btn-light" onclick="resetCustomerSearch()" style="
                     padding: 10px 16px;
                     background: #f8f9fa;
                     color: #333;
@@ -532,7 +532,7 @@
 
             <!-- 오른쪽: 액션 버튼 영역 -->
             <div style="display: flex; gap: 8px">
-              <button class="btn btn-success" onclick="openNewCustomerModal()" style="
+              <button id="customerBtnNew" class="btn btn-success" onclick="openNewCustomerModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -544,7 +544,7 @@
                   ">
                 <span style="font-size: 18px; margin-right: 4px">+</span> 신규 등록
               </button>
-              <button class="btn btn-secondary" onclick="exportCustomersToGoogleSheets()" style="
+              <button id="customerBtnExport" class="btn btn-secondary" onclick="exportCustomersToGoogleSheets()" style="
                     padding: 10px 20px;
                     background: #6c757d;
                     color: white;
