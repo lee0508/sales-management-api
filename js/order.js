@@ -183,9 +183,9 @@ async function loadOrderList() {
           const orderKey = `${row.발주일자}_${row.발주번호}`;
           return `
             <div class="action-buttons" id="orderActions-${orderKey}">
-              <button class="btn-icon btn-view" onclick="viewOrderDetail('${row.발주일자}', ${row.발주번호})" title="상세보기">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editOrder('${row.발주일자}', ${row.발주번호})" title="수정">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteOrder('${row.발주일자}', ${row.발주번호})" title="삭제">삭제</button>
+              <button class="btn-icon orderBtnView" onclick="viewOrderDetail('${row.발주일자}', ${row.발주번호})" title="상세보기">상세</button>
+              <button class="btn-icon orderBtnEdit" style="display: none;" onclick="editOrder('${row.발주일자}', ${row.발주번호})" title="수정">수정</button>
+              <button class="btn-icon orderBtnDelete" style="display: none;" onclick="deleteOrder('${row.발주일자}', ${row.발주번호})" title="삭제">삭제</button>
             </div>
           `;
         },
@@ -226,20 +226,22 @@ async function loadOrderList() {
         const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
         if (isChecked) {
-          actionDiv.find('.btn-view').hide();
-          actionDiv.find('.btn-edit').show();
-          actionDiv.find('.btn-delete').show();
+          actionDiv.find('.orderBtnView').hide();
+          actionDiv.find('.orderBtnEdit').show();
+          actionDiv.find('.orderBtnDelete').show();
         } else {
-          actionDiv.find('.btn-view').show();
-          actionDiv.find('.btn-edit').hide();
-          actionDiv.find('.btn-delete').hide();
+          actionDiv.find('.orderBtnView').show();
+          actionDiv.find('.orderBtnEdit').hide();
+          actionDiv.find('.orderBtnDelete').hide();
         }
       });
     },
   });
 
   // ✅ 전체선택 체크박스 이벤트 핸들러 등록
-  $(document).off('change', '#orderSelectAll').on('change', '#orderSelectAll', function () {
+  $(document)
+    .off('change.orderPage', '#orderSelectAll')
+    .on('change.orderPage', '#orderSelectAll', function () {
     const isChecked = $(this).prop('checked');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📦 [발주관리] 전체선택 체크박스 클릭');
@@ -255,7 +257,9 @@ async function loadOrderList() {
   });
 
   // ✅ 개별 체크박스 이벤트 핸들러 등록
-  $(document).off('change', '.orderRowCheck').on('change', '.orderRowCheck', function () {
+  $(document)
+    .off('change.orderPage', '.orderRowCheck')
+    .on('change.orderPage', '.orderRowCheck', function () {
     const $currentCheckbox = $(this);
     const orderDate = $currentCheckbox.data('order-date');
     const orderNo = $currentCheckbox.data('order-no');
@@ -281,9 +285,9 @@ async function loadOrderList() {
 
         // 다른 행의 버튼 숨김 처리
         const otherActionDiv = $(`#orderActions-${otherDate}_${otherNo}`);
-        otherActionDiv.find('.btn-view').show();
-        otherActionDiv.find('.btn-edit').hide();
-        otherActionDiv.find('.btn-delete').hide();
+        otherActionDiv.find('.orderBtnView').show();
+        otherActionDiv.find('.orderBtnEdit').hide();
+        otherActionDiv.find('.orderBtnDelete').hide();
       });
 
       console.log('✅ 다른 모든 체크박스 해제됨 (개별 선택 모드)');
@@ -308,9 +312,9 @@ async function loadOrderList() {
 
     if (isChecked) {
       // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
-      actionDiv.find('.btn-view').hide();
-      actionDiv.find('.btn-edit').show();
-      actionDiv.find('.btn-delete').show();
+      actionDiv.find('.orderBtnView').hide();
+      actionDiv.find('.orderBtnEdit').show();
+      actionDiv.find('.orderBtnDelete').show();
 
       console.log('🔘 표시된 버튼:');
       console.log('   ❌ [상세보기] 버튼 - 숨김');
@@ -318,9 +322,9 @@ async function loadOrderList() {
       console.log('   ✅ [삭제] 버튼 - 표시');
     } else {
       // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
-      actionDiv.find('.btn-view').show();
-      actionDiv.find('.btn-edit').hide();
-      actionDiv.find('.btn-delete').hide();
+      actionDiv.find('.orderBtnView').show();
+      actionDiv.find('.orderBtnEdit').hide();
+      actionDiv.find('.orderBtnDelete').hide();
 
       console.log('🔘 표시된 버튼:');
       console.log('   ✅ [상세보기] 버튼 - 표시');
@@ -577,9 +581,9 @@ function closeOrderDetailModal() {
     const orderNo = $(this).data('order-no');
     const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
-    actionDiv.find('.btn-view').show();
-    actionDiv.find('.btn-edit').hide();
-    actionDiv.find('.btn-delete').hide();
+    actionDiv.find('.orderBtnView').show();
+    actionDiv.find('.orderBtnEdit').hide();
+    actionDiv.find('.orderBtnDelete').hide();
   });
 
   // DataTable 정리 (메모리 누수 방지)
@@ -674,9 +678,9 @@ function closeOrderModal() {
     const orderNo = $(this).data('order-no');
     const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
-    actionDiv.find('.btn-view').show();
-    actionDiv.find('.btn-edit').hide();
-    actionDiv.find('.btn-delete').hide();
+    actionDiv.find('.orderBtnView').show();
+    actionDiv.find('.orderBtnEdit').hide();
+    actionDiv.find('.orderBtnDelete').hide();
   });
   document.getElementById('orderModal').classList.add('hidden');
   document.getElementById('orderForm').reset();
@@ -2232,9 +2236,9 @@ function closeOrderModal() {
     const orderNo = $(this).data('order-no');
     const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
-    actionDiv.find('.btn-view').show();
-    actionDiv.find('.btn-edit').hide();
-    actionDiv.find('.btn-delete').hide();
+    actionDiv.find('.orderBtnView').show();
+    actionDiv.find('.orderBtnEdit').hide();
+    actionDiv.find('.orderBtnDelete').hide();
   });
   newOrderDetails = [];
 }

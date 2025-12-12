@@ -273,18 +273,18 @@ $(document).ready(function () {
             const quotationKey = `${row.견적일자}-${row.견적번호}`;
             return `
               <div class="action-buttons" id="quotationActions-${quotationKey.replace('-', '_')}">
-                <button class="btn-icon btn-view" onclick="viewQuotationDetail('${row.견적일자}', ${
+                <button class="btn-icon quotationBtnView" onclick="viewQuotationDetail('${row.견적일자}', ${
               row.견적번호
             })" title="상세보기">상세</button>
-                <button class="btn-icon btn-edit" style="display: none;" onclick="editQuotation('${
+                <button class="btn-icon quotationBtnEdit" style="display: none;" onclick="editQuotation('${
                   row.견적일자
                 }', ${row.견적번호})" title="수정">수정</button>
-                <button class="btn-icon btn-delete" style="display: none;" onclick="deleteQuotation('${
+                <button class="btn-icon quotationBtnDelete" style="display: none;" onclick="deleteQuotation('${
                   row.견적일자
                 }', ${row.견적번호})" title="삭제">삭제</button>
                 ${
                   row.상태코드 === 1
-                    ? `<button class="btn-icon btn-approve" style="display: none; background: #28a745;" onclick="approveQuotation('${row.견적일자}', ${row.견적번호})" title="승인">승인</button>`
+                    ? `<button class="btn-icon quotationBtnApprove" style="display: none; background: #28a745;" onclick="approveQuotation('${row.견적일자}', ${row.견적번호})" title="승인">승인</button>`
                     : ''
                 }
               </div>
@@ -327,22 +327,24 @@ $(document).ready(function () {
           const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
 
           if (isChecked) {
-            actionDiv.find('.btn-view').hide();
-            actionDiv.find('.btn-edit').show();
-            actionDiv.find('.btn-delete').show();
-            actionDiv.find('.btn-approve').show();
+            actionDiv.find('.quotationBtnView').hide();
+            actionDiv.find('.quotationBtnEdit').show();
+            actionDiv.find('.quotationBtnDelete').show();
+            actionDiv.find('.quotationBtnApprove').show();
           } else {
-            actionDiv.find('.btn-view').show();
-            actionDiv.find('.btn-edit').hide();
-            actionDiv.find('.btn-delete').hide();
-            actionDiv.find('.btn-approve').hide();
+            actionDiv.find('.quotationBtnView').show();
+            actionDiv.find('.quotationBtnEdit').hide();
+            actionDiv.find('.quotationBtnDelete').hide();
+            actionDiv.find('.quotationBtnApprove').hide();
           }
         });
       },
     });
 
     // ✅ 전체선택 체크박스 이벤트 핸들러 등록
-    $(document).off('change', '#quotationSelectAll').on('change', '#quotationSelectAll', function () {
+    $(document)
+      .off('change.quotationPage', '#quotationSelectAll')
+      .on('change.quotationPage', '#quotationSelectAll', function () {
       const isChecked = $(this).prop('checked');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('📋 [견적관리] 전체선택 체크박스 클릭');
@@ -355,7 +357,9 @@ $(document).ready(function () {
     });
 
     // ✅ 개별 체크박스 이벤트 핸들러 등록
-    $(document).off('change', '.quotationRowCheck').on('change', '.quotationRowCheck', function () {
+    $(document)
+      .off('change.quotationPage', '.quotationRowCheck')
+      .on('change.quotationPage', '.quotationRowCheck', function () {
       const quotationDate = $(this).data('date');
       const quotationNo = $(this).data('no');
       const isChecked = $(this).prop('checked');
@@ -376,10 +380,10 @@ $(document).ready(function () {
 
       if (isChecked) {
         // 체크됨: 상세 버튼 숨기고 수정/삭제/승인 버튼 표시
-        actionDiv.find('.btn-view').hide();
-        actionDiv.find('.btn-edit').show();
-        actionDiv.find('.btn-delete').show();
-        actionDiv.find('.btn-approve').show();
+        actionDiv.find('.quotationBtnView').hide();
+        actionDiv.find('.quotationBtnEdit').show();
+        actionDiv.find('.quotationBtnDelete').show();
+        actionDiv.find('.quotationBtnApprove').show();
 
         console.log('🔘 표시된 버튼:');
         console.log('   ❌ [상세보기] 버튼 - 숨김');
@@ -388,10 +392,10 @@ $(document).ready(function () {
         console.log('   ✅ [승인] 버튼 - 표시');
       } else {
         // 체크 해제: 수정/삭제/승인 버튼 숨기고 상세 버튼 표시
-        actionDiv.find('.btn-view').show();
-        actionDiv.find('.btn-edit').hide();
-        actionDiv.find('.btn-delete').hide();
-        actionDiv.find('.btn-approve').hide();
+        actionDiv.find('.quotationBtnView').show();
+        actionDiv.find('.quotationBtnEdit').hide();
+        actionDiv.find('.quotationBtnDelete').hide();
+        actionDiv.find('.quotationBtnApprove').hide();
 
         console.log('🔘 표시된 버튼:');
         console.log('   ✅ [상세보기] 버튼 - 표시');
@@ -556,9 +560,9 @@ function closeQuotationDetailModal() {
     const quotationNo = $(this).data('no');
     const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
 
-    actionDiv.find('.btn-view').show();
-    actionDiv.find('.btn-edit').hide();
-    actionDiv.find('.btn-delete').hide();
+    actionDiv.find('.quotationBtnView').show();
+    actionDiv.find('.quotationBtnEdit').hide();
+    actionDiv.find('.quotationBtnDelete').hide();
   });
 
   // DataTable 정리 (메모리 누수 방지)
@@ -776,9 +780,9 @@ function closeQuotationEditModal() {
     const quotationNo = $(this).data('no');
     const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
 
-    actionDiv.find('.btn-view').show();
-    actionDiv.find('.btn-edit').hide();
-    actionDiv.find('.btn-delete').hide();
+    actionDiv.find('.quotationBtnView').show();
+    actionDiv.find('.quotationBtnEdit').hide();
+    actionDiv.find('.quotationBtnDelete').hide();
   });
 
   // DataTable 정리
@@ -1798,9 +1802,9 @@ function closeQuotationModal() {
     const quotationNo = $(this).data('no');
     const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
 
-    actionDiv.find('.btn-view').show();
-    actionDiv.find('.btn-edit').hide();
-    actionDiv.find('.btn-delete').hide();
+    actionDiv.find('.quotationBtnView').show();
+    actionDiv.find('.quotationBtnEdit').hide();
+    actionDiv.find('.quotationBtnDelete').hide();
   });
   newQuotationDetails = [];
 }

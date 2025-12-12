@@ -106,9 +106,9 @@ async function loadPurchaseStatements() {
           render: (data, type, row) => {
             return `
               <div id="purchaseActions-${row.거래일자}_${row.거래번호}" style="display: flex; gap: 4px; justify-content: center;">
-                <button class="btn-icon btn-view" onclick="openPurchaseStatementDetailModal('${row.전표번호}')" title="보기">보기</button>
-                <button class="btn-icon btn-edit" style="display: none;" onclick="editPurchaseStatement('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
-                <button class="btn-icon btn-delete" style="display: none;" onclick="openPurchaseStatementDeleteModal('${row.거래일자}', ${row.거래번호}, '${row.전표번호}')" title="삭제">삭제</button>
+                <button class="btn-icon purchaseBtnView" onclick="openPurchaseStatementDetailModal('${row.전표번호}')" title="보기">보기</button>
+                <button class="btn-icon purchaseBtnEdit" style="display: none;" onclick="editPurchaseStatement('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
+                <button class="btn-icon purchaseBtnDelete" style="display: none;" onclick="openPurchaseStatementDeleteModal('${row.거래일자}', ${row.거래번호}, '${row.전표번호}')" title="삭제">삭제</button>
               </div>
             `;
           },
@@ -143,20 +143,22 @@ async function loadPurchaseStatements() {
           const actionDiv = $('#purchaseActions-' + purchaseDate + '_' + purchaseNo);
 
           if (isChecked) {
-            actionDiv.find('.btn-view').hide();
-            actionDiv.find('.btn-edit').show();
-            actionDiv.find('.btn-delete').show();
+            actionDiv.find('.purchaseBtnView').hide();
+            actionDiv.find('.purchaseBtnEdit').show();
+            actionDiv.find('.purchaseBtnDelete').show();
           } else {
-            actionDiv.find('.btn-view').show();
-            actionDiv.find('.btn-edit').hide();
-            actionDiv.find('.btn-delete').hide();
+            actionDiv.find('.purchaseBtnView').show();
+            actionDiv.find('.purchaseBtnEdit').hide();
+            actionDiv.find('.purchaseBtnDelete').hide();
           }
         });
       },
     });
 
     // ✅ 전체선택 체크박스 이벤트 핸들러 등록
-    $(document).off('change', '#purchaseSelectAll').on('change', '#purchaseSelectAll', function () {
+    $(document)
+      .off('change.purchasePage', '#purchaseSelectAll')
+      .on('change.purchasePage', '#purchaseSelectAll', function () {
       const isChecked = $(this).prop('checked');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('💰 [매입전표관리] 전체선택 체크박스 클릭');
@@ -169,7 +171,9 @@ async function loadPurchaseStatements() {
     });
 
     // ✅ 개별 체크박스 이벤트 핸들러 등록
-    $(document).off('change', '.purchaseRowCheck').on('change', '.purchaseRowCheck', function () {
+    $(document)
+      .off('change.purchasePage', '.purchaseRowCheck')
+      .on('change.purchasePage', '.purchaseRowCheck', function () {
       const purchaseDate = String($(this).data('date'));
       const purchaseNo = String($(this).data('no'));
       const isChecked = $(this).prop('checked');
@@ -190,9 +194,9 @@ async function loadPurchaseStatements() {
 
       if (isChecked) {
         // 체크됨: 보기 버튼 숨기고 수정/삭제 버튼 표시
-        actionDiv.find('.btn-view').hide();
-        actionDiv.find('.btn-edit').show();
-        actionDiv.find('.btn-delete').show();
+        actionDiv.find('.purchaseBtnView').hide();
+        actionDiv.find('.purchaseBtnEdit').show();
+        actionDiv.find('.purchaseBtnDelete').show();
 
         console.log('🔘 표시된 버튼:');
         console.log('   ❌ [보기] 버튼 - 숨김');
@@ -200,9 +204,9 @@ async function loadPurchaseStatements() {
         console.log('   ✅ [삭제] 버튼 - 표시');
       } else {
         // 체크 해제: 수정/삭제 버튼 숨기고 보기 버튼 표시
-        actionDiv.find('.btn-view').show();
-        actionDiv.find('.btn-edit').hide();
-        actionDiv.find('.btn-delete').hide();
+        actionDiv.find('.purchaseBtnView').show();
+        actionDiv.find('.purchaseBtnEdit').hide();
+        actionDiv.find('.purchaseBtnDelete').hide();
 
         console.log('🔘 표시된 버튼:');
         console.log('   ✅ [보기] 버튼 - 표시');
