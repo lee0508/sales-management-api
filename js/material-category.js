@@ -70,10 +70,10 @@ function initMaterialCategoryTable() {
         className: 'text-center',
         render: function (data, type, row) {
           return `
-            <div class="action-buttons" id="category-actions-${row.분류코드}">
-              <button class="btn-icon btn-view" onclick="viewCategoryDetail('${row.분류코드}')">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editMaterialCategory('${row.분류코드}')">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="openCategoryDeleteModal('${row.분류코드}')">삭제</button>
+            <div class="action-buttons" id="categoryActions-${row.분류코드}">
+              <button class="btn-icon categoryBtnView" onclick="viewCategoryDetail('${row.분류코드}')">상세</button>
+              <button class="btn-icon categoryBtnEdit" style="display: none;" onclick="editMaterialCategory('${row.분류코드}')">수정</button>
+              <button class="btn-icon categoryBtnDelete" style="display: none;" onclick="openCategoryDeleteModal('${row.분류코드}')">삭제</button>
             </div>
           `;
         },
@@ -101,14 +101,14 @@ function initMaterialCategoryTable() {
  */
 function setupCategoryCheckboxHandlers() {
   // 전체 선택 체크박스
-  $('#selectAllCategories').on('change', function () {
+  $('#selectAllCategories').off('change.categoryPage').on('change.categoryPage', function () {
     const isChecked = $(this).prop('checked');
     $('.category-checkbox').prop('checked', isChecked);
     updateCategoryActionButtons();
   });
 
   // 개별 체크박스 (이벤트 위임)
-  $('#materialCategoryTable').on('change', '.category-checkbox', function () {
+  $('#materialCategoryTable').off('change.categoryPage').on('change.categoryPage', '.category-checkbox', function () {
     updateCategoryActionButtons();
 
     // 전체 선택 체크박스 상태 업데이트
@@ -126,17 +126,17 @@ function updateCategoryActionButtons() {
 
   checkedBoxes.each(function () {
     const code = $(this).data('code');
-    $(`#category-actions-${code} .btn-view`).hide();
-    $(`#category-actions-${code} .btn-edit`).show();
-    $(`#category-actions-${code} .btn-delete`).show();
+    $(`#categoryActions-${code} .categoryBtnView`).hide();
+    $(`#categoryActions-${code} .categoryBtnEdit`).show();
+    $(`#categoryActions-${code} .categoryBtnDelete`).show();
   });
 
   // 선택 해제된 항목은 상세 버튼만 표시
   $('.category-checkbox:not(:checked)').each(function () {
     const code = $(this).data('code');
-    $(`#category-actions-${code} .btn-view`).show();
-    $(`#category-actions-${code} .btn-edit`).hide();
-    $(`#category-actions-${code} .btn-delete`).hide();
+    $(`#categoryActions-${code} .categoryBtnView`).show();
+    $(`#categoryActions-${code} .categoryBtnEdit`).hide();
+    $(`#categoryActions-${code} .categoryBtnDelete`).hide();
   });
 }
 

@@ -97,13 +97,13 @@ function initMaterialHistoryTable() {
         width: '200px',
         render: function (data, type, row) {
           const 자재코드 = row.분류코드 + row.세부코드;
-          const uniqueId = `material-history-actions-${자재코드}`;
+          const uniqueId = `historyActions-${자재코드}`;
 
           // 삭제된 자재는 상세 버튼만 표시
           if (row.사용구분 === 9) {
             return `
               <div id="${uniqueId}" style="display: flex; gap: 4px; justify-content: center; align-items: center;">
-                <button class="btn-detail" onclick="viewMaterialDetail('${자재코드}')"
+                <button class="historyBtnView" onclick="viewMaterialDetail('${자재코드}')"
                         style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
                   상세
                 </button>
@@ -115,15 +115,15 @@ function initMaterialHistoryTable() {
           // 정상 자재 - 기본적으로 상세 버튼만 표시, 수정/삭제는 숨김
           return `
             <div id="${uniqueId}" style="display: flex; gap: 4px; justify-content: center;">
-              <button class="btn-detail" onclick="viewMaterialDetail('${자재코드}')"
+              <button class="historyBtnView" onclick="viewMaterialDetail('${자재코드}')"
                       style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
                 상세
               </button>
-              <button class="btn-edit" onclick="editMaterial('${자재코드}')"
+              <button class="historyBtnEdit" onclick="editMaterial('${자재코드}')"
                       style="padding: 6px 12px; background: #ffc107; color: #333; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; display: none;">
                 수정
               </button>
-              <button class="btn-delete" onclick="deleteMaterial('${자재코드}')"
+              <button class="historyBtnDelete" onclick="deleteMaterial('${자재코드}')"
                       style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; display: none;">
                 삭제
               </button>
@@ -195,7 +195,7 @@ function updateMaterialHistoryButtonStates() {
   checkboxes.forEach((checkbox, index) => {
     const isChecked = checkbox.checked;
     const fullCode = checkbox.getAttribute('data-code'); // 이미 분류코드+세부코드 형태
-    const actionsDivId = `material-history-actions-${fullCode}`;
+    const actionsDivId = `historyActions-${fullCode}`;
     const actionsDiv = document.getElementById(actionsDivId);
 
     console.log(
@@ -204,8 +204,8 @@ function updateMaterialHistoryButtonStates() {
 
     if (actionsDiv) {
       const detailBtn = actionsDiv.querySelector('.btn-detail');
-      const editBtn = actionsDiv.querySelector('.btn-edit');
-      const deleteBtn = actionsDiv.querySelector('.btn-delete');
+      const editBtn = actionsDiv.querySelector('.historyBtnEdit');
+      const deleteBtn = actionsDiv.querySelector('.historyBtnDelete');
 
       console.log(
         `  버튼 찾기: detailBtn=${!!detailBtn}, editBtn=${!!editBtn}, deleteBtn=${!!deleteBtn}`,

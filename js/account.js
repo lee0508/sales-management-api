@@ -87,10 +87,10 @@ $(document).ready(function () {
         className: 'text-center',
         render: function (data, type, row) {
           return `
-            <div class="action-buttons" id="actions-${row.계정코드}">
-              <button class="btn-icon btn-view" onclick="viewAccountDetail('${row.계정코드}')">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editAccount('${row.계정코드}')">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteAccount('${row.계정코드}', '${row.계정명}')">삭제</button>
+            <div class="action-buttons" id="accountActions-${row.계정코드}">
+              <button class="btn-icon accountBtnView" onclick="viewAccountDetail('${row.계정코드}')">상세</button>
+              <button class="btn-icon accountBtnEdit" style="display: none;" onclick="editAccount('${row.계정코드}')">수정</button>
+              <button class="btn-icon accountBtnDelete" style="display: none;" onclick="deleteAccount('${row.계정코드}', '${row.계정명}')">삭제</button>
             </div>
           `;
         },
@@ -120,18 +120,18 @@ $(document).ready(function () {
     // 현재 행의 버튼 표시/숨김 처리
     const accountCode = $(this).data('code');
     const isChecked = $(this).prop('checked');
-    const actionDiv = $('#actions-' + accountCode);
+    const actionDiv = $('#accountActions-' + accountCode);
 
     if (isChecked) {
       // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
-      actionDiv.find('.btn-view').hide();
-      actionDiv.find('.btn-edit').show();
-      actionDiv.find('.btn-delete').show();
+      actionDiv.find('.accountBtnView').hide();
+      actionDiv.find('.accountBtnEdit').show();
+      actionDiv.find('.accountBtnDelete').show();
     } else {
       // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
-      actionDiv.find('.btn-view').show();
-      actionDiv.find('.btn-edit').hide();
-      actionDiv.find('.btn-delete').hide();
+      actionDiv.find('.accountBtnView').show();
+      actionDiv.find('.accountBtnEdit').hide();
+      actionDiv.find('.accountBtnDelete').hide();
     }
   });
 

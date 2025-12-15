@@ -1,7 +1,8 @@
 // ✅ 거래명세서관리 스크립트 (transaction.js)
 // 최초 1회만 호출
 
-let transactionTableInstance = null;
+// ✅ Prefix 규칙 준수: transactionTableInstance → window.transactionTable
+window.transactionTable = null;
 let isTransactionSelectAllMode = false; // 전체선택 모드 플래그
 
 function initTransactionDates() {
@@ -12,11 +13,15 @@ function initTransactionDates() {
   if (!end.value) end.value = todayStr;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
+// ✅ 거래명세서 페이지 초기화 함수 (showPage에서 호출)
+window.initTransactionPage = function() {
+  console.log('✅ 거래명세서 페이지 초기화 시작');
+
+  // 날짜 초기화
   initTransactionDates();
-  loadTransactions(); // 필요시 초기 로드
-  // window.loadTransactions = loadTransactions;
+
+  // 데이터 로드
+  loadTransactions();
 
   // ✅ 수정 모달 닫기 버튼 이벤트 (네임스페이스 사용)
   $(document).on('click.transactionPage', '#closeTransactionEditModalBtn', () => {
@@ -31,10 +36,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ✅ 품목 수정 모달 닫기 버튼 이벤트 (네임스페이스 사용)
-  $(document).on('click.transactionPage', '#closeTransactionDetailEditModalBtn', () => {
-    closeTransactionDetailEditModal();
+  $(document).on('click.transactionPage', '#transactionItemEditModalCloseBtn', () => {
+    closeTransactionItemEditModal();
   });
-});
+
+  console.log('✅ 거래명세서 페이지 초기화 완료');
+};
 
 // ✅ 거래명세서 목록 불러오기
 async function loadTransactions() {
@@ -56,9 +63,19 @@ async function loadTransactions() {
   //   endDateInput.value = todayStr;
   // }
   try {
-    const startDate = document.getElementById('transactionStartDate').value;
-    const endDate = document.getElementById('transactionEndDate').value;
-    const status = document.getElementById('transactionStatusFilter').value;
+    // ✅ 안전한 엘리먼트 접근
+    const startDateEl = document.getElementById('transactionStartDate');
+    const endDateEl = document.getElementById('transactionEndDate');
+    const statusEl = document.getElementById('transactionStatusFilter');
+
+    if (!startDateEl || !endDateEl || !statusEl) {
+      console.warn('필수 입력 요소를 찾을 수 없습니다.');
+      return;
+    }
+
+    const startDate = startDateEl.value;
+    const endDate = endDateEl.value;
+    const status = statusEl.value;
 
     const query = new URLSearchParams();
     if (startDate) query.append('startDate', startDate);
@@ -72,21 +89,26 @@ async function loadTransactions() {
 
     if (!data.success) throw new Error('데이터를 불러오지 못했습니다.');
 
-    const tableBody = document.querySelector('#transactionTable tbody');
-    tableBody.innerHTML = '';
-
     const tableData = data.data || [];
-    document.getElementById('transactionCount').textContent = tableData.length;
 
-    // ✅ 기존 DataTable 있으면 destroy
-    if (window.transactionTableInstance) {
-      window.transactionTableInstance.destroy();
+    // ✅ 안전한 카운트 업데이트
+    const countEl = document.getElementById('transactionCount');
+    if (countEl) {
+      countEl.textContent = tableData.length;
     }
 
-    // ✅ DataTable 초기화
-    window.transactionTableInstance = $('#transactionTable').DataTable({
-      data: tableData,
-      columns: [
+    // ✅ DataTable 재사용 패턴: 없으면 생성, 있으면 데이터만 업데이트
+    if (!window.transactionTable || typeof window.transactionTable.clear !== 'function') {
+      // ✅ DataTable 인스턴스가 손상된 경우 복구
+      if ($.fn.DataTable.isDataTable('#transactionTable')) {
+        $('#transactionTable').DataTable().destroy();
+        $('#transactionTable').empty();
+      }
+
+      // ✅ DataTable 초기화 (최초 1회만)
+      window.transactionTable = $('#transactionTable').DataTable({
+        data: [],
+        columns: [
         {
           data: null,
           render: (data, type, row, meta) =>
@@ -132,8 +154,8 @@ async function loadTransactions() {
           data: null,
           render: (data, type, row) => {
             return `
-              <div id="transaction-actions-${row.거래일자}_${row.거래번호}" style="display: flex; gap: 4px; justify-content: center;">
-                <button class="btn-icon transactionBtnView" onclick="openTransactionDetailModal('${row.명세서번호}')" title="보기">상세</button>
+              <div id="transactionActions-${row.거래일자}_${row.거래번호}" style="display: flex; gap: 4px; justify-content: center;">
+                <button class="btn-icon transactionBtnView" onclick="openTransactionViewModal('${row.명세서번호}')" title="보기">상세</button>
                 <button class="btn-icon transactionBtnEdit" style="display: none;" onclick="editTransaction('${row.거래일자}', ${row.거래번호})" title="수정">수정</button>
                 <button class="btn-icon transactionBtnDelete" style="display: none;" onclick="deleteTransaction('${row.거래일자}', ${row.거래번호})" title="삭제">삭제</button>
                 <!--<button class="btn-icon transactionBtnApprove" style="display: none;" onclick="approveTransaction('${row.거래일자}', ${row.거래번호})" title="확정">확정</button>-->
@@ -174,7 +196,7 @@ async function loadTransactions() {
           const transactionDate = String($checkbox.data('date'));
           const transactionNo = String($checkbox.data('no'));
           const isChecked = $checkbox.prop('checked');
-          const actionDiv = $('#transaction-actions-' + transactionDate + '_' + transactionNo);
+          const actionDiv = $('#transactionActions-' + transactionDate + '_' + transactionNo);
 
           if (isChecked) {
             actionDiv.find('.transactionBtnView').hide();
@@ -189,7 +211,11 @@ async function loadTransactions() {
           }
         });
       },
-    });
+      });
+    }
+
+    // ✅ DataTable에 데이터 업데이트 (재사용 패턴)
+    window.transactionTable.clear().rows.add(tableData).draw();
 
     // ✅ 전체선택 체크박스 이벤트 핸들러 등록 (네임스페이스 사용)
     $(document)
@@ -237,7 +263,7 @@ async function loadTransactions() {
 
             $otherCheckbox.prop('checked', false);
 
-            const otherActionDiv = $('#transaction-actions-' + otherDate + '_' + otherNo);
+            const otherActionDiv = $('#transactionActions-' + otherDate + '_' + otherNo);
             otherActionDiv.find('.transactionBtnView').show();
             otherActionDiv.find('.transactionBtnEdit').hide();
             otherActionDiv.find('.transactionBtnDelete').hide();
@@ -253,7 +279,7 @@ async function loadTransactions() {
         $('#transactionSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
 
         // 현재 행의 버튼 표시/숨김 처리
-        const actionDiv = $('#transaction-actions-' + transactionDate + '_' + transactionNo);
+        const actionDiv = $('#transactionActions-' + transactionDate + '_' + transactionNo);
 
         if (isChecked) {
           // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
@@ -283,12 +309,6 @@ async function loadTransactions() {
 
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       });
-
-    if (data.data.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="11" class="text-center">데이터가 없습니다.</td></tr>';
-      document.getElementById('transactionCount').textContent = '0';
-      return;
-    }
   } catch (err) {
     console.error('❌ 거래명세서 조회 오류:', err);
     alert('거래명세서를 불러오는 중 오류가 발생했습니다.');
@@ -314,16 +334,16 @@ window.filterTransactions = function filterTransactions() {
   loadTransactions();
 }
 
-// ✅ 거래명세서 상세보기
-async function openTransactionDetailModal(transactionNo) {
-  const modal = document.getElementById('transactionDetailModal');
+// ✅ 거래명세서 상세보기 (Prefix 규칙: transactionViewModal)
+window.openTransactionViewModal = async function openTransactionViewModal(transactionNo) {
+  const modal = document.getElementById('transactionViewModal');
   modal.style.display = 'flex';
   modal.classList.remove('hidden');
 
   // 드래그 기능 활성화 (최초 1회만 실행)
-  if (typeof makeModalDraggable === 'function' && !window.transactionDetailModalDraggable) {
-    makeModalDraggable('transactionDetailModal', 'transactionDetailModalHeader');
-    window.transactionDetailModalDraggable = true;
+  if (typeof makeModalDraggable === 'function' && !window.transactionViewModalDraggable) {
+    makeModalDraggable('transactionViewModal', 'transactionViewModalHeader');
+    window.transactionViewModalDraggable = true;
   }
 
   try {
@@ -356,11 +376,11 @@ async function openTransactionDetailModal(transactionNo) {
     document.getElementById('transactionDetailUserName').textContent = firstDetail.사용자명 || '-';
 
     // ✅ 상세 DataTable 초기화
-    if (window.transactionDetailTableInstance) {
-      window.transactionDetailTableInstance.destroy();
+    if (window.transactionViewDetailTable) {
+      window.transactionViewDetailTable.destroy();
     }
 
-    window.transactionDetailTableInstance = $('#transactionDetailTable').DataTable({
+    window.transactionViewDetailTable = $('#transactionViewDetailTable').DataTable({
       data: details,
       columns: [
         {
@@ -898,21 +918,24 @@ async function submitTransactionCreate(event) {
   }
 }
 
-// ✅ 거래명세서 상세 닫기
-window.closeTransactionDetailModal = function closeTransactionDetailModal() {
-  const modal = document.getElementById('transactionDetailModal');
+// ✅ 거래명세서 상세 닫기 (Prefix 규칙: transactionViewModal)
+window.closeTransactionViewModal = function closeTransactionViewModal() {
+  const modal = document.getElementById('transactionViewModal');
   modal.style.display = 'none';
   modal.classList.add('hidden');
 }
 
+// ✅ 하위 호환성 유지
+window.closeTransactionDetailModal = window.closeTransactionViewModal;
+
 // ✅ CSV 내보내기 (Google Sheets용)
 window.exportTransactionsToExcel = function exportTransactionsToExcel() {
-  if (!window.transactionTableInstance) {
+  if (!window.transactionTable) {
     alert('내보낼 데이터가 없습니다.');
     return;
   }
 
-  const data = window.transactionTableInstance
+  const data = window.transactionTable
     .rows()
     .data()
     .toArray()
@@ -1394,11 +1417,14 @@ window.clearSelectedTransactionMaterial = function clearSelectedTransactionMater
   document.getElementById('transactionAddDetailAmount').value = '0';
 }
 
-// ✅ 자재 추가 모달 닫기
-window.closeTransactionDetailAddModal = function closeTransactionDetailAddModal() {
-  document.getElementById('transactionDetailAddModal').style.display = 'none';
+// ✅ 품목 추가 모달 닫기 (Prefix 규칙: transactionItemCreateModal)
+window.closeTransactionItemCreateModal = function closeTransactionItemCreateModal() {
+  document.getElementById('transactionItemCreateModal').style.display = 'none';
   window.clearSelectedTransactionMaterial();
 }
+
+// ✅ 하위 호환성 유지
+window.closeTransactionDetailAddModal = window.closeTransactionItemCreateModal;
 
 // ✅ 거래명세서 상세 행 수정 - 수정 모달 열기
 function editTransactionDetailRow(rowIndex) {
@@ -1430,7 +1456,7 @@ function editTransactionDetailRow(rowIndex) {
     ).toLocaleString();
 
     // 모달에 rowIndex 저장
-    const modal = document.getElementById('transactionDetailEditModal');
+    const modal = document.getElementById('transactionItemEditModal');
     modal.dataset.rowIndex = rowIndex;
 
     // 모달 표시
@@ -1453,7 +1479,7 @@ function calculateTransactionEditDetailAmount() {
 // ✅ 품목 수정 확인
 function confirmTransactionDetailEdit() {
   try {
-    const modal = document.getElementById('transactionDetailEditModal');
+    const modal = document.getElementById('transactionItemEditModal');
     const rowIndex = parseInt(modal.dataset.rowIndex);
 
     const table = window.transactionEditDetailTableInstance;
@@ -1494,9 +1520,14 @@ function confirmTransactionDetailEdit() {
   }
 }
 
-// ✅ 품목 수정 모달 닫기
+// ✅ 품목 수정 모달 닫기 (Prefix 규칙: transactionItemEditModal)
+window.closeTransactionItemEditModal = function closeTransactionItemEditModal() {
+  document.getElementById('transactionItemEditModal').style.display = 'none';
+}
+
+// ✅ 하위 호환성 유지
 function closeTransactionDetailEditModal() {
-  document.getElementById('transactionDetailEditModal').style.display = 'none';
+  window.closeTransactionItemEditModal();
 }
 
 // ✅ 품목 삭제 - 삭제 확인 모달 열기
@@ -1522,7 +1553,7 @@ function deleteTransactionDetailRow(rowIndex) {
     ).textContent = `[${rowData.자재코드}] ${rowData.자재명}`;
 
     // 모달에 rowIndex 저장
-    const modal = document.getElementById('transactionDetailDeleteModal');
+    const modal = document.getElementById('transactionItemDeleteModal');
     modal.dataset.rowIndex = rowIndex;
 
     // 모달 표시
@@ -1536,7 +1567,7 @@ function deleteTransactionDetailRow(rowIndex) {
 // ✅ 품목 삭제 확인
 function confirmTransactionDetailDelete() {
   try {
-    const modal = document.getElementById('transactionDetailDeleteModal');
+    const modal = document.getElementById('transactionItemDeleteModal');
     const rowIndex = parseInt(modal.dataset.rowIndex);
 
     const table = window.transactionEditDetailTableInstance;

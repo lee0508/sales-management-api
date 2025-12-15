@@ -761,6 +761,9 @@ app.post('/api/customers', requireAuth, async (req, res) => {
     console.log('===== 매출처 신규 등록 요청 =====');
     console.log('매출처코드:', 매출처코드);
     console.log('매출처명:', 매출처명);
+    console.log('📋 은행코드 값:', 은행코드);
+    console.log('📋 은행코드 타입:', typeof 은행코드);
+    console.log('📋 전체 요청 body:', JSON.stringify(req.body, null, 2));
 
     // 세션에서 사용자코드 가져오기
     console.log('세션 ID:', req.sessionID);
@@ -783,69 +786,31 @@ app.post('/api/customers', requireAuth, async (req, res) => {
     const 사업장코드 = req.session?.user?.사업장코드;
     console.log('사업장코드:', 사업장코드);
 
-    // 중복 체크 및 자동 증가 로직
-    let 최종매출처코드 = 매출처코드;
+    // ✅ 대문자 변환 (클라이언트에서도 처리하지만 서버에서 한 번 더 체크)
+    let 매출처코드_대문자 = (매출처코드 || '').toUpperCase();
 
-    // 1. 중복 확인
+    // 중복 체크 (클라이언트에서 검증했지만 서버에서도 확인)
+    // ✅ 삭제된 매출처(사용구분=9)는 제외하고 체크
     const checkQuery = `
       SELECT COUNT(*) as cnt
       FROM 매출처
-      WHERE 사업장코드 = @사업장코드 AND 매출처코드 = @매출처코드
+      WHERE 사업장코드 = @사업장코드
+        AND 매출처코드 = @매출처코드
+        AND 사용구분 <> 9
     `;
 
     const checkResult = await pool
       .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
-      .input('매출처코드', sql.VarChar(8), 매출처코드)
+      .input('매출처코드', sql.VarChar(8), 매출처코드_대문자)
       .query(checkQuery);
 
-    // 2. 중복이면 다음 코드 자동 생성
+    // 중복이면 에러 반환 (클라이언트에서 검증 안 했을 경우 대비)
     if (checkResult.recordset[0].cnt > 0) {
-      console.log('⚠️ 매출처코드 중복 감지 - 자동 증가 처리');
-
-      const maxQuery = `
-        SELECT TOP 1 매출처코드
-        FROM 매출처
-        WHERE 사업장코드 = @사업장코드
-          AND LEN(매출처코드) = 4
-        ORDER BY
-          SUBSTRING(매출처코드, 1, 1) DESC,
-          CAST(SUBSTRING(매출처코드, 2, 3) AS INT) DESC
-      `;
-
-      const maxResult = await pool
-        .request()
-        .input('사업장코드', sql.VarChar(2), 사업장코드)
-        .query(maxQuery);
-
-      if (maxResult.recordset.length > 0) {
-        const lastCode = maxResult.recordset[0].매출처코드;
-        let prefix = lastCode.charAt(0); // 영문 부분 (예: "A")
-        const numPart = lastCode.substring(1); // 숫자 부분 (예: "999")
-        let nextNum = parseInt(numPart) + 1;
-
-        // 숫자가 999를 초과하면 다음 영문자로 변경하고 숫자를 001로 리셋
-        if (nextNum > 999) {
-          const nextCharCode = prefix.charCodeAt(0) + 1;
-
-          // Z를 넘어가면 A로 돌아감
-          if (nextCharCode > 90) {
-            // 'Z'의 ASCII 코드는 90
-            prefix = 'A';
-          } else {
-            prefix = String.fromCharCode(nextCharCode);
-          }
-
-          nextNum = 1;
-          console.log(
-            `  숫자 999 초과 → 영문 변경: ${lastCode.charAt(0)} → ${prefix}, 숫자 리셋: 001`,
-          );
-        }
-
-        최종매출처코드 = prefix + String(nextNum).padStart(3, '0');
-
-        console.log(`  기존 코드: ${매출처코드} → 새 코드: ${최종매출처코드}`);
-      }
+      return res.status(400).json({
+        success: false,
+        message: '이미 존재하는 매출처코드입니다.',
+      });
     }
 
     // 수정일자 (YYYYMMDD 형식)
@@ -853,7 +818,7 @@ app.post('/api/customers', requireAuth, async (req, res) => {
 
     await pool
       .request()
-      .input('매출처코드', sql.VarChar(8), 최종매출처코드)
+      .input('매출처코드', sql.VarChar(8), 매출처코드_대문자)
       .input('사업장코드', sql.VarChar(2), 사업장코드)
       .input('매출처명', sql.VarChar(30), 매출처명)
       .input('사업자번호', sql.VarChar(14), 사업자번호 || '')
@@ -886,16 +851,13 @@ app.post('/api/customers', requireAuth, async (req, res) => {
         )
       `);
 
-    console.log('✅ 매출처 등록 완료 - 매출처코드:', 최종매출처코드);
+    console.log('✅ 매출처 등록 완료 - 매출처코드:', 매출처코드_대문자);
 
     res.json({
       success: true,
-      message:
-        최종매출처코드 !== 매출처코드
-          ? `매출처가 등록되었습니다. (코드: ${최종매출처코드})`
-          : '매출처가 등록되었습니다.',
+      message: '매출처가 등록되었습니다.',
       data: {
-        매출처코드: 최종매출처코드,
+        매출처코드: 매출처코드_대문자,
       },
     });
   } catch (err) {
@@ -928,6 +890,12 @@ app.put('/api/customers/:code', requireAuth, async (req, res) => {
       사용구분,
       비고란,
     } = req.body;
+
+    console.log('===== 매출처 수정 요청 =====');
+    console.log('매출처코드:', code);
+    console.log('📋 은행코드 값:', 은행코드);
+    console.log('📋 은행코드 타입:', typeof 은행코드);
+    console.log('📋 전체 요청 body:', JSON.stringify(req.body, null, 2));
 
     // 세션에서 사용자코드 가져오기
     const 사용자코드 = req.session?.user?.사용자코드;

@@ -130,18 +130,18 @@ window.loadTaxInvoices = async function (skipDateInit = false) {
           data: null,
           orderable: false,
           render: function (data, type, row) {
-            const actionId = `tax-invoice-actions-${row.작성년도}-${row.책번호}-${row.일련번호}`;
+            const actionId = `taxinvoiceActions-${row.작성년도}-${row.책번호}-${row.일련번호}`;
             return `
               <div class="action-buttons" id="${actionId}">
                 <button
-                  class="btn-icon btn-view"
+                  class="btn-icon taxinvoiceBtnView"
                   onclick="openTaxInvoiceDetailModal('${row.작성년도}', ${row.책번호}, ${row.일련번호})"
                   title="상세보기"
                 >
                   상세
                 </button>
                 <button
-                  class="btn-icon btn-edit"
+                  class="btn-icon taxinvoiceBtnEdit"
                   style="display: none;"
                   onclick="openTaxInvoiceEditModal('${row.작성년도}', ${row.책번호}, ${row.일련번호})"
                   title="수정"
@@ -149,7 +149,7 @@ window.loadTaxInvoices = async function (skipDateInit = false) {
                   수정
                 </button>
                 <button
-                  class="btn-icon btn-delete"
+                  class="btn-icon taxinvoiceBtnDelete"
                   style="display: none;"
                   onclick="deleteTaxInvoice('${row.작성년도}', ${row.책번호}, ${row.일련번호})"
                   title="삭제"
@@ -183,16 +183,16 @@ window.loadTaxInvoices = async function (skipDateInit = false) {
  * 체크 해제 시: 상세 버튼 표시, 수정/삭제 버튼 숨김
  */
 window.toggleTaxInvoiceActions = function (작성년도, 책번호, 일련번호) {
-  const actionId = `tax-invoice-actions-${작성년도}-${책번호}-${일련번호}`;
+  const actionId = `taxinvoiceActions-${작성년도}-${책번호}-${일련번호}`;
   const actionDiv = document.getElementById(actionId);
   const checkbox = document.querySelector(
     `.tax-invoice-checkbox[value="${작성년도}-${책번호}-${일련번호}"]`
   );
 
   if (actionDiv && checkbox) {
-    const viewBtn = actionDiv.querySelector('.btn-view');
-    const editBtn = actionDiv.querySelector('.btn-edit');
-    const deleteBtn = actionDiv.querySelector('.btn-delete');
+    const viewBtn = actionDiv.querySelector('.taxinvoiceBtnView');
+    const editBtn = actionDiv.querySelector('.taxinvoiceBtnEdit');
+    const deleteBtn = actionDiv.querySelector('.taxinvoiceBtnDelete');
 
     if (checkbox.checked) {
       // 체크 시: 상세 숨김, 수정/삭제 표시

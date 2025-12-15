@@ -486,7 +486,7 @@
         </div>
 
         <!-- 매출처관리 페이지 -->
-        <div id="customerPage" class="page-content hidden">
+        <div id="salesCustomerPage" class="page-content hidden">
           <h2 style="display: none">매출처관리</h2>
           <div class="toolbar" style="
                 display: flex;
@@ -496,7 +496,7 @@
               ">
             <!-- 왼쪽: 검색 영역 -->
             <div style="display: flex; gap: 8px; align-items: center">
-              <input type="text" id="customerSearchInput" placeholder="매출처코드 또는 매출처명 검색..." style="
+              <input type="text" id="salesCustomerSearchInput" placeholder="매출처코드 또는 매출처명 검색..." style="
                     padding: 10px 16px;
                     border: 1px solid #ddd;
                     border-radius: 8px;
@@ -504,7 +504,7 @@
                     width: 280px;
                     outline: none;
                   " />
-              <button id="customerBtnSearch" class="btn btn-primary" onclick="searchCustomers()" style="
+              <button id="salesCustomerBtnSearch" class="btn btn-primary" onclick="searchSalesCustomers()" style="
                     padding: 10px 20px;
                     background: #007bff;
                     color: white;
@@ -516,7 +516,7 @@
                   ">
                 🔍 검색
               </button>
-              <button id="customerBtnReset" class="btn btn-light" onclick="resetCustomerSearch()" style="
+              <button id="salesCustomerBtnReset" class="btn btn-light" onclick="resetSalesCustomerSearch()" style="
                     padding: 10px 16px;
                     background: #f8f9fa;
                     color: #333;
@@ -532,7 +532,7 @@
 
             <!-- 오른쪽: 액션 버튼 영역 -->
             <div style="display: flex; gap: 8px">
-              <button id="customerBtnNew" class="btn btn-success" onclick="openNewCustomerModal()" style="
+              <button id="salesCustomerBtnNew" class="btn btn-success" onclick="openNewSalesCustomerModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -544,7 +544,7 @@
                   ">
                 <span style="font-size: 18px; margin-right: 4px">+</span> 신규 등록
               </button>
-              <button id="customerBtnExport" class="btn btn-secondary" onclick="exportCustomersToGoogleSheets()" style="
+              <button id="salesCustomerBtnExport" class="btn btn-secondary" onclick="exportSalesCustomersToGoogleSheets()" style="
                     padding: 10px 20px;
                     background: #6c757d;
                     color: white;
@@ -560,11 +560,11 @@
           </div>
 
           <!-- ✅ DataTables 적용용 테이블 -->
-          <table id="customerTable" class="display" style="width: 100%">
+          <table id="salesCustomerTable" class="display" style="width: 100%">
             <thead>
               <tr>
                 <th style="width: 40px">
-                  <input type="checkbox" id="customerSelectAll" title="전체 선택" aria-label="전체 선택" />
+                  <input type="checkbox" id="salesCustomerSelectAll" title="전체 선택" aria-label="전체 선택" />
                 </th>
                 <th>순번</th>
                 <th>매출처코드</th>
@@ -581,7 +581,7 @@
         </div>
 
         <!-- 매출처 상세보기 모달 -->
-        <div id="customerDetailModal" style="
+        <div id="salesCustomerViewModal" style="
               display: none;
               position: fixed;
               top: 0;
@@ -604,7 +604,7 @@
                 box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
               ">
             <!-- 고정된 제목 영역 (드래그 핸들) -->
-            <div id="customerDetailModalHeader" style="
+            <div id="salesCustomerViewModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -620,7 +620,7 @@
               <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: var(--text-dark)">
                 매출처 상세정보
               </h2>
-              <button onclick="closeCustomerDetailModal()" style="
+              <button id="salesCustomerViewModalCloseBtn" onclick="closeSalesCustomerViewModal()" style="
                     background: #f0f0f0;
                     border: none;
                     font-size: 24px;
@@ -639,12 +639,12 @@
               </button>
             </div>
 
-            <div id="customerDetailContent" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
+            <div id="salesCustomerViewContent" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
               <!-- 상세 정보가 여기에 동적으로 로드됩니다 -->
             </div>
 
             <div style="margin-top: 24px; display: flex; justify-content: flex-end">
-              <button onclick="closeCustomerDetailModal()" class="btn btn-secondary">닫기</button>
+              <button onclick="closeSalesCustomerViewModal()" class="btn btn-secondary">닫기</button>
             </div>
           </div>
         </div>
@@ -652,7 +652,7 @@
         <!-- ========================= -->
         <!-- 매출처 조회 모달 (견적서 등에서 사용)-->
         <!-- ========================= -->
-        <div id="customerSearchModal" class="modal hidden">
+        <div id="salesCustomerSearchModal" class="modal hidden">
           <div class="modal-content">
             <h3>매출처 조회</h3>
             <input type="text" id="customerSearchSimple" placeholder="매출처명 검색..." />
@@ -766,8 +766,8 @@
           </div>
         </div>
 
-        <!-- ✅ 견적서 작성용 매출처 검색 모달 -->
-        <div id="quotationCustomerSearchModal" class="modal" style="display: none">
+        <!-- ✅ 매출처 검색 모달 (공통 1개만 사용) -->
+        <div id="customerSearchModal" class="modal" style="display: none">
           <div class="modal-content" style="max-width: 800px">
             <div style="
                   display: flex;
@@ -776,7 +776,7 @@
                   margin-bottom: 20px;
                 ">
               <h3 style="margin: 0">매출처 검색</h3>
-              <button onclick="closeQuotationCustomerSearchModal()" style="
+              <button onclick="closeCustomerSearchModal()" style="
                     background: #f0f0f0;
                     border: none;
                     font-size: 24px;
@@ -790,10 +790,10 @@
             </div>
 
             <div style="display: flex; gap: 10px; margin-bottom: 16px">
-              <input type="text" id="quotationCustomerSearchInput" placeholder="매출처명 또는 코드 검색"
-                onkeypress="if(event.key === 'Enter') searchQuotationCustomers()"
+              <input type="text" id="customerSearchModalInput" placeholder="매출처명 또는 코드 검색"
+                onkeypress="if(event.key === 'Enter') searchCustomersForModal()"
                 style="flex: 1; padding: 10px 12px; border: 2px solid #e5e7eb; border-radius: 6px" />
-              <button onclick="searchQuotationCustomers()" style="
+              <button onclick="searchCustomersForModal()" style="
                     padding: 10px 20px;
                     background: #007bff;
                     color: white;
@@ -841,7 +841,7 @@
         </div>
 
         <!-- 매출처 신규등록/수정 모달 (공용) -->
-        <div id="customerModal" style="
+        <div id="salesCustomerEditModal" style="
               display: none;
               position: fixed;
               top: 0;
@@ -864,7 +864,7 @@
                 box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
               ">
             <!-- 고정된 제목 영역 (드래그 핸들) -->
-            <div id="customerModalHeader" style="
+            <div id="salesCustomerEditModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -880,7 +880,7 @@
               <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: var(--text-dark)">
                 매출처 신규등록
               </h2>
-              <button onclick="closeCustomerModal()" style="
+              <button id="salesCustomerEditModalCloseBtn" onclick="closeSalesCustomerEditModal()" style="
                     background: #f0f0f0;
                     border: none;
                     font-size: 24px;
@@ -899,7 +899,7 @@
               </button>
             </div>
 
-            <form id="customerForm" onsubmit="submitCustomer(event)">
+            <form id="salesCustomerEditForm" onsubmit="submitSalesCustomer(event)">
               <!-- 1. 매출처코드 (전체 너비) -->
               <div style="margin-bottom: 16px">
                 <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">매출처코드</label>
@@ -915,13 +915,28 @@
               <!-- 2. 매출처명 (전체 너비) -->
               <div style="margin-bottom: 16px">
                 <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px">매출처명 *</label>
-                <input type="text" id="customerName" name="customerName" required style="
-                      width: 100%;
-                      padding: 12px 16px;
-                      border: 2px solid var(--border);
-                      border-radius: 8px;
-                      font-size: 14px;
-                    " placeholder="매출처명" />
+                <div style="display: flex; gap: 8px">
+                  <input type="text" id="customerName" name="customerName" required style="
+                        flex: 1;
+                        padding: 12px 16px;
+                        border: 2px solid var(--border);
+                        border-radius: 8px;
+                        font-size: 14px;
+                      " placeholder="매출처명" />
+                  <button type="button" onclick="openCustomerSearchFromEditForm()" style="
+                        padding: 12px 16px;
+                        background: #4a5568;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 16px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        transition: background 0.2s;
+                      " onmouseover="this.style.background='#2d3748'" onmouseout="this.style.background='#4a5568'">🔍</button>
+                </div>
               </div>
 
               <!-- 3. 대표자명 (전체 너비) -->
@@ -1132,7 +1147,7 @@
 
               <!-- 버튼 영역 -->
               <div style="display: flex; gap: 12px; justify-content: flex-end">
-                <button type="button" onclick="closeCustomerModal()" style="
+                <button type="button" onclick="closeSalesCustomerEditModal()" style="
                       padding: 10px 24px;
                       background: var(--bg-light);
                       border: 1px solid var(--border);
@@ -4147,10 +4162,11 @@
         </div>
 
         <!-- ✅ 거래명세서 상세보기 모달 -->
-        <div id="transactionDetailModal" class="modal hidden">
+        <!-- ✅ 거래명세서 상세보기 모달 (Prefix 규칙: transactionViewModal) -->
+        <div id="transactionViewModal" class="modal hidden">
           <div class="modal-content large" style="max-width: 1000px; max-height: 90vh; overflow-y: auto">
             <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) -->
-            <div id="transactionDetailModalHeader" style="
+            <div id="transactionViewModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -4163,7 +4179,7 @@
               <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
                 거래명세서 상세 보기
               </h2>
-              <button onclick="closeTransactionDetailModal()" style="
+              <button id="transactionViewModalCloseBtn" onclick="closeTransactionViewModal()" style="
                     width: 36px;
                     height: 36px;
                     border-radius: 50%;
@@ -4218,7 +4234,7 @@
               <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
                 거래 품목 내역
               </h3>
-              <table id="transactionDetailTable" class="display" style="width: 100%">
+              <table id="transactionViewDetailTable" class="display" style="width: 100%">
                 <thead>
                   <tr>
                     <th>순번</th>
@@ -4255,7 +4271,7 @@
                   padding-top: 16px;
                   border-top: 1px solid #e5e7eb;
                 ">
-              <button id="transactionDetailCloseBtn" onclick="closeTransactionDetailModal()" style="
+              <button id="transactionViewModalCloseBtn2" onclick="closeTransactionViewModal()" style="
                     padding: 10px 24px;
                     background: #dc2626;
                     color: white;
@@ -4454,10 +4470,10 @@
           </div>
         </div>
 
-        <!-- ✅ 거래명세서 수정 - 자재 추가 모달 -->
-        <div id="transactionDetailAddModal" class="modal" style="display: none">
+        <!-- ✅ 거래명세서 수정 - 품목 추가 모달 (Prefix 규칙: transactionItemCreateModal) -->
+        <div id="transactionItemCreateModal" class="modal" style="display: none">
           <div class="modal-content" style="max-width: 600px">
-            <div style="
+            <div id="transactionItemCreateModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -4468,7 +4484,7 @@
               <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
                 품목 추가
               </h2>
-              <button onclick="closeTransactionDetailAddModal()" style="
+              <button id="transactionItemCreateModalCloseBtn" onclick="closeTransactionItemCreateModal()" style="
                     width: 36px;
                     height: 36px;
                     border-radius: 50%;
@@ -4690,10 +4706,10 @@
           </div>
         </div>
 
-        <!-- ✅ 거래명세서 수정 - 품목 수정 모달 -->
-        <div id="transactionDetailEditModal" class="modal" style="display: none">
+        <!-- ✅ 거래명세서 수정 - 품목 수정 모달 (Prefix 규칙: transactionItemEditModal) -->
+        <div id="transactionItemEditModal" class="modal" style="display: none">
           <div class="modal-content" style="max-width: 500px">
-            <div style="
+            <div id="transactionItemEditModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -4704,7 +4720,7 @@
               <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
                 품목 수정
               </h2>
-              <button id="closeTransactionDetailEditModalBtn" style="
+              <button id="transactionItemEditModalCloseBtn" style="
                     width: 36px;
                     height: 36px;
                     border-radius: 50%;
@@ -4812,8 +4828,8 @@
           </div>
         </div>
 
-        <!-- ✅ 거래명세서 수정 - 품목 삭제 확인 모달 -->
-        <div id="transactionDetailDeleteModal" style="
+        <!-- ✅ 거래명세서 수정 - 품목 삭제 확인 모달 (Prefix 규칙: transactionItemDeleteModal) -->
+        <div id="transactionItemDeleteModal" style="
               display: none;
               position: fixed;
               top: 0;
@@ -6267,8 +6283,8 @@
               title: '거래명세서관리',
               menu: 'sales',
               loadFunc: () => {
-                if (typeof window.loadTransactions === 'function') {
-                  window.loadTransactions();
+                if (typeof window.initTransactionPage === 'function') {
+                  window.initTransactionPage();
                 }
               },
             },
@@ -6289,12 +6305,12 @@
               loadFunc: null,
             },
             customer: {
-              element: 'customerPage',
+              element: 'salesCustomerPage',
               title: '매출처관리',
               menu: 'sales',
               loadFunc: () => {
-                if (typeof window.loadCustomers === 'function') {
-                  window.loadCustomers();
+                if (typeof window.loadSalesCustomers === 'function') {
+                  window.loadSalesCustomers();
                 }
               },
             },
@@ -6303,8 +6319,8 @@
               title: '발주관리',
               menu: 'purchase',
               loadFunc: () => {
-                if (typeof window.loadOrders === 'function') {
-                  window.loadOrders();
+                if (typeof window.loadOrderList === 'function') {
+                  window.loadOrderList();
                 }
               },
             },
@@ -6903,10 +6919,10 @@
               <input type="date" id="orderStartDate" class="form-control" style="width: 150px" />
               <span>~</span>
               <input type="date" id="orderEndDate" class="form-control" style="width: 150px" />
-              <button class="btn btn-secondary" onclick="filterOrders()">조회</button>
+              <button id="orderBtnFilter" class="btn btn-secondary" onclick="filterOrders()">조회</button>
             </div>
             <div class="toolbar-right">
-              <button class="btn btn-success" onclick="openNewOrderModal()" style="
+              <button id="orderBtnNew" class="btn btn-success" onclick="openNewOrderModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -6918,7 +6934,7 @@
                   ">
                 <span style="font-size: 18px; margin-right: 4px">+</span> 발주서 작성
               </button>
-              <button class="btn btn-secondary" onclick="exportOrdersToExcel()" style="
+              <button id="orderBtnExport" class="btn btn-secondary" onclick="exportOrdersToExcel()" style="
                     padding: 10px 20px;
                     background: #6c757d;
                     color: white;
@@ -8175,11 +8191,11 @@
               <input type="date" id="purchaseStatementStartDate" class="form-control" style="width: 150px" />
               <span>~</span>
               <input type="date" id="purchaseStatementEndDate" class="form-control" style="width: 150px" />
-              <button class="btn btn-secondary" onclick="filterPurchaseStatements()">조회</button>
+              <button id="purchaseBtnFilter" class="btn btn-secondary" onclick="filterPurchaseStatements()">조회</button>
             </div>
 
             <div class="toolbar-right">
-              <button class="btn btn-success" onclick="openNewPurchaseStatementModal()" style="
+              <button id="purchaseBtnNew" class="btn btn-success" onclick="openNewPurchaseStatementModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -8191,7 +8207,7 @@
                   ">
                 <span style="font-size: 18px; margin-right: 4px">+</span> 매입전표 작성
               </button>
-              <button class="btn btn-secondary" onclick="exportPurchaseStatementsToExcel()" style="
+              <button id="purchaseBtnExport" class="btn btn-secondary" onclick="exportPurchaseStatementsToExcel()" style="
                     padding: 10px 20px;
                     background: #6c757d;
                     color: white;
@@ -8254,7 +8270,7 @@
                     width: 280px;
                     outline: none;
                   " />
-              <button class="btn btn-primary" onclick="searchSuppliers()" style="
+              <button id="supplierBtnSearch" class="btn btn-primary" onclick="searchSuppliers()" style="
                     padding: 10px 20px;
                     background: #007bff;
                     color: white;
@@ -8266,7 +8282,7 @@
                   ">
                 🔍 검색
               </button>
-              <button class="btn btn-light" onclick="resetSupplierSearch()" style="
+              <button id="supplierBtnReset" class="btn btn-light" onclick="resetSupplierSearch()" style="
                     padding: 10px 16px;
                     background: #f8f9fa;
                     color: #333;
@@ -8282,7 +8298,7 @@
 
             <!-- 오른쪽: 액션 버튼 영역 -->
             <div style="display: flex; gap: 8px">
-              <button class="btn btn-success" onclick="openSupplierModal()" style="
+              <button id="supplierBtnNew" class="btn btn-success" onclick="openSupplierModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -8294,7 +8310,7 @@
                   ">
                 <span style="font-size: 18px; margin-right: 4px">+</span> 신규 등록
               </button>
-              <button class="btn btn-secondary" onclick="exportSuppliersToExcel()" style="
+              <button id="supplierBtnExport" class="btn btn-secondary" onclick="exportSuppliersToExcel()" style="
                     padding: 10px 20px;
                     background: #6c757d;
                     color: white;
@@ -8780,8 +8796,8 @@
         <!-- 발주 관련 모달들 -->
         <!-- ========================= -->
 
-        <!-- 발주 작성 모달 -->
-        <div id="newOrderModal" class="modal" style="display: none">
+        <!-- ✅ 발주 작성 모달 (레거시 방식: orderCreateModal) -->
+        <div id="orderCreateModal" class="modal" style="display: none">
           <div class="modal-content" style="
                 max-width: 1200px;
                 max-height: 90vh;
@@ -8789,8 +8805,8 @@
                 padding: 32px;
                 position: relative;
               ">
-            <!-- ✅ 헤더 영역 -->
-            <div id="newOrderModalHeader" style="
+            <!-- ✅ 헤더 영역 (Prefix 규칙: orderCreateModalHeader) -->
+            <div id="orderCreateModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -8800,10 +8816,10 @@
                   cursor: move;
                   user-select: none;
                 ">
-              <h2 id="newOrderModalTitle" style="margin: 0; font-size: 24px; font-weight: 700; color: var(--text-dark)">
+              <h2 id="orderCreateModalTitle" style="margin: 0; font-size: 24px; font-weight: 700; color: var(--text-dark)">
                 발주서 작성
               </h2>
-              <button onclick="closeOrderModal()" style="
+              <button id="orderCreateModalCloseBtn" onclick="closeOrderModal()" style="
                     background: #f0f0f0;
                     border: none;
                     font-size: 24px;
@@ -8824,7 +8840,7 @@
 
             <form id="orderForm" onsubmit="submitNewOrder(event)">
               <!-- ✅ 발주 마스터 정보 (카드 스타일) -->
-              <div style="
+              <div id="orderMasterInfoCard" style="
                     background: #f8f9fa;
                     padding: 20px;
                     border-radius: 8px;
@@ -8833,9 +8849,9 @@
                 <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
                   발주 기본 정보
                 </h3>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
+                <div id="orderFormGridContainer" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
                   <!-- 발주일자 -->
-                  <div>
+                  <div id="orderDateFieldContainer">
                     <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
                       발주일자 <span style="color: #ef4444">*</span>
                     </label>
@@ -8843,7 +8859,7 @@
                   </div>
 
                   <!-- 입고희망일자 -->
-                  <div>
+                  <div id="orderDeliveryDateFieldContainer">
                     <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
                       입고희망일자
                     </label>
@@ -8851,19 +8867,19 @@
                   </div>
 
                   <!-- 매입처 선택 -->
-                  <div style="grid-column: 1 / -1">
+                  <div id="orderSupplierFieldContainer" style="grid-column: 1 / -1">
                     <label style="
                           display: block;
                           margin-bottom: 8px;
                           font-weight: 500;
                           font-size: 14px;
                         ">매입처 *</label>
-                    <div style="display: flex; gap: 8px">
-                      <!-- 숨겨진 매입처 코드 필드 (실제 값 저장용) -->
-                      <input type="hidden" id="selectedSupplierCode" />
+                    <div id="orderSupplierInputWrapper" style="display: flex; gap: 8px">
+                      <!-- ✅ 숨겨진 매입처 코드 필드 (Prefix 규칙: orderSelectedSupplierCode) -->
+                      <input type="hidden" id="orderSelectedSupplierCode" />
 
-                      <!-- 통합 검색 입력란 -->
-                      <input type="text" id="selectedSupplierName" required style="
+                      <!-- ✅ 통합 검색 입력란 (Prefix 규칙: orderSelectedSupplierName) -->
+                      <input type="text" id="orderSelectedSupplierName" required style="
                             flex: 1;
                             padding: 12px 16px;
                             border: 2px solid var(--border);
@@ -8885,8 +8901,8 @@
                         검색
                       </button>
                     </div>
-                    <!-- 선택된 매입처 정보 표시 -->
-                    <div id="selectedSupplierInfo" style="
+                    <!-- ✅ 선택된 매입처 정보 표시 (Prefix 규칙: orderSelectedSupplierInfo) -->
+                    <div id="orderSelectedSupplierInfo" style="
                           display: none;
                           margin-top: 8px;
                           padding: 8px 12px;
@@ -8895,13 +8911,13 @@
                           border: 1px solid #bfdbfe;
                         ">
                       <span style="font-size: 12px; color: #3b82f6; font-weight: 600">선택된 매입처:</span>
-                      <span id="selectedSupplierDisplay"
+                      <span id="orderSelectedSupplierDisplay"
                         style="margin-left: 8px; font-weight: 600; color: #1e40af"></span>
                     </div>
                   </div>
 
                   <!-- 결제방법 -->
-                  <div>
+                  <div id="orderPaymentMethodFieldContainer">
                     <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
                       결제방법
                     </label>
@@ -8915,7 +8931,7 @@
                   </div>
 
                   <!-- 상태 -->
-                  <div>
+                  <div id="orderStatusFieldContainer">
                     <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
                       상태
                     </label>
@@ -8927,7 +8943,7 @@
                   </div>
 
                   <!-- 제목 (전체 너비) -->
-                  <div style="grid-column: 1 / -1">
+                  <div id="orderTitleFieldContainer" style="grid-column: 1 / -1">
                     <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
                       제목 <span style="color: #ef4444">*</span>
                     </label>
@@ -8936,7 +8952,7 @@
                   </div>
 
                   <!-- 적요 (전체 너비) -->
-                  <div style="grid-column: 1 / -1">
+                  <div id="orderRemarksFieldContainer" style="grid-column: 1 / -1">
                     <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
                       적요
                     </label>
@@ -8947,8 +8963,8 @@
               </div>
 
               <!-- ✅ 발주 품목 내역 -->
-              <div style="margin-bottom: 24px">
-                <div style="
+              <div id="orderDetailSection" style="margin-bottom: 24px">
+                <div id="orderDetailHeaderWrapper" style="
                       display: flex;
                       justify-content: space-between;
                       align-items: center;
@@ -8970,7 +8986,7 @@
                 </div>
 
                 <div id="newOrderDetailTableContainer" style="overflow-x: auto">
-                  <table style="
+                  <table id="newOrderDetailTable" class="display" style="
                         width: 100%;
                         border-collapse: collapse;
                         background: white;
@@ -9101,7 +9117,7 @@
               </div>
 
               <!-- ✅ 저장 버튼 -->
-              <div style="
+              <div id="orderFormButtonContainer" style="
                     display: flex;
                     gap: 12px;
                     justify-content: flex-end;
@@ -9142,7 +9158,7 @@
         <!-- ✅ 매입처 검색 모달 -->
         <div id="supplierSearchModal" class="modal" style="display: none">
           <div class="modal-content" style="max-width: 800px">
-            <div style="
+            <div id="supplierSearchModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -9162,7 +9178,7 @@
               </button>
             </div>
 
-            <div style="display: flex; gap: 10px; margin-bottom: 16px">
+            <div id="supplierSearchInputWrapper" style="display: flex; gap: 10px; margin-bottom: 16px">
               <input type="text" id="orderSupplierSearchInput" placeholder="매입처명 또는 코드 검색"
                 onkeypress="if(event.key === 'Enter') searchOrderSuppliers()"
                 style="flex: 1; padding: 10px 12px; border: 2px solid #e5e7eb; border-radius: 6px" />
@@ -9178,7 +9194,7 @@
               </button>
             </div>
 
-            <div style="
+            <div id="supplierSearchTableContainer" style="
                   max-height: 400px;
                   overflow-y: auto;
                   border: 1px solid #e5e7eb;
@@ -9216,7 +9232,7 @@
         <!-- 신규 발주서용 품목 추가 모달 -->
         <div id="newOrderMaterialModal" class="modal" style="display: none">
           <div class="modal-content" style="max-width: 900px">
-            <div style="
+            <div id="newOrderMaterialModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -9246,11 +9262,11 @@
               </button>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 16px">
+            <div id="newOrderMaterialFormWrapper" style="display: flex; flex-direction: column; gap: 16px">
               <!-- 자재 검색 영역 -->
-              <div>
+              <div id="newOrderMaterialSearchSection">
                 <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">자재 검색</label>
-                <div style="display: flex; gap: 8px">
+                <div id="newOrderMaterialSearchInputWrapper" style="display: flex; gap: 8px">
                   <input type="text" id="newOrderMaterialSearchInput" style="
                         flex: 1;
                         padding: 10px 12px;
@@ -9502,7 +9518,7 @@
             </div>
 
             <!-- ✅ 발주 기본 정보 (카드 스타일) -->
-            <div style="
+            <div id="orderDetailInfoCard" style="
                   background: #f9fafb;
                   padding: 20px;
                   border-radius: 12px;
@@ -9512,20 +9528,20 @@
               <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
                 기본 정보
               </h3>
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
-                <div style="display: flex; align-items: center">
+              <div id="orderDetailInfoGrid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
+                <div id="orderDetailNoField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">발주번호</span>
                   <span id="orderDetailNo" style="color: #1f2937; font-weight: 600">-</span>
                 </div>
-                <div style="display: flex; align-items: center">
+                <div id="orderDetailDateField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">발주일자</span>
                   <span id="orderDetailDate" style="color: #1f2937">-</span>
                 </div>
-                <div style="display: flex; align-items: center">
+                <div id="orderDetailSupplierField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">매입처명</span>
                   <span id="orderDetailSupplier" style="color: #1f2937">-</span>
                 </div>
-                <div style="display: flex; align-items: center">
+                <div id="orderDetailRemarkField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">비고</span>
                   <span id="orderDetailRemark" style="color: #1f2937">-</span>
                 </div>
@@ -9533,7 +9549,7 @@
             </div>
 
             <!-- ✅ 발주 상세 목록 -->
-            <div id="orderDetailSection" style="
+            <div id="orderDetailListSection" style="
                   background: #f9fafb;
                   padding: 20px;
                   border-radius: 12px;
@@ -9569,7 +9585,7 @@
             </div>
 
             <!-- ✅ 출력 버튼 영역 -->
-            <div style="
+            <div id="orderDetailButtonContainer" style="
                   margin-top: 24px;
                   display: flex;
                   justify-content: flex-end;
@@ -9650,7 +9666,7 @@
             </div>
 
             <!-- ✅ 발주 기본 정보 (카드 스타일) -->
-            <div style="
+            <div id="orderEditInfoCard" style="
                   background: #f9fafb;
                   padding: 20px;
                   border-radius: 12px;
@@ -9660,20 +9676,20 @@
               <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
                 기본 정보
               </h3>
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
-                <div style="display: flex; align-items: center">
+              <div id="orderEditInfoGrid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
+                <div id="editOrderNoField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">발주번호</span>
                   <span id="editOrderNo" style="color: #1f2937; font-weight: 600">-</span>
                 </div>
-                <div style="display: flex; align-items: center">
+                <div id="editOrderDateField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">발주일자</span>
                   <span id="editOrderDate" style="color: #1f2937">-</span>
                 </div>
-                <div style="display: flex; align-items: center">
+                <div id="editSupplierNameField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">매입처명</span>
                   <span id="editSupplierName" style="color: #1f2937">-</span>
                 </div>
-                <div style="display: flex; align-items: center">
+                <div id="editOrderDeliveryDateField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">입고희망일자</span>
                   <input type="date" id="editOrderDeliveryDate" style="
                         padding: 8px 12px;
@@ -9682,7 +9698,7 @@
                         font-size: 14px;
                       " />
                 </div>
-                <div style="display: flex; align-items: center">
+                <div id="editOrderPaymentMethodField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">결제방법</span>
                   <select id="editOrderPaymentMethod" style="
                         padding: 8px 12px;
@@ -9697,7 +9713,7 @@
                     <option value="어음">어음</option>
                   </select>
                 </div>
-                <div style="display: flex; align-items: center">
+                <div id="editOrderStatusField" style="display: flex; align-items: center">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">상태</span>
                   <select id="editOrderStatus" style="
                         padding: 8px 12px;
@@ -9710,7 +9726,7 @@
                     <option value="2">입고완료</option>
                   </select>
                 </div>
-                <div style="display: flex; align-items: center; grid-column: 1 / -1">
+                <div id="editOrderTitleField" style="display: flex; align-items: center; grid-column: 1 / -1">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280">제목</span>
                   <input type="text" id="editOrderTitle" style="
                         flex: 1;
@@ -9720,7 +9736,7 @@
                         font-size: 14px;
                       " placeholder="발주 제목" />
                 </div>
-                <div style="display: flex; align-items: flex-start; grid-column: 1 / -1">
+                <div id="editOrderRemarkField" style="display: flex; align-items: flex-start; grid-column: 1 / -1">
                   <span style="min-width: 100px; font-weight: 500; color: #6b7280; padding-top: 8px">적요</span>
                   <textarea id="editOrderRemark" rows="2" style="
                         flex: 1;
@@ -9735,8 +9751,8 @@
             </div>
 
             <!-- ✅ 발주 상세 목록 -->
-            <div>
-              <div style="
+            <div id="orderEditDetailSection">
+              <div id="orderEditDetailHeaderWrapper" style="
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -9745,7 +9761,7 @@
                 <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #374151">
                   발주 품목 내역
                 </h3>
-                <div style="display: flex; gap: 8px">
+                <div id="orderEditDetailButtonGroup" style="display: flex; gap: 8px">
                   <button type="button" onclick="addOrderDetailRowInEdit()" style="
                         padding: 8px 16px;
                         background: #10b981;
@@ -9797,7 +9813,7 @@
             </div>
 
             <!-- ✅ 버튼 영역 -->
-            <div style="
+            <div id="orderEditButtonContainer" style="
                   display: flex;
                   gap: 12px;
                   justify-content: flex-end;

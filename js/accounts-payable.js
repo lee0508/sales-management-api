@@ -127,17 +127,17 @@ function initAccountsPayablePage() {
         render: function (data, type, row, meta) {
           const payableKey = `${row.미지급금지급일자}-${row.매입처코드}`;
           return `
-            <div class="action-buttons" id="payable-actions-${payableKey.replace(
+            <div class="action-buttons" id="payableActions-${payableKey.replace(
               /[^a-zA-Z0-9]/g,
               '_',
             )}">
-              <button class="btn-icon btn-view" onclick="viewAccountsPayableDetail(${
+              <button class="btn-icon payableBtnView" onclick="viewAccountsPayableDetail(${
                 meta.row
               })" title="상세보기">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editAccountsPayableByRow(${
+              <button class="btn-icon payableBtnEdit" style="display: none;" onclick="editAccountsPayableByRow(${
                 meta.row
               })" title="수정">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteAccountsPayableByRow(${
+              <button class="btn-icon payableBtnDelete" style="display: none;" onclick="deleteAccountsPayableByRow(${
                 meta.row
               })" title="삭제">삭제</button>
             </div>
@@ -209,14 +209,14 @@ async function loadAccountsPayable() {
       const actionDiv = $(`#actions-${quotationDate}_${quotationNo}`);
 
       if (isChecked) {
-        actionDiv.find('.btn-view').hide();
-        actionDiv.find('.btn-edit').show();
-        actionDiv.find('.btn-delete').show();
+        actionDiv.find('.payableBtnView').hide();
+        actionDiv.find('.payableBtnEdit').show();
+        actionDiv.find('.payableBtnDelete').show();
         actionDiv.find('.btn-approve').show();
       } else {
-        actionDiv.find('.btn-view').show();
-        actionDiv.find('.btn-edit').hide();
-        actionDiv.find('.btn-delete').hide();
+        actionDiv.find('.payableBtnView').show();
+        actionDiv.find('.payableBtnEdit').hide();
+        actionDiv.find('.payableBtnDelete').hide();
         actionDiv.find('.btn-approve').hide();
       }
     });
@@ -250,7 +250,7 @@ function updatePayableButtonStates() {
 
     if (rowData) {
       const payableKey = `${rowData.미지급금지급일자}-${rowData.매입처코드}`;
-      const actionsDivId = `payable-actions-${payableKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const actionsDivId = `payableActions-${payableKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const actionsDiv = document.getElementById(actionsDivId);
 
       console.log(
@@ -260,8 +260,8 @@ function updatePayableButtonStates() {
       );
 
       if (actionsDiv) {
-        const editBtn = actionsDiv.querySelector('.btn-edit');
-        const deleteBtn = actionsDiv.querySelector('.btn-delete');
+        const editBtn = actionsDiv.querySelector('.payableBtnEdit');
+        const deleteBtn = actionsDiv.querySelector('.payableBtnDelete');
 
         console.log(`  버튼 찾기: editBtn=${!!editBtn}, deleteBtn=${!!deleteBtn}`);
 

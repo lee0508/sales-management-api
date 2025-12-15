@@ -798,6 +798,46 @@ body {
 .orderBtnDelete { background: #dc3545; }
 .orderBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
 
+/* 자재분류관리 */
+.categoryBtnView { background: var(--primary); }
+.categoryBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.categoryBtnEdit { background: #28a745; }
+.categoryBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.categoryBtnDelete { background: #dc3545; }
+.categoryBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+
+/* 자재내역관리 */
+.historyBtnView { background: #17a2b8; color: white; padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.historyBtnView:hover { background: #138496; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(23, 162, 184, 0.3); }
+.historyBtnEdit { background: #ffc107; color: #333; padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.historyBtnEdit:hover { background: #e0a800; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(255, 193, 7, 0.3); }
+.historyBtnDelete { background: #dc3545; color: white; padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.historyBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+
+/* 계정과목관리 */
+.accountBtnView { background: var(--primary); }
+.accountBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.accountBtnEdit { background: #28a745; }
+.accountBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.accountBtnDelete { background: #dc3545; }
+.accountBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+
+/* 미수금관리 */
+.receivableBtnView { background: var(--primary); }
+.receivableBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.receivableBtnEdit { background: #28a745; }
+.receivableBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.receivableBtnDelete { background: #dc3545; }
+.receivableBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+
+/* 미지급금관리 */
+.payableBtnView { background: var(--primary); }
+.payableBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.payableBtnEdit { background: #28a745; }
+.payableBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.payableBtnDelete { background: #dc3545; }
+.payableBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+
 /* 버튼 클릭 효과 */
 .btn-icon:active {
   transform: translateY(0);
@@ -1308,6 +1348,12 @@ body {
   color: #991b1b;
 }
 
+.status-deleted {
+  background: #f3f4f6;
+  color: #6b7280;
+  text-decoration: line-through;
+}
+
 .status-completed {
   background: #dbeafe;
   color: #1e40af;
@@ -1477,6 +1523,7 @@ input[type='checkbox'] {
 #quotationDetailEditModal,
 #quotationDetailDeleteModal,
 #customerSearchModal,
+#quotationCustomerSearchModal,
 #materialSearchModal,
 #priceHistoryModal,
 #newQuotationMaterialModal {
@@ -1938,3 +1985,11 @@ input[type='checkbox'] {
 .btn-preview-close:hover {
   background: #da190b;
 }
+
+/* 계산서관리 */
+.taxinvoiceBtnView { background: var(--primary); }
+.taxinvoiceBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
+.taxinvoiceBtnEdit { background: #28a745; }
+.taxinvoiceBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.taxinvoiceBtnDelete { background: #dc3545; }
+.taxinvoiceBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }

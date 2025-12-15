@@ -7,8 +7,23 @@ let quotationTable = null;
 
 // ==================== 전역 함수 정의 (최상단) ====================
 // 견적서용 매출처 선택 함수 - 고유한 이름 사용 (taxinvoice.js와 충돌 방지)
-window.selectQuotationCustomer = function selectQuotationCustomer(customer) {
+window.selectQuotationCustomer = function selectQuotationCustomer(customerOrCode, name) {
   try {
+    // ✅ 두 가지 호출 방식 지원:
+    // 1. selectQuotationCustomer(customer) - 객체 전달 (견적 전용 검색에서 호출)
+    // 2. selectQuotationCustomer(code, name) - 개별 파라미터 (공통 모달에서 호출)
+    let code, customerName;
+
+    if (typeof customerOrCode === 'object' && customerOrCode !== null) {
+      // 객체로 전달된 경우
+      code = customerOrCode.매출처코드;
+      customerName = customerOrCode.매출처명;
+    } else {
+      // 개별 파라미터로 전달된 경우
+      code = customerOrCode;
+      customerName = name;
+    }
+
     // 매출처 코드와 이름 설정
     const codeInput = document.getElementById('selectedCustomerCode');
     const nameInput = document.getElementById('selectedCustomerName');
@@ -19,31 +34,34 @@ window.selectQuotationCustomer = function selectQuotationCustomer(customer) {
       return;
     }
 
-    codeInput.value = customer.매출처코드;
-    nameInput.value = customer.매출처명;
+    codeInput.value = code;
+    nameInput.value = customerName;
 
     // 선택된 매출처 정보 표시
     const infoDiv = document.getElementById('selectedCustomerInfo');
     const displaySpan = document.getElementById('selectedCustomerDisplay');
 
     if (infoDiv && displaySpan) {
-      displaySpan.textContent = `[${customer.매출처코드}] ${customer.매출처명}`;
+      displaySpan.textContent = `[${code}] ${customerName}`;
       infoDiv.style.display = 'block';
     }
 
     // 모달 닫기
     window.closeQuotationCustomerSearchModal();
+
+    console.log('✅ 매출처 선택 완료:', code, customerName);
   } catch (err) {
     console.error('❌ selectQuotationCustomer 에러:', err);
     alert('매출처 선택 중 오류가 발생했습니다: ' + err.message);
   }
 };
 
-// 견적서 작성용 매출처 검색 모달 닫기 함수
+// ✅ 견적서 작성용 매출처 검색 모달 닫기 함수 (공통 모달 사용)
+// @deprecated - customer.js의 closeCustomerSearchModal() 사용 권장
 window.closeQuotationCustomerSearchModal = function closeQuotationCustomerSearchModal() {
-  const modal = document.getElementById('quotationCustomerSearchModal');
-  if (modal) {
-    modal.style.display = 'none';
+  // customer.js의 공통 모달 닫기 함수 호출
+  if (typeof window.closeCustomerSearchModal === 'function') {
+    window.closeCustomerSearchModal();
   }
 };
 // ==================================================================
@@ -341,6 +359,9 @@ $(document).ready(function () {
       },
     });
 
+    // ✅ 전역 참조 통일 (window.quotationTableInstance와 quotationTable을 동일하게)
+    window.quotationTableInstance = quotationTable;
+
     // ✅ 전체선택 체크박스 이벤트 핸들러 등록
     $(document)
       .off('change.quotationPage', '#quotationSelectAll')
@@ -442,7 +463,10 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
     }
 
     const master = masterData.data.master;
-    const details = masterData.data.detail;
+    // ✅ API 응답이 details 또는 detail로 올 수 있으므로 둘 다 처리
+    const details = masterData.data.details || masterData.data.detail || [];
+
+    console.log('✅ 견적 상세 데이터:', { master, detailCount: details.length });
 
     // 기본 정보 표시
     $('#q_no').text(`${master.견적일자}-${master.견적번호}`);
@@ -455,9 +479,9 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
       window.quotationDetailDataTable.destroy();
     }
 
-    // ✅ DataTable 초기화
+    // ✅ DataTable 초기화 (API 필드명에 맞게 수정)
     window.quotationDetailDataTable = $('#quotationDetailTable').DataTable({
-      data: details || [],
+      data: details,
       columns: [
         {
           data: '자재코드',
@@ -484,7 +508,8 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
           className: 'dt-right',
         },
         {
-          data: '출고단가',
+          // ✅ API에서 '단가'로 반환 (출고단가 as 단가)
+          data: '단가',
           defaultContent: 0,
           render: function (data) {
             return (data || 0).toLocaleString();
@@ -492,7 +517,8 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
           className: 'dt-right',
         },
         {
-          data: '금액',
+          // ✅ API에서 '공급가액'으로 반환 (수량 * 출고단가)
+          data: '공급가액',
           defaultContent: 0,
           render: function (data) {
             return (data || 0).toLocaleString();
@@ -524,11 +550,11 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
       info: true,
     });
 
-    console.log(`✅ 견적 상세 DataTable 초기화 완료 (${details ? details.length : 0}건)`);
+    console.log(`✅ 견적 상세 DataTable 초기화 완료 (${details.length}건)`);
 
-    // ✅ 합계 금액 계산
-    const totalAmount = (details || []).reduce((sum, item) => {
-      return sum + (item.금액 || 0);
+    // ✅ 합계 금액 계산 (API 필드명: 공급가액)
+    const totalAmount = details.reduce((sum, item) => {
+      return sum + (item.공급가액 || 0);
     }, 0);
 
     // 합계 표시
@@ -563,6 +589,7 @@ function closeQuotationDetailModal() {
     actionDiv.find('.quotationBtnView').show();
     actionDiv.find('.quotationBtnEdit').hide();
     actionDiv.find('.quotationBtnDelete').hide();
+    actionDiv.find('.quotationBtnApprove').hide(); // ✅ 승인 버튼도 숨김
   });
 
   // DataTable 정리 (메모리 누수 방지)
@@ -783,6 +810,7 @@ function closeQuotationEditModal() {
     actionDiv.find('.quotationBtnView').show();
     actionDiv.find('.quotationBtnEdit').hide();
     actionDiv.find('.quotationBtnDelete').hide();
+    actionDiv.find('.quotationBtnApprove').hide(); // ✅ 승인 버튼도 숨김
   });
 
   // DataTable 정리
@@ -1805,33 +1833,49 @@ function closeQuotationModal() {
     actionDiv.find('.quotationBtnView').show();
     actionDiv.find('.quotationBtnEdit').hide();
     actionDiv.find('.quotationBtnDelete').hide();
+    actionDiv.find('.quotationBtnApprove').hide(); // ✅ 승인 버튼도 숨김
   });
   newQuotationDetails = [];
 }
 
-// ✅ 견적서 작성용 매출처 검색 모달 열기
+// ✅ 견적서 작성용 매출처 검색 모달 열기 (공통 모달 1개 사용)
 function openQuotationCustomerSearchModal() {
-  // 입력 필드의 값을 검색 모달로 가져가기
+  // 견적 입력값을 공통 검색창에 전달
   const searchValue = document.getElementById('selectedCustomerName').value.trim();
 
-  document.getElementById('quotationCustomerSearchModal').style.display = 'block';
-  document.getElementById('quotationCustomerSearchInput').value = searchValue;
+  // [핵심] customer.js의 공통 모달 열기 사용
+  // callerContext = 'quotation' (선택 결과를 견적에 주입하기 위한 컨텍스트)
+  // initialSearchValue = searchValue (매출처명 입력란의 값을 검색어로 전달)
+  if (typeof window.openCustomerSearchModal === 'function') {
+    window.openCustomerSearchModal('quotation', searchValue);
+  }
 
-  // 값이 있으면 자동으로 검색 실행
-  if (searchValue) {
+  // 값이 있으면 자동검색 (표준 함수 우선, 없으면 견적 전용 함수)
+  if (searchValue && typeof window.searchCustomersForModal === 'function') {
+    window.searchCustomersForModal();
+  } else if (searchValue) {
     searchQuotationCustomers();
   }
 }
 
 // ✅ 전역으로 노출 (HTML에서 호출할 수 있도록)
 window.openQuotationCustomerSearchModal = openQuotationCustomerSearchModal;
-// 하위 호환성을 위한 별칭 (추후 제거 예정)
-window.openCustomerSearchModal = openQuotationCustomerSearchModal;
+// ❌ 절대 두지 마세요: 공통 openCustomerSearchModal을 덮어씀 (충돌 원인)
+// window.openCustomerSearchModal = openQuotationCustomerSearchModal;
 
 // ✅ 견적서용 매출처 검색
+// @deprecated - customer.js의 공통 모달 검색 사용 권장 (searchCustomersForModal)
+// 하위 호환성을 위해 유지, customer.js가 이미 별칭 제공: window.searchQuotationCustomers = window.searchCustomersForModal
 async function searchQuotationCustomers() {
+  // customer.js의 공통 검색 함수가 있으면 그것을 사용
+  if (typeof window.searchCustomersForModal === 'function') {
+    return window.searchCustomersForModal();
+  }
+
+  // 없으면 기존 로직 사용 (하위 호환)
   try {
-    const searchText = document.getElementById('quotationCustomerSearchInput').value.trim();
+    // customerSearchModalInput ID 사용 (표준 ID)
+    const searchText = document.getElementById('customerSearchModalInput').value.trim();
 
     const response = await fetch(
       `/api/customers?search=${encodeURIComponent(searchText)}`,
@@ -1932,6 +1976,7 @@ async function searchQuotationCustomers() {
 }
 
 // ✅ 전역으로 노출 (HTML에서 호출할 수 있도록)
+// 참고: customer.js가 이미 별칭 제공 - window.searchQuotationCustomers = window.searchCustomersForModal
 window.searchQuotationCustomers = searchQuotationCustomers;
 
 // 신규 견적서 작성 모드 플래그

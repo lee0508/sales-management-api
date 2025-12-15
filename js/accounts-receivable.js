@@ -127,17 +127,17 @@ function initAccountsReceivablePage() {
         render: function (data, type, row, meta) {
           const receivableKey = `${row.미수금입금일자}-${row.매출처코드}`;
           return `
-            <div class="action-buttons" id="receivable-actions-${receivableKey.replace(
+            <div class="action-buttons" id="receivableActions-${receivableKey.replace(
               /[^a-zA-Z0-9]/g,
               '_',
             )}">
-              <button class="btn-icon btn-view" onclick="viewAccountsReceivableDetail(${
+              <button class="btn-icon receivableBtnView" onclick="viewAccountsReceivableDetail(${
                 meta.row
               })" title="상세보기">상세</button>
-              <button class="btn-icon btn-edit" style="display: none;" onclick="editAccountsReceivableByRow(${
+              <button class="btn-icon receivableBtnEdit" style="display: none;" onclick="editAccountsReceivableByRow(${
                 meta.row
               })" title="수정">수정</button>
-              <button class="btn-icon btn-delete" style="display: none;" onclick="deleteAccountsReceivableByRow(${
+              <button class="btn-icon receivableBtnDelete" style="display: none;" onclick="deleteAccountsReceivableByRow(${
                 meta.row
               })" title="삭제">삭제</button>
             </div>
@@ -227,7 +227,7 @@ function updateReceivableButtonStates() {
 
     if (rowData) {
       const receivableKey = `${rowData.미수금입금일자}-${rowData.매출처코드}`;
-      const actionsDivId = `receivable-actions-${receivableKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const actionsDivId = `receivableActions-${receivableKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const actionsDiv = document.getElementById(actionsDivId);
 
       console.log(
@@ -237,8 +237,8 @@ function updateReceivableButtonStates() {
       );
 
       if (actionsDiv) {
-        const editBtn = actionsDiv.querySelector('.btn-edit');
-        const deleteBtn = actionsDiv.querySelector('.btn-delete');
+        const editBtn = actionsDiv.querySelector('.receivableBtnEdit');
+        const deleteBtn = actionsDiv.querySelector('.receivableBtnDelete');
 
         console.log(`  버튼 찾기: editBtn=${!!editBtn}, deleteBtn=${!!deleteBtn}`);
 
