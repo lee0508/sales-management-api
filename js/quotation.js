@@ -1864,118 +1864,19 @@ window.openQuotationCustomerSearchModal = openQuotationCustomerSearchModal;
 // window.openCustomerSearchModal = openQuotationCustomerSearchModal;
 
 // ✅ 견적서용 매출처 검색
-// @deprecated - customer.js의 공통 모달 검색 사용 권장 (searchCustomersForModal)
-// 하위 호환성을 위해 유지, customer.js가 이미 별칭 제공: window.searchQuotationCustomers = window.searchCustomersForModal
+// @deprecated - customer.js의 공통 모달 검색 사용 (searchCustomersForModal)
+// customer.js가 이미 별칭 제공: window.searchQuotationCustomers = window.searchCustomersForModal
+// 이 함수는 하위 호환성을 위해서만 유지됨
 async function searchQuotationCustomers() {
-  // customer.js의 공통 검색 함수가 있으면 그것을 사용
+  // customer.js의 공통 검색 함수 사용
   if (typeof window.searchCustomersForModal === 'function') {
     return window.searchCustomersForModal();
   }
 
-  // 없으면 기존 로직 사용 (하위 호환)
-  try {
-    // customerSearchModalInput ID 사용 (표준 ID)
-    const searchText = document.getElementById('customerSearchModalInput').value.trim();
-
-    const response = await fetch(
-      `/api/customers?search=${encodeURIComponent(searchText)}`,
-      { credentials: 'include' }, // 세션 쿠키 포함
-    );
-    const result = await response.json();
-
-    if (!result.success) {
-      throw new Error(result.message || '매출처 조회 실패');
-    }
-
-    const tbody = document.getElementById('customerSearchTableBody');
-
-    if (result.data.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="4" style="padding: 40px; text-align: center; color: #999;">
-            검색 결과가 없습니다
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
-    tbody.innerHTML = '';
-
-    result.data.forEach((customer, index) => {
-      const tr = document.createElement('tr');
-      tr.style.cursor = 'pointer';
-
-      tr.innerHTML = `
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${customer.매출처코드}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${customer.매출처명}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${
-          customer.전화번호 || '-'
-        }</td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">
-          <button class="select-customer-btn" data-index="${index}" style="
-            padding: 6px 16px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-          ">선택</button>
-        </td>
-      `;
-
-      // innerHTML 설정 후 이벤트 리스너 추가
-      tr.onmouseover = () => (tr.style.background = '#f8f9fa');
-      tr.onmouseout = () => (tr.style.background = 'white');
-
-      // 행 클릭 시 매출처 선택
-      tr.onclick = (e) => {
-        console.log('🔵 행 클릭:', customer.매출처코드, 'target:', e.target.tagName);
-        // 선택 버튼 클릭은 버튼의 onclick 이벤트가 처리하므로 제외
-        if (e.target.tagName !== 'BUTTON') {
-          try {
-            console.log('🔵 행 클릭 → selectQuotationCustomer 호출');
-            window.selectQuotationCustomer(customer);
-          } catch (err) {
-            console.error('❌ 행 클릭 → selectQuotationCustomer 에러:', err);
-          }
-        }
-      };
-
-      // 선택 버튼 클릭 이벤트
-      const selectBtn = tr.querySelector('.select-customer-btn');
-
-      console.log(`🔵 버튼 찾기 [${index}]:`, selectBtn ? '찾음' : '못찾음', customer.매출처코드);
-
-      if (selectBtn) {
-        selectBtn.onclick = (e) => {
-          console.log('🔵 선택 버튼 클릭:', customer.매출처코드);
-          e.stopPropagation(); // 행 클릭 이벤트 방지
-
-          try {
-            console.log('🔵 selectQuotationCustomer 호출 시작, customer 객체:', customer);
-            window.selectQuotationCustomer(customer); // 견적서 전용 함수 호출
-            console.log('🔵 selectQuotationCustomer 호출 완료');
-          } catch (err) {
-            console.error('❌ selectQuotationCustomer 호출 에러:', err);
-            alert('매출처 선택 중 오류가 발생했습니다: ' + err.message);
-          }
-        };
-      } else {
-        console.error('❌ 선택 버튼을 찾을 수 없음:', customer.매출처코드);
-      }
-
-      tbody.appendChild(tr);
-    });
-
-    console.log(`✅ 매출처 검색 완료: ${result.data.length}건`);
-  } catch (err) {
-    console.error('❌ 매출처 검색 오류:', err);
-    alert('매출처 검색 중 오류가 발생했습니다: ' + err.message);
-  }
+  console.error('❌ searchCustomersForModal 함수를 찾을 수 없습니다. customer.js가 로드되었는지 확인하세요.');
 }
 
-// ✅ 전역으로 노출 (HTML에서 호출할 수 있도록)
+// ✅ 전역으로 노출 (하위 호환성)
 // 참고: customer.js가 이미 별칭 제공 - window.searchQuotationCustomers = window.searchCustomersForModal
 window.searchQuotationCustomers = searchQuotationCustomers;
 
