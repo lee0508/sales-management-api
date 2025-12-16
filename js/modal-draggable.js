@@ -33,9 +33,11 @@ function makeModalDraggable(modalId, headerId) {
     dragHandle = modalContent;
   }
 
-  // 초기 위치 설정 (중앙)
-  modalContent.style.position = 'relative';
-  modalContent.style.margin = '50px auto';
+  // ✅ 초기 위치 설정 (이미 position이 설정되어 있으면 유지)
+  if (!modalContent.style.position || modalContent.style.position === '') {
+    modalContent.style.position = 'relative';
+    modalContent.style.margin = '50px auto';
+  }
 
   dragHandle.style.cursor = 'move';
 
@@ -54,10 +56,9 @@ function makeModalDraggable(modalId, headerId) {
       return;
     }
 
-    initialX = e.clientX - xOffset;
-    initialY = e.clientY - yOffset;
-
     if (e.target === dragHandle || dragHandle.contains(e.target)) {
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
       isDragging = true;
     }
   }
@@ -83,7 +84,8 @@ function makeModalDraggable(modalId, headerId) {
   }
 
   function setTranslate(xPos, yPos, el) {
-    el.style.transform = `translate(${xPos}px, ${yPos}px)`;
+    // ✅ transform만 사용하여 드래그 (기존 translate(-50%, -50%) 유지)
+    el.style.transform = `translate(calc(-50% + ${xPos}px), calc(-50% + ${yPos}px))`;
   }
 
   // 모달이 닫힐 때 위치 초기화
@@ -93,7 +95,12 @@ function makeModalDraggable(modalId, headerId) {
         if (modal.style.display === 'none') {
           xOffset = 0;
           yOffset = 0;
-          modalContent.style.transform = 'translate(0px, 0px)';
+          // ✅ position: absolute인 경우 중앙 정렬 유지
+          if (modalContent.style.position === 'absolute') {
+            modalContent.style.transform = 'translate(-50%, -50%)';
+          } else {
+            modalContent.style.transform = 'translate(0px, 0px)';
+          }
         }
       }
     });

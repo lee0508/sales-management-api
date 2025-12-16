@@ -639,27 +639,29 @@ async function editQuotation(quotationDate, quotationNo) {
     const master = result.data.master;
     const details = result.data.detail || [];
 
-    // 기본 정보 표시 (읽기 전용)
-    document.getElementById('editQuotationNo').textContent = `${quotationDate}-${quotationNo}`;
-    document.getElementById('editQuotationDate').textContent = quotationDate.replace(
+    // ✅ 기본 정보 표시 (Prefix Rule 적용)
+    document.getElementById('quotationEditNo').value = `${quotationDate}-${quotationNo}`;
+    document.getElementById('quotationEditDate').value = quotationDate.replace(
       /(\d{4})(\d{2})(\d{2})/,
       '$1-$2-$3',
     );
-    document.getElementById('editCustomerName').textContent = master.매출처명 || '-';
+    document.getElementById('quotationEditCustomerName').value = master.매출처명 || '-';
 
-    // 출고희망일자 (YYYYMMDD -> YYYY-MM-DD)
-    const deliveryDate = master.출고희망일자 || '';
-    if (deliveryDate && deliveryDate.length === 8) {
-      document.getElementById('editDeliveryDate').value = `${deliveryDate.substring(
+    // 유효일자, 상태, 담당자, 연락처
+    const validDate = master.유효일자 || '';
+    if (validDate && validDate.length === 8) {
+      document.getElementById('quotationEditValidDate').value = `${validDate.substring(
         0,
         4,
-      )}-${deliveryDate.substring(4, 6)}-${deliveryDate.substring(6, 8)}`;
+      )}-${validDate.substring(4, 6)}-${validDate.substring(6, 8)}`;
     } else {
-      document.getElementById('editDeliveryDate').value = '';
+      document.getElementById('quotationEditValidDate').value = '';
     }
 
-    document.getElementById('editTitle').value = master.제목 || '';
-    document.getElementById('editRemark').value = master.적요 || '';
+    document.getElementById('quotationEditStatus').value = master.상태 || '작성';
+    document.getElementById('quotationEditManager').value = master.담당자 || '';
+    document.getElementById('quotationEditContact').value = master.연락처 || '';
+    document.getElementById('quotationEditRemark').value = master.적요 || '';
 
     // 모달에 견적일자, 번호 저장 (submit 시 사용)
     const modal = document.getElementById('quotationEditModal');
@@ -842,84 +844,70 @@ function addQuotationDetailRow() {
 }
 
 // ✅ 자재 검색 함수
+// ✅ [견적관리] 공통 자재 검색 (quotationDetailAddModal)
+// HTML에 있는 materialSearchInput / materialSearchTableBody / materialSearchResults 기준으로 동작
 async function searchMaterials() {
   try {
-    // 각 필드의 검색어 가져오기
-    const searchCode = document.getElementById('materialSearchCode').value.trim();
-    const searchName = document.getElementById('materialSearchName').value.trim();
-    const searchSpec = document.getElementById('materialSearchSpec').value.trim();
-
-    // 최소 1개 이상의 검색어 입력 확인
-    if (!searchCode && !searchName && !searchSpec) {
-      alert('최소 1개 이상의 검색 조건을 입력해주세요.');
+    const keyword = document.getElementById('materialSearchInput').value.trim();
+    if (!keyword) {
+      alert('검색어를 입력해주세요.');
       return;
     }
 
-    console.log('🔍 견적 자재 검색:', {
-      자재코드: searchCode,
-      자재명: searchName,
-      규격: searchSpec,
-    });
-
-    // 검색 조건을 쿼리 파라미터로 전달
+    // 서버는 /api/materials 에서 searchName을 처리
     const params = new URLSearchParams();
-    if (searchCode) params.append('searchCode', searchCode);
-    if (searchName) params.append('searchName', searchName);
-    if (searchSpec) params.append('searchSpec', searchSpec);
+    params.append('searchName', keyword);
 
-    const result = await apiCall(`/materials?${params.toString()}`);
+    const response = await fetch(`/api/materials?${params.toString()}`);
+    const result = await response.json();
 
-    if (!result.success || !result.data) {
-      throw new Error('자재 목록을 불러올 수 없습니다.');
-    }
+    if (!result.success) throw new Error(result.message || '자재 조회 실패');
 
-    const filteredMaterials = result.data;
+    const tbody = document.getElementById('materialSearchTableBody');
+    const resultsDiv = document.getElementById('materialSearchResults');
 
-    if (filteredMaterials.length === 0) {
-      alert('검색 결과가 없습니다.');
-      document.getElementById('materialSearchResults').style.display = 'none';
+    if (!result.data || result.data.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="padding:40px;text-align:center;color:#999;">
+            검색 결과가 없습니다
+          </td>
+        </tr>`;
+      resultsDiv.style.display = 'block';
       return;
     }
 
-    // 검색 결과 테이블에 표시
-    const tbody = document.getElementById('materialSearchTableBody');
     tbody.innerHTML = '';
+    result.data.forEach((material) => {
+      const 자재코드 = (material.분류코드 || '') + (material.세부코드 || '');
 
-    filteredMaterials.forEach((m) => {
-      const 자재코드 = m.분류코드 + m.세부코드;
       const tr = document.createElement('tr');
       tr.style.cursor = 'pointer';
-      tr.style.transition = 'background 0.2s';
-      tr.onmouseover = function () {
-        this.style.background = '#f3f4f6';
-      };
-      tr.onmouseout = function () {
-        this.style.background = 'white';
-      };
-      tr.onclick = function () {
-        selectMaterial(m);
-      };
+      tr.onmouseover = () => (tr.style.background = '#f8f9fa');
+      tr.onmouseout = () => (tr.style.background = 'white');
 
       tr.innerHTML = `
-        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${자재코드}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${
-          m.자재명
-        }</td>
-        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${
-          m.규격 || '-'
-        }</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${자재코드}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${material.자재명 || '-'}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${material.규격 || '-'}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${(
+          material.출고단가1 || 0
+        ).toLocaleString()}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center;">
+          <button type="button" class="btn btn-sm"
+            onclick='selectMaterialForQuotation(${JSON.stringify(material).replace(/'/g,"&apos;")})'>
+            선택
+          </button>
+        </td>
       `;
-
       tbody.appendChild(tr);
     });
 
-    // 검색 결과 표시
-    document.getElementById('materialSearchResults').style.display = 'block';
-
-    console.log(`✅ 자재 검색 완료: ${filteredMaterials.length}건`);
+    resultsDiv.style.display = 'block';
+    console.log(`✅ 자재 검색 완료: ${result.data.length}건`);
   } catch (err) {
     console.error('❌ 자재 검색 오류:', err);
-    alert('자재 검색 중 오류가 발생했습니다: ' + err.message);
+    alert('자재 검색 중 오류가 발생했습니다.');
   }
 }
 
@@ -943,10 +931,28 @@ function selectMaterial(material) {
 // ✅ 선택된 자재 취소
 function clearSelectedMaterial() {
   selectedMaterial = null;
-  document.getElementById('selectedMaterialInfo').style.display = 'none';
-  document.getElementById('materialSearchCode').value = '';
-  document.getElementById('materialSearchName').value = '';
-  document.getElementById('materialSearchSpec').value = '';
+  if (typeof newSelectedMaterial !== 'undefined') newSelectedMaterial = null;
+
+  const selectedInfo = document.getElementById('selectedMaterialInfo');
+  if (selectedInfo) selectedInfo.style.display = 'none';
+
+  // 검색 결과 다시 표시
+  const resultsDiv = document.getElementById('materialSearchResults');
+  if (resultsDiv) resultsDiv.style.display = 'block';
+}
+
+// ✅ 금액 자동 계산 (수량 * 단가)
+function calculateDetailAmount() {
+  const qtyEl = document.getElementById('addDetailQuantity');
+  const priceEl = document.getElementById('addDetailPrice');
+  const amtEl = document.getElementById('addDetailAmount');
+
+  if (qtyEl && priceEl && amtEl) {
+    const qty = parseFloat(qtyEl.value) || 0;
+    const price = parseFloat(priceEl.value) || 0;
+    const amount = qty * price;
+    amtEl.value = amount.toLocaleString();
+  }
 }
 
 // ✅ 출고단가 이력 보기
@@ -1528,9 +1534,9 @@ async function submitQuotationEdit() {
   const quotationNo = modal.dataset.quotationNo;
 
   try {
-    // 1. 마스터 정보 업데이트
-    const deliveryDateInput = document.getElementById('editDeliveryDate').value;
-    const 출고희망일자 = deliveryDateInput ? deliveryDateInput.replace(/-/g, '') : '';
+    // ✅ 1. 마스터 정보 업데이트 (Prefix Rule 적용)
+    const quotationDateInput = document.getElementById('quotationEditDate').value;
+    const validDateInput = document.getElementById('quotationEditValidDate').value;
 
     const masterResponse = await fetch(`/api/quotations/${quotationDate}/${quotationNo}`, {
       method: 'PUT',
@@ -1539,13 +1545,13 @@ async function submitQuotationEdit() {
       },
       credentials: 'include', // 세션 쿠키 포함
       body: JSON.stringify({
+        견적일자: quotationDateInput ? quotationDateInput.replace(/-/g, '') : '',
         매출처코드: modal.dataset.매출처코드,
-        출고희망일자: 출고희망일자,
-        결제방법: parseInt(modal.dataset.결제방법),
-        결제예정일자: modal.dataset.결제예정일자,
-        유효일수: parseInt(modal.dataset.유효일수),
-        제목: document.getElementById('editTitle').value,
-        적요: document.getElementById('editRemark').value,
+        유효일자: validDateInput ? validDateInput.replace(/-/g, '') : '',
+        상태: document.getElementById('quotationEditStatus').value,
+        담당자: document.getElementById('quotationEditManager').value,
+        연락처: document.getElementById('quotationEditContact').value,
+        적요: document.getElementById('quotationEditRemark').value,
       }),
     });
 
@@ -1753,6 +1759,9 @@ async function onEditQuotation(selectedQuotation) {
 
 async function openQuotationEditModal(quotationDate, quotationNo) {
   try {
+    // ✅ 모드 설정
+    currentQuotationMode = 'edit';
+
     // 1) 마스터 + 상세 조회
     const res = await fetch(`/api/quotations/${quotationDate}/${quotationNo}`);
     const json = await res.json();
@@ -1809,12 +1818,29 @@ function openNewQuotationModal() {
   renderNewQuotationDetailTable();
 
   // 모달 표시
-  document.getElementById('quotationModal').style.display = 'block';
+  const modal = document.getElementById('quotationModal');
+  modal.style.display = 'block';
+  modal.style.position = 'fixed';
 
-  // 드래그 기능 활성화 (최초 1회만 실행)
+  // ✅ 드래그 기능 활성화 (최초 1회만 실행)
+  const modalContent = document.getElementById('quotationModalContent');
   if (!window.quotationModalDraggable) {
-    makeModalDraggable('quotationModal', 'quotationModalHeader');
-    window.quotationModalDraggable = true;
+    // 최초 실행시에만 modal-content에 드래그를 위한 positioning 설정
+    if (modalContent) {
+      modalContent.style.position = 'absolute';
+      modalContent.style.top = '50%';
+      modalContent.style.left = '50%';
+      modalContent.style.transform = 'translate(-50%, -50%)';
+      modalContent.style.margin = '0';
+    }
+
+    // makeModalDraggable 함수 호출 (modal-draggable.js에서 로드됨)
+    if (typeof makeModalDraggable === 'function') {
+      makeModalDraggable('quotationModal', 'quotationModalHeader');
+      window.quotationModalDraggable = true;
+    } else {
+      console.error('❌ makeModalDraggable 함수를 찾을 수 없습니다. modal-draggable.js가 로드되었는지 확인하세요.');
+    }
   }
 }
 
@@ -1850,11 +1876,15 @@ function openQuotationCustomerSearchModal() {
     window.openCustomerSearchModal('quotation', searchValue);
   }
 
-  // 값이 있으면 자동검색 (표준 함수 우선, 없으면 견적 전용 함수)
-  if (searchValue && typeof window.searchCustomersForModal === 'function') {
-    window.searchCustomersForModal();
-  } else if (searchValue) {
-    searchQuotationCustomers();
+  // 값이 있으면 자동검색 (모달이 열린 후 실행되도록 setTimeout 사용)
+  if (searchValue) {
+    setTimeout(() => {
+      if (typeof window.searchCustomersForModal === 'function') {
+        window.searchCustomersForModal();
+      } else {
+        searchQuotationCustomers();
+      }
+    }, 100);
   }
 }
 
@@ -1880,39 +1910,233 @@ async function searchQuotationCustomers() {
 // 참고: customer.js가 이미 별칭 제공 - window.searchQuotationCustomers = window.searchCustomersForModal
 window.searchQuotationCustomers = searchQuotationCustomers;
 
-// 신규 견적서 작성 모드 플래그
-let isNewQuotationMode = false;
+// ==================== 품목 선택 처리 ====================
 
-// ✅ 자재 검색 모달 열기 (신규 견적서 작성용)
-function openMaterialSearchModal() {
-  // 신규 견적서 작성 모드로 설정
-  isNewQuotationMode = true;
+/**
+ * 품목 검색 모달 열기 (견적서 작성용)
+ * @description HTML에서 호출하는 견적 전용 함수 (material.js의 공용 모달 사용)
+ */
+window.openQuotationMaterialSearch = function() {
+  // material.js의 공용 모달 열기 (context: 'quotation')
+  if (typeof window.openMaterialSearchModal === 'function') {
+    window.openMaterialSearchModal('quotation', '');
+  } else {
+    console.error('❌ material.js의 openMaterialSearchModal 함수를 찾을 수 없습니다.');
+  }
+};
 
-  // 견적서 작성 모달을 임시로 숨김 (완전히 숨기기)
-  const quotationModal = document.getElementById('quotationModal');
-  quotationModal.dataset.previousDisplay = quotationModal.style.display;
-  quotationModal.style.display = 'none';
+// ✅ [견적관리 - 신규] 품목 선택 처리 함수 (material.js에서 호출)
+window.selectQuotationMaterial = function(material) {
+  console.log('✅ 견적관리 품목 선택:', material);
+
+  // 자재코드 생성
+  const 자재코드 = (material.분류코드 || '') + (material.세부코드 || '');
+
+  // newQuotationDetails 배열에 추가
+  newQuotationDetails.push({
+    자재코드: 자재코드,
+    자재명: material.자재명,
+    규격: material.규격 || '',
+    수량: 1,
+    단가: material.출고단가1 || 0,
+  });
+
+  // 테이블 렌더링
+  renderNewQuotationDetailTable();
+
+  // 모달 닫기
+  if (typeof window.closeMaterialSearchModal === 'function') {
+    window.closeMaterialSearchModal();
+  }
+};
+
+// ✅ [견적관리 - 수정] 품목 선택 처리 함수 (material.js에서 호출)
+window.selectQuotationEditMaterial = function(material) {
+  console.log('✅ 견적 수정 품목 선택:', material);
+
+  // material.js에서 전달받은 데이터를 quotationMaterialAddModal 형식에 맞게 변환
+  const materialForModal = {
+    품목코드: material.품목코드 || ((material.분류코드 || '') + (material.세부코드 || '')),
+    품목명: material.자재명,
+    판매단가: material.출고단가 || material.출고단가1 || 0,
+    규격: material.규격 || '',
+  };
+
+  // 선택된 품목 저장
+  selectedMaterialForAdd = materialForModal;
+
+  // 품목 검색 모달 닫기
+  if (typeof window.closeMaterialSearchModal === 'function') {
+    window.closeMaterialSearchModal();
+  }
+
+  // 품목 추가 모달 열기 (수량/단가 입력용)
+  openQuotationMaterialAddModal(materialForModal);
+};
+
+// ==================== 품목 추가 모달 관리 ====================
+
+// 선택된 품목 정보 저장 (전역 변수가 이미 존재하면 재사용)
+if (typeof selectedMaterialForAdd === 'undefined') {
+  var selectedMaterialForAdd = null;
+}
+
+/**
+ * 품목 추가 모달 열기
+ * @param {Object} material - 미리 선택된 품목 정보 (선택적)
+ */
+window.openQuotationMaterialAddModal = function(material) {
+  const modal = document.getElementById('quotationMaterialAddModal');
+  if (!modal) {
+    console.error('❌ quotationMaterialAddModal 요소를 찾을 수 없습니다.');
+    return;
+  }
 
   // 모달 초기화
-  selectedMaterial = null;
-  document.getElementById('materialSearchCode').value = '';
-  document.getElementById('materialSearchName').value = '';
-  document.getElementById('materialSearchSpec').value = '';
-  document.getElementById('materialSearchResults').style.display = 'none';
-  document.getElementById('selectedMaterialInfo').style.display = 'none';
-  document.getElementById('addDetailQuantity').value = '1';
-  document.getElementById('addDetailPrice').value = '0';
-  document.getElementById('addDetailAmount').value = '0';
+  document.getElementById('quotationMaterialAddName').value = '';
+  document.getElementById('quotationMaterialAddQuantity').value = '1';
+  document.getElementById('quotationMaterialAddPrice').value = '0';
+  document.getElementById('quotationMaterialAddAmount').value = '0';
+  document.getElementById('quotationMaterialAddSelectedInfo').style.display = 'none';
+  selectedMaterialForAdd = null;
 
-  // 품목 추가 모달 표시
-  const modal = document.getElementById('quotationDetailAddModal');
+  // 미리 선택된 품목이 있으면 표시
+  if (material) {
+    selectedMaterialForAdd = material;
+    document.getElementById('quotationMaterialAddName').value = material.품목명 || material.자재명 || '';
+    document.getElementById('quotationMaterialAddPrice').value = material.판매단가 || material.출고단가 || material.출고단가1 || 0;
+    document.getElementById('quotationMaterialAddSelectedName').textContent = material.품목명 || material.자재명 || '-';
+    document.getElementById('quotationMaterialAddSelectedCode').textContent = material.품목코드 || '-';
+    document.getElementById('quotationMaterialAddSelectedInfo').style.display = 'block';
+    calculateQuotationMaterialAddAmount();
+  }
+
   modal.style.display = 'block';
-  modal.style.zIndex = '9999';
-  modal.style.position = 'fixed';
+};
 
-  console.log('견적서 작성 모달 숨김');
-  console.log('품목 추가 모달 z-index:', modal.style.zIndex);
-}
+/**
+ * 품목 추가 모달 닫기
+ */
+window.closeQuotationMaterialAddModal = function() {
+  const modal = document.getElementById('quotationMaterialAddModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  selectedMaterialForAdd = null;
+};
+
+/**
+ * 선택된 품목 정보 초기화
+ */
+window.clearQuotationMaterialAddSelected = function() {
+  selectedMaterialForAdd = null;
+  document.getElementById('quotationMaterialAddName').value = '';
+  document.getElementById('quotationMaterialAddPrice').value = '0';
+  document.getElementById('quotationMaterialAddSelectedInfo').style.display = 'none';
+  calculateQuotationMaterialAddAmount();
+};
+
+/**
+ * 금액 자동계산
+ */
+window.calculateQuotationMaterialAddAmount = function() {
+  const quantity = parseFloat(document.getElementById('quotationMaterialAddQuantity').value) || 0;
+  const price = parseFloat(document.getElementById('quotationMaterialAddPrice').value) || 0;
+  const amount = Math.round(quantity * price);
+  document.getElementById('quotationMaterialAddAmount').value = amount.toLocaleString();
+};
+
+/**
+ * 품목 추가 확정 (직접 입력 또는 검색 선택 모두 지원)
+ */
+window.confirmQuotationMaterialAdd = function() {
+  const materialName = document.getElementById('quotationMaterialAddName').value.trim();
+  const quantity = parseFloat(document.getElementById('quotationMaterialAddQuantity').value);
+  const price = parseFloat(document.getElementById('quotationMaterialAddPrice').value);
+
+  // 품목명 입력 확인
+  if (!materialName) {
+    alert('품목명을 입력하거나 검색하여 선택해주세요.');
+    return;
+  }
+
+  // 수량 입력 확인
+  if (!quantity || quantity <= 0) {
+    alert('수량을 입력해주세요.');
+    return;
+  }
+
+  // ✅ 검색으로 선택한 경우와 직접 입력한 경우 모두 처리
+  let 자재코드 = '';
+  let 규격 = '';
+
+  if (selectedMaterialForAdd) {
+    // 검색 모달에서 선택한 경우
+    자재코드 = selectedMaterialForAdd.품목코드 || '';
+    규격 = selectedMaterialForAdd.규격 || '';
+  } else {
+    // 직접 입력한 경우 (자재코드 없음)
+    자재코드 = '';
+    규격 = '';
+  }
+
+  // newQuotationDetails 배열에 추가
+  newQuotationDetails.push({
+    자재코드: 자재코드,
+    자재명: materialName,
+    규격: 규격,
+    수량: quantity,
+    단가: price,
+  });
+
+  // 테이블 렌더링
+  renderNewQuotationDetailTable();
+
+  // 모달 닫기
+  closeQuotationMaterialAddModal();
+};
+
+/**
+ * 이전 단가 조회 (향후 구현)
+ */
+window.showQuotationMaterialPriceHistory = function() {
+  if (!selectedMaterialForAdd) {
+    alert('품목을 먼저 선택해주세요.');
+    return;
+  }
+  alert('이전 단가 조회 기능은 향후 구현 예정입니다.');
+};
+
+/**
+ * 품목 검색 모달에서 품목 선택 시 호출되는 함수
+ * @description material.js에서 context='quotation_material_add'로 호출
+ */
+window.selectQuotationMaterialAdd = function(material) {
+  console.log('✅ 품목 추가 모달용 품목 선택:', material);
+
+  // material.js에서 전달받은 데이터를 저장
+  selectedMaterialForAdd = {
+    품목코드: material.품목코드 || ((material.분류코드 || '') + (material.세부코드 || '')),
+    품목명: material.자재명,
+    판매단가: material.출고단가 || material.출고단가1 || 0,
+    규격: material.규격 || '',
+  };
+
+  // UI 업데이트
+  document.getElementById('quotationMaterialAddName').value = selectedMaterialForAdd.품목명;
+  document.getElementById('quotationMaterialAddPrice').value = selectedMaterialForAdd.판매단가;
+  document.getElementById('quotationMaterialAddSelectedName').textContent = selectedMaterialForAdd.품목명;
+  document.getElementById('quotationMaterialAddSelectedCode').textContent = selectedMaterialForAdd.품목코드;
+  document.getElementById('quotationMaterialAddSelectedInfo').style.display = 'block';
+
+  // 금액 재계산
+  calculateQuotationMaterialAddAmount();
+
+  // 품목 검색 모달 닫기
+  if (typeof window.closeMaterialSearchModal === 'function') {
+    window.closeMaterialSearchModal();
+  }
+};
 
 // 테스트 모달 닫기 (임시 함수)
 function closeTestSimpleModal() {
@@ -2150,37 +2374,54 @@ function selectPriceFromHistoryForNewQuotation(price) {
 }
 
 // ✅ 자재 선택 및 추가 (견적서 작성용)
+// ✅ [견적관리] 자재 선택 (공통 - 모달 내 입력 필드 사용)
 function selectMaterialForQuotation(material) {
-  const 수량 = prompt(`${material.자재명}\n수량을 입력하세요:`, '1');
-
-  if (!수량 || isNaN(수량) || parseFloat(수량) <= 0) {
-    alert('유효한 수량을 입력해주세요.');
-    return;
+  // 선택된 자재를 변수에 저장 (신규/수정 모두 호환)
+  selectedMaterial = material;
+  if (typeof newSelectedMaterial !== 'undefined') {
+    newSelectedMaterial = material;
   }
 
-  const 단가 = prompt(`${material.자재명}\n출고단가를 입력하세요:`, material.출고단가1 || '0');
+  // 자재코드 생성
+  const 자재코드 = (material.분류코드 || '') + (material.세부코드 || '');
 
-  if (!단가 || isNaN(단가) || parseFloat(단가) < 0) {
-    alert('유효한 단가를 입력해주세요.');
-    return;
+  // 선택된 자재 정보 표시
+  const selectedInfo = document.getElementById('selectedMaterialInfo');
+  const selectedName = document.getElementById('selectedMaterialName');
+  const selectedCode = document.getElementById('selectedMaterialCode');
+
+  if (selectedInfo) selectedInfo.style.display = 'block';
+  if (selectedName) selectedName.textContent = material.자재명 || '-';
+  if (selectedCode) selectedCode.textContent = `품목코드: ${자재코드}`;
+
+  // 기본 단가 설정 (값이 없을 때만)
+  const priceEl = document.getElementById('addDetailPrice');
+  if (priceEl && (!priceEl.value || priceEl.value === '0')) {
+    priceEl.value = material.출고단가1 || 0;
   }
 
-  // 상세내역 추가
-  newQuotationDetails.push({
-    자재코드: material.자재코드,
-    자재명: material.자재명,
-    규격: material.규격,
-    수량: parseFloat(수량),
-    단가: parseFloat(단가),
-  });
+  // 검색 결과 숨기기
+  const resultsDiv = document.getElementById('materialSearchResults');
+  if (resultsDiv) resultsDiv.style.display = 'none';
 
-  renderNewQuotationDetailTable();
-  closeMaterialSearchModal();
+  // 금액 자동 계산
+  calculateDetailAmount();
+
+  // 수량 입력란에 포커스
+  const qtyEl = document.getElementById('addDetailQuantity');
+  if (qtyEl) {
+    setTimeout(() => qtyEl.focus(), 100);
+  }
 }
 
 // ✅ 새 견적서 상세내역 테이블 렌더링
 function renderNewQuotationDetailTable() {
-  const tbody = document.getElementById('quotationDetailTableBody');
+  const tbody = document.getElementById('quotationCreateDetailTableBody');
+
+  if (!tbody) {
+    console.warn('⚠️ quotationCreateDetailTableBody 요소를 찾을 수 없습니다');
+    return;
+  }
 
   if (newQuotationDetails.length === 0) {
     tbody.innerHTML = `
@@ -2214,7 +2455,7 @@ function renderNewQuotationDetailTable() {
       <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${
         index + 1
       }</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.자재코드}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.자재코드 || '-'}</td>
       <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.자재명 || '-'}</td>
       <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.규격 || '-'}</td>
       <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${detail.수량.toLocaleString()}</td>
@@ -2326,24 +2567,8 @@ async function submitQuotation(event) {
 
 let newSelectedMaterial = null;
 
-// 모달 열기 - 견적서 작성 모달은 유지하고 품목 추가 모달만 표시
-function openMaterialSearchModal() {
-  // 새 모달 초기화
-  newSelectedMaterial = null;
-  document.getElementById('newMaterialSearchCode').value = '';
-  document.getElementById('newMaterialSearchName').value = '';
-  document.getElementById('newMaterialSearchSpec').value = '';
-  document.getElementById('newMaterialSearchResults').style.display = 'none';
-  document.getElementById('newSelectedMaterialInfo').style.display = 'none';
-  document.getElementById('newDetailQuantity').value = '1';
-  document.getElementById('newDetailPrice').value = '0';
-  document.getElementById('newDetailAmount').value = '0';
-
-  // 품목 추가 모달 표시 (견적서 작성 모달은 그대로 유지)
-  const modal = document.getElementById('newQuotationMaterialModal');
-  modal.style.display = 'block';
-  modal.style.zIndex = '9999';
-}
+// ❌ [중복 삭제됨] openMaterialSearchModal() - 위의 공통 함수(라인 1887) 사용
+// 이전에는 newQuotationMaterialModal을 사용했으나, 이제 quotationDetailAddModal 1개로 통합
 
 // 테스트 모달 닫기
 function closeTestSimpleModal() {
@@ -3327,3 +3552,549 @@ window.filterQuotations = filterQuotations;
 window.printQuotation = printQuotation;
 window.printQuotationFromDetail = printQuotationFromDetail;
 window.closeQuotationDetailModal = closeQuotationDetailModal;
+
+// ========================================================================
+// 새로운 HTML 구조(251215)에 맞춘 함수들
+// ========================================================================
+
+// 견적서 작성 모달 관련 변수
+let quotationMaterials = []; // 견적서에 추가된 품목 목록
+// selectedMaterialForAdd는 상단에서 전역 변수로 선언됨
+let currentQuotationMode = 'new'; // 'new' 또는 'edit'
+
+// ========== 견적서 작성 모달 ==========
+
+/**
+ * 견적서 작성 모달 열기
+ */
+function openQuotationModal() {
+  currentQuotationMode = 'new';
+  quotationMaterials = [];
+
+  // 오늘 날짜로 설정
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('quotationDate').value = today;
+  document.getElementById('quotationValidDate').value = '';
+
+  // 매출처 초기화
+  document.getElementById('quotationCustomerName').value = '';
+
+  // 기타 필드 초기화
+  document.getElementById('quotationManager').value = '';
+  document.getElementById('quotationContact').value = '';
+  document.getElementById('quotationRemark').value = '';
+
+  // 품목 테이블 초기화
+  renderQuotationMaterialTable();
+
+  // 모달 표시
+  document.getElementById('quotationModal').style.display = 'flex';
+}
+
+/**
+ * 견적서 작성 모달 닫기
+ */
+function closeQuotationModal() {
+  document.getElementById('quotationModal').style.display = 'none';
+  quotationMaterials = [];
+  selectedMaterialForAdd = null;
+}
+
+// ❌ [중복 제거] openQuotationCustomerSearchModal는 1858라인에 이미 정의됨
+// ❌ [중복 제거] selectCustomerForQuotation는 customer.js의 selectQuotationCustomer 사용
+
+/**
+ * 품목 검색 모달 열기 (견적서 작성용)
+ */
+function openMaterialSearchModalForQuotation() {
+  currentQuotationMode = 'new';
+
+  // 공통 품목 검색 모달 열기
+  if (typeof window.openMaterialSearchModal === 'function') {
+    window.openMaterialSearchModal('quotation');
+  } else {
+    alert('품목 검색 모달을 찾을 수 없습니다.');
+  }
+}
+
+/**
+ * 품목 검색에서 품목 선택 시 호출 (공통 모달 → 품목 추가 모달)
+ */
+window.selectMaterialForQuotation = function(material) {
+  selectedMaterialForAdd = material;
+
+  // 품목 검색 모달 닫기
+  if (typeof window.closeMaterialSearchModal === 'function') {
+    window.closeMaterialSearchModal();
+  }
+
+  // 품목 추가 모달 열기
+  openQuotationMaterialAddModal(material);
+};
+
+// ❌ [중복 제거 완료] 품목 추가 모달 관련 함수들은 lines 1977-2139에 Prefix Rule 준수 버전으로 통합됨
+// - openQuotationMaterialAddModal() → window.openQuotationMaterialAddModal() (line 1988)
+// - closeQuotationMaterialAddModal() → window.closeQuotationMaterialAddModal() (line 2020)
+// - calculateMaterialAmount() → window.calculateQuotationMaterialAddAmount() (line 2042)
+// - addMaterialToQuotation() → window.confirmQuotationMaterialAdd() (line 2052)
+
+/**
+ * 견적서 품목 테이블 렌더링
+ */
+function renderQuotationMaterialTable() {
+  const tbody = document.getElementById('quotationMaterialTableBody');
+  tbody.innerHTML = '';
+
+  let totalAmount = 0;
+
+  quotationMaterials.forEach((item, index) => {
+    totalAmount += item.금액;
+
+    const row = `
+      <tr>
+        <td style="text-align: center">${index + 1}</td>
+        <td>${item.품목코드}</td>
+        <td>${item.품목명}</td>
+        <td style="text-align: right">${item.수량.toLocaleString()}</td>
+        <td style="text-align: right">${item.단가.toLocaleString()}</td>
+        <td style="text-align: right">${item.금액.toLocaleString()}</td>
+        <td style="text-align: center">
+          <button type="button" class="btn btn-sm btn-danger" onclick="removeQuotationMaterial(${index})">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+    tbody.insertAdjacentHTML('beforeend', row);
+  });
+
+  // 합계 표시
+  document.getElementById('quotationTotalAmount').textContent = totalAmount.toLocaleString();
+}
+
+/**
+ * 견적서에서 품목 삭제
+ */
+function removeQuotationMaterial(index) {
+  if (confirm('이 품목을 삭제하시겠습니까?')) {
+    quotationMaterials.splice(index, 1);
+    renderQuotationMaterialTable();
+  }
+}
+
+/**
+ * 견적서 저장
+ */
+async function saveQuotation() {
+  // 입력값 검증
+  const quotationDate = document.getElementById('quotationDate').value;
+  const validDate = document.getElementById('quotationValidDate').value;
+  const customerName = document.getElementById('quotationCustomerName').value;
+  const manager = document.getElementById('quotationManager').value;
+  const contact = document.getElementById('quotationContact').value;
+  const remark = document.getElementById('quotationRemark').value;
+
+  if (!quotationDate) {
+    alert('견적일자를 선택해주세요.');
+    return;
+  }
+
+  if (!customerName) {
+    alert('매출처를 선택해주세요.');
+    return;
+  }
+
+  if (quotationMaterials.length === 0) {
+    alert('품목을 추가해주세요.');
+    return;
+  }
+
+  // TODO: 서버로 데이터 전송
+  const quotationData = {
+    견적일자: quotationDate,
+    유효일자: validDate,
+    매출처명: customerName,
+    담당자: manager,
+    연락처: contact,
+    비고: remark,
+    품목목록: quotationMaterials
+  };
+
+  console.log('견적서 저장:', quotationData);
+
+  try {
+    // API 호출 코드 추가 필요
+    alert('견적서가 저장되었습니다.');
+    closeQuotationModal();
+
+    // 견적 목록 새로고침
+    if (typeof loadQuotations === 'function') {
+      loadQuotations();
+    }
+  } catch (error) {
+    console.error('견적서 저장 오류:', error);
+    alert('견적서 저장 중 오류가 발생했습니다.');
+  }
+}
+
+// ========== 견적 상세 보기 모달 ==========
+
+/**
+ * 견적 상세 보기 모달 열기
+ */
+function openQuotationDetailModal() {
+  // 선택된 견적 확인
+  const selectedRow = document.querySelector('#quotationTableBody input[type="checkbox"]:checked');
+
+  if (!selectedRow) {
+    alert('견적을 선택해주세요.');
+    return;
+  }
+
+  // TODO: 선택된 견적 데이터 로드
+  const quotationNo = selectedRow.value;
+
+  // 테스트 데이터
+  document.getElementById('detailQuotationNo').textContent = quotationNo;
+  document.getElementById('detailQuotationDate').textContent = '2025-12-15';
+  document.getElementById('detailValidDate').textContent = '2025-12-30';
+  document.getElementById('detailStatus').textContent = '작성';
+  document.getElementById('detailCustomerName').textContent = '[C001] 테스트 매출처';
+  document.getElementById('detailManager').textContent = '홍길동';
+  document.getElementById('detailContact').textContent = '010-1234-5678';
+  document.getElementById('detailRemark').textContent = '테스트 비고';
+
+  // 모달 표시
+  document.getElementById('quotationDetailModal').style.display = 'flex';
+}
+
+/**
+ * 견적 상세 보기 모달 닫기
+ */
+function closeQuotationDetailModal() {
+  document.getElementById('quotationDetailModal').style.display = 'none';
+}
+
+// ========== 견적 수정 모달 ==========
+
+/**
+ * 견적 수정 모달 열기
+ */
+function openQuotationEditModal() {
+  // 선택된 견적 확인
+  const selectedRow = document.querySelector('#quotationTableBody input[type="checkbox"]:checked');
+
+  if (!selectedRow) {
+    alert('견적을 선택해주세요.');
+    return;
+  }
+
+  currentQuotationMode = 'edit';
+
+  // TODO: 선택된 견적 데이터 로드
+  const quotationNo = selectedRow.value;
+
+  // ✅ 테스트 데이터 (Prefix Rule 적용)
+  document.getElementById('quotationEditNo').value = quotationNo;
+  document.getElementById('quotationEditDate').value = '2025-12-15';
+  document.getElementById('quotationEditValidDate').value = '2025-12-30';
+  document.getElementById('quotationEditStatus').value = '작성';
+  document.getElementById('quotationEditCustomerName').value = '[C001] 테스트 매출처';
+  document.getElementById('quotationEditManager').value = '홍길동';
+  document.getElementById('quotationEditContact').value = '010-1234-5678';
+  document.getElementById('quotationEditRemark').value = '테스트 비고';
+
+  // 모달 표시
+  document.getElementById('quotationEditModal').style.display = 'flex';
+}
+
+/**
+ * 견적 수정 모달 닫기
+ */
+function closeQuotationEditModal() {
+  document.getElementById('quotationEditModal').style.display = 'none';
+}
+
+/**
+ * 수정용 매출처 검색 모달 열기 (Prefix Rule 적용)
+ */
+function openEditCustomerSearchModal() {
+  const searchValue = document.getElementById('quotationEditCustomerName').value.trim();
+
+  // 공통 매출처 검색 모달 열기
+  if (typeof window.openCustomerSearchModal === 'function') {
+    window.openCustomerSearchModal('quotation_edit', searchValue);
+  }
+
+  // 검색어가 있으면 자동 검색
+  if (searchValue) {
+    setTimeout(() => {
+      if (typeof window.searchCustomersForModal === 'function') {
+        window.searchCustomersForModal();
+      }
+    }, 100);
+  }
+}
+
+/**
+ * 수정용 매출처 선택 (Prefix Rule 적용)
+ */
+window.selectCustomerForQuotationEdit = function(customerCode, customerName) {
+  document.getElementById('quotationEditCustomerName').value = `[${customerCode}] ${customerName}`;
+
+  // 공통 모달 닫기
+  if (typeof window.closeCustomerSearchModal === 'function') {
+    window.closeCustomerSearchModal();
+  }
+};
+
+/**
+ * 수정용 품목 검색 모달 열기
+ */
+function openMaterialSearchModalForEdit() {
+  currentQuotationMode = 'edit';
+
+  // 공통 품목 검색 모달 열기
+  if (typeof window.openMaterialSearchModal === 'function') {
+    window.openMaterialSearchModal('quotation_edit');
+  } else {
+    alert('품목 검색 모달을 찾을 수 없습니다.');
+  }
+}
+
+/**
+ * 견적 수정 저장 (Prefix Rule 적용)
+ */
+async function updateQuotation() {
+  // ✅ 입력값 검증 (Prefix Rule 적용)
+  const quotationNo = document.getElementById('quotationEditNo').value;
+  const quotationDate = document.getElementById('quotationEditDate').value;
+  const validDate = document.getElementById('quotationEditValidDate').value;
+  const status = document.getElementById('quotationEditStatus').value;
+  const customerName = document.getElementById('quotationEditCustomerName').value;
+  const manager = document.getElementById('quotationEditManager').value;
+  const contact = document.getElementById('quotationEditContact').value;
+  const remark = document.getElementById('quotationEditRemark').value;
+
+  if (!quotationDate) {
+    alert('견적일자를 선택해주세요.');
+    return;
+  }
+
+  if (!customerName) {
+    alert('매출처를 선택해주세요.');
+    return;
+  }
+
+  // TODO: 서버로 데이터 전송
+  const quotationData = {
+    견적번호: quotationNo,
+    견적일자: quotationDate,
+    유효일자: validDate,
+    상태: status,
+    매출처명: customerName,
+    담당자: manager,
+    연락처: contact,
+    비고: remark
+  };
+
+  console.log('견적 수정:', quotationData);
+
+  try {
+    // API 호출 코드 추가 필요
+    alert('견적이 수정되었습니다.');
+    closeQuotationEditModal();
+
+    // 견적 목록 새로고침
+    if (typeof loadQuotations === 'function') {
+      loadQuotations();
+    }
+  } catch (error) {
+    console.error('견적 수정 오류:', error);
+    alert('견적 수정 중 오류가 발생했습니다.');
+  }
+}
+
+/**
+ * 견적 삭제
+ */
+async function deleteQuotation() {
+  const selectedRows = document.querySelectorAll('#quotationTableBody input[type="checkbox"]:checked');
+
+  if (selectedRows.length === 0) {
+    alert('삭제할 견적을 선택해주세요.');
+    return;
+  }
+
+  if (!confirm(`선택한 ${selectedRows.length}개의 견적을 삭제하시겠습니까?`)) {
+    return;
+  }
+
+  try {
+    // TODO: API 호출
+    alert('견적이 삭제되었습니다.');
+
+    // 견적 목록 새로고침
+    if (typeof loadQuotations === 'function') {
+      loadQuotations();
+    }
+  } catch (error) {
+    console.error('견적 삭제 오류:', error);
+    alert('견적 삭제 중 오류가 발생했습니다.');
+  }
+}
+
+/**
+ * 견적 인쇄
+ */
+function printQuotation() {
+  const selectedRow = document.querySelector('#quotationTableBody input[type="checkbox"]:checked');
+
+  if (!selectedRow) {
+    alert('인쇄할 견적을 선택해주세요.');
+    return;
+  }
+
+  // TODO: 인쇄 기능 구현
+  alert('인쇄 기능은 준비 중입니다.');
+}
+
+/**
+ * 전체 체크박스 토글
+ */
+function toggleAllQuotations(checkbox) {
+  const checkboxes = document.querySelectorAll('#quotationTableBody input[type="checkbox"]');
+  checkboxes.forEach(cb => {
+    cb.checked = checkbox.checked;
+  });
+}
+
+// 전역 함수 노출
+window.openQuotationModal = openQuotationModal;
+window.closeQuotationModal = closeQuotationModal;
+window.openQuotationCustomerSearchModal = openQuotationCustomerSearchModal;
+window.openMaterialSearchModalForQuotation = openMaterialSearchModalForQuotation;
+// ❌ [중복 제거] 아래 함수들은 lines 1988-2052에서 이미 window 객체에 직접 할당됨
+// window.openQuotationMaterialAddModal (line 1988)
+// window.closeQuotationMaterialAddModal (line 2020)
+// window.calculateQuotationMaterialAddAmount (line 2042) - 이전 이름: calculateMaterialAmount
+// window.confirmQuotationMaterialAdd (line 2052) - 이전 이름: addMaterialToQuotation
+window.removeQuotationMaterial = removeQuotationMaterial;
+window.saveQuotation = saveQuotation;
+window.openQuotationDetailModal = openQuotationDetailModal;
+window.closeQuotationDetailModal = closeQuotationDetailModal;
+window.openQuotationEditModal = openQuotationEditModal;
+window.closeQuotationEditModal = closeQuotationEditModal;
+window.openEditCustomerSearchModal = openEditCustomerSearchModal;
+window.openMaterialSearchModalForEdit = openMaterialSearchModalForEdit;
+window.updateQuotation = updateQuotation;
+window.deleteQuotation = deleteQuotation;
+window.printQuotation = printQuotation;
+window.toggleAllQuotations = toggleAllQuotations;
+
+/**
+ * 견적 데이터를 CSV로 내보내기 (Google Sheets 가져오기용)
+ * DataTable 기반으로 전체 데이터 또는 현재 표시된 데이터 내보내기
+ */
+function exportQuotationsToExcel() {
+  try {
+    console.log('===== 견적 Google Sheets 내보내기 시작 =====');
+
+    if (!quotationTable) {
+      alert('견적 테이블이 초기화되지 않았습니다.');
+      return;
+    }
+
+    // DataTable에서 현재 표시된 데이터 가져오기
+    const dataToExport = quotationTable.rows({ search: 'applied' }).data().toArray();
+
+    if (dataToExport.length === 0) {
+      alert('내보낼 견적 데이터가 없습니다.');
+      return;
+    }
+
+    console.log(`✅ 내보낼 데이터 수: ${dataToExport.length}건`);
+
+    // CSV 헤더
+    const headers = [
+      '견적번호',
+      '매출처명',
+      '견적일자',
+      '제목',
+      '견적금액',
+      '담당자',
+      '상태',
+    ];
+
+    // CSV 특수문자 처리
+    const escapeCsv = (value) => {
+      const text = (value ?? '').toString().replace(/"/g, '""');
+      return `"${text}"`;
+    };
+
+    // CSV 내용 생성
+    let csvContent = '\uFEFF' + headers.join(',') + '\n'; // UTF-8 BOM 추가
+
+    dataToExport.forEach((row) => {
+      const statusMap = {
+        1: '작성중',
+        2: '승인',
+        3: '반려',
+      };
+      const status = statusMap[row.상태코드] || '알수없음';
+
+      // 견적일자 포맷 (YYYYMMDD → YYYY-MM-DD)
+      let formattedDate = row.견적일자 || '';
+      if (formattedDate.length === 8) {
+        formattedDate = `${formattedDate.substring(0, 4)}-${formattedDate.substring(4, 6)}-${formattedDate.substring(6, 8)}`;
+      }
+
+      const rowData = [
+        `${row.견적일자}-${row.견적번호}`,
+        row.매출처명 || '-',
+        formattedDate,
+        row.제목 || '-',
+        (row.견적금액 || 0).toLocaleString() + '원',
+        row.담당자 || '-',
+        status,
+      ].map(escapeCsv);
+
+      csvContent += rowData.join(',') + '\n';
+    });
+
+    // Blob 생성 및 다운로드
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const date = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const fileName = `견적관리_${year}${month}${date}_${hours}${minutes}${seconds}.csv`;
+
+    if (navigator.msSaveBlob) {
+      // IE 10+
+      navigator.msSaveBlob(blob, fileName);
+    } else {
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    console.log('✅ CSV 파일 다운로드 완료:', fileName);
+    alert(
+      `${dataToExport.length}개의 견적 정보가 CSV로 내보내졌습니다.\n\n📊 Google Sheets에서 불러오려면:\n1. sheets.google.com 접속\n2. 파일 > 가져오기 > 업로드\n3. 다운로드된 CSV 파일 선택`,
+    );
+  } catch (error) {
+    console.error('❌ 견적 Google Sheets 내보내기 오류:', error);
+    alert('내보내기 중 오류가 발생했습니다: ' + error.message);
+  }
+}
+
+window.exportQuotationsToExcel = exportQuotationsToExcel;
