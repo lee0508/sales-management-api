@@ -3,7 +3,7 @@
  */
 
 // 전역 변수로 DataTable 인스턴스 저장
-let quotationTable = null;
+let quotationManageTable = null;
 
 // ==================== 전역 함수 정의 (최상단) ====================
 // 견적서용 매출처 선택 함수 - 고유한 이름 사용 (taxinvoice.js와 충돌 방지)
@@ -24,9 +24,9 @@ window.selectQuotationCustomer = function selectQuotationCustomer(customerOrCode
       customerName = name;
     }
 
-    // 매출처 코드와 이름 설정
-    const codeInput = document.getElementById('selectedCustomerCode');
-    const nameInput = document.getElementById('selectedCustomerName');
+    // 매출처 코드와 이름 설정 (Prefix Rule 적용)
+    const codeInput = document.getElementById('quotationManageCreateCustomerCode');
+    const nameInput = document.getElementById('quotationManageCreateCustomerName');
 
     if (!codeInput || !nameInput) {
       console.error('❌ 입력 필드를 찾을 수 없습니다!');
@@ -38,8 +38,8 @@ window.selectQuotationCustomer = function selectQuotationCustomer(customerOrCode
     nameInput.value = customerName;
 
     // 선택된 매출처 정보 표시
-    const infoDiv = document.getElementById('selectedCustomerInfo');
-    const displaySpan = document.getElementById('selectedCustomerDisplay');
+    const infoDiv = document.getElementById('quotationManageCreateCustomerInfo');
+    const displaySpan = document.getElementById('quotationManageCreateCustomerDisplay');
 
     if (infoDiv && displaySpan) {
       displaySpan.textContent = `[${code}] ${customerName}`;
@@ -68,15 +68,15 @@ window.closeQuotationCustomerSearchModal = function closeQuotationCustomerSearch
 
 $(document).ready(function () {
   // 견적서 작성 모달 드래그 기능
-  makeModalDraggable('quotationModalContent', 'quotationModalHeader');
+  makeModalDraggable('quotationManageCreateModalContent', 'quotationManageCreateModalHeader');
   // 견적서 수정 모달 드래그 기능
-  makeModalDraggable('quotationEditModalContent', 'quotationEditModalHeader');
+  makeModalDraggable('quotationManageEditModalContent', 'quotationManageEditModalHeader');
   // 견적 상세 보기 모달 드래그 기능
-  makeModalDraggable('quotationDetailModalContent', 'quotationDetailModalHeader');
+  makeModalDraggable('quotationManageViewModalContent', 'quotationManageViewModalHeader');
 
   // ✅ 상세 버튼 모달 닫기 함수
-  // function closeQuotationDetailModal() {
-  //   const modal = document.getElementById('quotationDetailModal');
+  // function closeQuotationManageViewModal() {
+  //   const modal = document.getElementById('quotationManageViewModal');
   //   if (modal) {
   //     modal.classList.add('hidden');
   //     modal.style.display = 'none';
@@ -90,40 +90,40 @@ $(document).ready(function () {
   // }
 
   // ✅ 전역으로 즉시 노출 (HTML에서 호출할 수 있도록)
-  // window.closeQuotationDetailModal = closeQuotationDetailModal;
+  // window.closeQuotationManageViewModal = closeQuotationDetailModal;
 
   // ✅ 상세 보기 모달 닫기 버튼
   $('#closeQuotationDetailModal').on('click', () => {
-    closeQuotationDetailModal();
+    closeQuotationManageViewModal();
   });
 
   // ✅ 상세보기 모달 배경 클릭시 닫기
-  $(document).on('click', '#quotationDetailModal', function (e) {
-    if (e.target.id === 'quotationDetailModal') {
-      closeQuotationDetailModal();
+  $(document).on('click', '#quotationManageViewModal', function (e) {
+    if (e.target.id === 'quotationManageViewModal') {
+      closeQuotationManageViewModal();
     }
   });
 
   // ✅ 수정 모달 닫기 버튼
   $('#closeQuotationEditModalBtn').on('click', () => {
-    closeQuotationEditModal();
+    closeQuotationManageEditModal();
   });
 
   // ✅ 수정 모달 배경 클릭시 닫기
-  $(document).on('click', '#quotationEditModal', function (e) {
-    if (e.target.id === 'quotationEditModal') {
-      closeQuotationEditModal();
+  $(document).on('click', '#quotationManageEditModal', function (e) {
+    if (e.target.id === 'quotationManageEditModal') {
+      closeQuotationManageEditModal();
     }
   });
 
   // ✅ 품목 추가 모달 닫기 버튼
   $('#closeQuotationDetailAddModal').on('click', () => {
-    closeQuotationDetailAddModal();
+    closeQuotationManageMaterialAddModal();
   });
 
   // ✅ 품목 수정 모달 닫기 버튼
   $('#closeQuotationDetailEditModal').on('click', () => {
-    closeQuotationDetailEditModal();
+    closeQuotationManageMaterialEditModal();
   });
 
   // ✅ 단가 이력 모달 닫기 버튼
@@ -167,8 +167,8 @@ $(document).ready(function () {
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
 
-    const startDateInput = document.getElementById('quotationStartDate');
-    const endDateInput = document.getElementById('quotationEndDate');
+    const startDateInput = document.getElementById('quotationManageStartDate');
+    const endDateInput = document.getElementById('quotationManageEndDate');
 
     // 항상 오늘 날짜로 설정
     if (startDateInput) {
@@ -179,21 +179,21 @@ $(document).ready(function () {
     }
 
     // 이미 DataTable이 존재하면 파괴
-    if (quotationTable) {
-      quotationTable.destroy();
-      quotationTable = null;
+    if (quotationManageTable) {
+      quotationManageTable.destroy();
+      quotationManageTable = null;
     }
 
     // DataTable 초기화
-    quotationTable = $('#quotationTable').DataTable({
+    quotationManageTable = $('#quotationManageTable').DataTable({
       ajax: {
         url: '/api/quotations',
         data: function (d) {
           // 필터링 파라미터 추가
           const 사업장코드 = currentUser?.사업장코드 || '01';
-          const 상태코드 = $('#quotationStatusFilter').val();
-          const startDate = $('#quotationStartDate').val()?.replace(/-/g, '') || '';
-          const endDate = $('#quotationEndDate').val()?.replace(/-/g, '') || '';
+          const 상태코드 = $('#quotationManageStatusFilter').val();
+          const startDate = $('#quotationManageStartDate').val()?.replace(/-/g, '') || '';
+          const endDate = $('#quotationManageEndDate').val()?.replace(/-/g, '') || '';
 
           return {
             사업장코드: 사업장코드,
@@ -204,7 +204,7 @@ $(document).ready(function () {
         },
         dataSrc: function (json) {
           // 견적 건수 업데이트
-          const countEl = document.getElementById('quotationCount');
+          const countEl = document.getElementById('quotationManageCount');
           if (countEl && json.total !== undefined) {
             countEl.innerText = `${json.total.toLocaleString()}`;
           }
@@ -226,7 +226,7 @@ $(document).ready(function () {
           data: null,
           className: 'dt-center',
           /* render: function (data, type, row, meta) {
-            const table = $('#quotationTable').DataTable();
+            const table = $('#quotationManageTable').DataTable();
             const info = table.page.info();
             return info.recordsDisplay - meta.row;
           }, */
@@ -259,10 +259,12 @@ $(document).ready(function () {
         },
         // 7. 견적금액
         {
-          data: '견적금액',
-          render: function (data) {
-            if (!data) return '0원';
-            return data.toLocaleString() + '원';
+          // ✅ API에서 '합계금액'으로 반환 가능성 체크 (견적금액 또는 합계금액)
+          data: null,
+          render: function (_data, _type, row) {
+            const amount = row.견적금액 || row.합계금액 || 0;
+            if (!amount) return '0원';
+            return amount.toLocaleString() + '원';
           },
         },
         // 8. 담당자
@@ -291,18 +293,18 @@ $(document).ready(function () {
             const quotationKey = `${row.견적일자}-${row.견적번호}`;
             return `
               <div class="action-buttons" id="quotationActions-${quotationKey.replace('-', '_')}">
-                <button class="btn-icon quotationBtnView" onclick="viewQuotationDetail('${row.견적일자}', ${
+                <button class="btn-icon quotationBtnView" onclick="viewQuotationManageDetail('${row.견적일자}', ${
               row.견적번호
             })" title="상세보기">상세</button>
-                <button class="btn-icon quotationBtnEdit" style="display: none;" onclick="editQuotation('${
+                <button class="btn-icon quotationBtnEdit" style="display: none;" onclick="editQuotationManage('${
                   row.견적일자
                 }', ${row.견적번호})" title="수정">수정</button>
-                <button class="btn-icon quotationBtnDelete" style="display: none;" onclick="deleteQuotation('${
+                <button class="btn-icon quotationBtnDelete" style="display: none;" onclick="deleteQuotationManage('${
                   row.견적일자
                 }', ${row.견적번호})" title="삭제">삭제</button>
                 ${
                   row.상태코드 === 1
-                    ? `<button class="btn-icon quotationBtnApprove" style="display: none; background: #28a745;" onclick="approveQuotation('${row.견적일자}', ${row.견적번호})" title="승인">승인</button>`
+                    ? `<button class="btn-icon quotationBtnApprove" style="display: none; background: #28a745;" onclick="approveQuotationManage('${row.견적일자}', ${row.견적번호})" title="승인">승인</button>`
                     : ''
                 }
               </div>
@@ -330,13 +332,8 @@ $(document).ready(function () {
       responsive: true,
       autoWidth: false,
       drawCallback: function () {
-        // 전체선택 체크박스 상태 확인
-        const isSelectAllChecked = $('#quotationSelectAll').prop('checked');
-
-        // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
-        $('.quotationRowCheck').prop('checked', isSelectAllChecked);
-
-        // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
+        // DataTable이 다시 그려질 때 버튼 표시 상태 복원
+        // 주의: 체크박스 상태는 건드리지 않음 (개별 선택 시 전체선택 문제 방지)
         $('.quotationRowCheck').each(function () {
           const $checkbox = $(this);
           const quotationDate = $checkbox.data('date');
@@ -359,42 +356,76 @@ $(document).ready(function () {
       },
     });
 
-    // ✅ 전역 참조 통일 (window.quotationTableInstance와 quotationTable을 동일하게)
-    window.quotationTableInstance = quotationTable;
+    // ✅ 전역 참조 통일 (window.quotationManageTableInstance와 quotationManageTable을 동일하게)
+    window.quotationManageTableInstance = quotationManageTable;
 
-    // ✅ 전체선택 체크박스 이벤트 핸들러 등록
+    // 전체 선택 모드 플래그 (전체 선택 체크박스 클릭 시 true)
+    let isSelectAllMode = false;
+
+    // ✅ 전체선택 체크박스 클릭 이벤트 핸들러 등록 (click 이벤트 사용)
     $(document)
-      .off('change.quotationPage', '#quotationSelectAll')
-      .on('change.quotationPage', '#quotationSelectAll', function () {
+      .off('click.quotationManagePage', '#quotationManageSelectAll')
+      .on('click.quotationManagePage', '#quotationManageSelectAll', function () {
       const isChecked = $(this).prop('checked');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📋 [견적관리] 전체선택 체크박스 클릭');
-      console.log(`✅ 체크 상태: ${isChecked ? '전체 선택' : '전체 해제'}`);
 
-      $('.quotationRowCheck').prop('checked', isChecked).trigger('change');
+      // 전체 선택 모드 활성화
+      isSelectAllMode = true;
 
-      console.log('✅ 전체선택 처리 완료');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      // 모든 개별 체크박스를 선택/해제
+      $('.quotationRowCheck').each(function() {
+        const $checkbox = $(this);
+        const quotationDate = $checkbox.data('date');
+        const quotationNo = $checkbox.data('no');
+        const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
+
+        $checkbox.prop('checked', isChecked);
+
+        if (isChecked) {
+          // 체크됨: 상세 버튼 숨기고 수정/삭제/승인 버튼 표시
+          actionDiv.find('.quotationBtnView').hide();
+          actionDiv.find('.quotationBtnEdit').show();
+          actionDiv.find('.quotationBtnDelete').show();
+          actionDiv.find('.quotationBtnApprove').show();
+        } else {
+          // 체크 해제: 수정/삭제/승인 버튼 숨기고 상세 버튼 표시
+          actionDiv.find('.quotationBtnView').show();
+          actionDiv.find('.quotationBtnEdit').hide();
+          actionDiv.find('.quotationBtnDelete').hide();
+          actionDiv.find('.quotationBtnApprove').hide();
+        }
+      });
+
+      // 전체 선택 모드 비활성화
+      isSelectAllMode = false;
     });
 
     // ✅ 개별 체크박스 이벤트 핸들러 등록
     $(document)
-      .off('change.quotationPage', '.quotationRowCheck')
-      .on('change.quotationPage', '.quotationRowCheck', function () {
+      .off('change.quotationManagePage', '.quotationRowCheck')
+      .on('change.quotationManagePage', '.quotationRowCheck', function () {
       const quotationDate = $(this).data('date');
       const quotationNo = $(this).data('no');
       const isChecked = $(this).prop('checked');
 
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📋 [견적관리] 체크박스 이벤트 발생');
-      console.log(`📅 견적일자: ${quotationDate}`);
-      console.log(`🔢 견적번호: ${quotationNo}`);
-      console.log(`✅ 체크 상태: ${isChecked ? '선택됨' : '해제됨'}`);
+      // 전체 선택 모드가 아닐 때만 라디오 버튼처럼 동작
+      if (!isSelectAllMode && isChecked) {
+        // 새로운 체크박스를 선택하면 다른 모든 체크박스 해제
+        $('.quotationRowCheck').not(this).each(function () {
+          const $otherCheckbox = $(this);
+          const otherDate = $otherCheckbox.data('date');
+          const otherNo = $otherCheckbox.data('no');
+          const otherActionDiv = $(`#quotationActions-${otherDate}_${otherNo}`);
 
-      // 전체 선택 체크박스 상태 업데이트
-      const totalCheckboxes = $('.quotationRowCheck').length;
-      const checkedCheckboxes = $('.quotationRowCheck:checked').length;
-      $('#quotationSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
+          // 다른 체크박스 해제
+          $otherCheckbox.prop('checked', false);
+
+          // 다른 행의 버튼 상태 복원
+          otherActionDiv.find('.quotationBtnView').show();
+          otherActionDiv.find('.quotationBtnEdit').hide();
+          otherActionDiv.find('.quotationBtnDelete').hide();
+          otherActionDiv.find('.quotationBtnApprove').hide();
+        });
+      }
 
       // 현재 행의 버튼 표시/숨김 처리
       const actionDiv = $(`#quotationActions-${quotationDate}_${quotationNo}`);
@@ -405,27 +436,13 @@ $(document).ready(function () {
         actionDiv.find('.quotationBtnEdit').show();
         actionDiv.find('.quotationBtnDelete').show();
         actionDiv.find('.quotationBtnApprove').show();
-
-        console.log('🔘 표시된 버튼:');
-        console.log('   ❌ [상세보기] 버튼 - 숨김');
-        console.log('   ✅ [수정] 버튼 - 표시');
-        console.log('   ✅ [삭제] 버튼 - 표시');
-        console.log('   ✅ [승인] 버튼 - 표시');
       } else {
         // 체크 해제: 수정/삭제/승인 버튼 숨기고 상세 버튼 표시
         actionDiv.find('.quotationBtnView').show();
         actionDiv.find('.quotationBtnEdit').hide();
         actionDiv.find('.quotationBtnDelete').hide();
         actionDiv.find('.quotationBtnApprove').hide();
-
-        console.log('🔘 표시된 버튼:');
-        console.log('   ✅ [상세보기] 버튼 - 표시');
-        console.log('   ❌ [수정] 버튼 - 숨김');
-        console.log('   ❌ [삭제] 버튼 - 숨김');
-        console.log('   ❌ [승인] 버튼 - 숨김');
       }
-
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     });
   }
 
@@ -434,17 +451,17 @@ $(document).ready(function () {
 });
 
 // ✅ 견적 상세 버튼 모달 열기 함수 (견적일자, 견적번호로 조회)
-async function openQuotationDetailModal(quotationDate, quotationNo) {
-  const modal = document.getElementById('quotationDetailModal');
+async function openQuotationManageViewModal(quotationDate, quotationNo) {
+  const modal = document.getElementById('quotationManageViewModal');
   if (modal) {
     modal.classList.remove('hidden');
     modal.style.display = 'block';
   }
 
   // 드래그 기능 활성화 (최초 1회만 실행)
-  if (typeof makeModalDraggable === 'function' && !window.quotationDetailModalDraggable) {
-    makeModalDraggable('quotationDetailModal', 'quotationDetailModalHeader');
-    window.quotationDetailModalDraggable = true;
+  if (typeof makeModalDraggable === 'function' && !window.quotationManageViewModalDraggable) {
+    makeModalDraggable('quotationManageViewModal', 'quotationManageViewModalHeader');
+    window.quotationManageViewModalDraggable = true;
   }
 
   // ✅ 출력 버튼을 위해 현재 견적 정보 저장
@@ -475,12 +492,12 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
     $('#q_remark').text(master.적요 || '-');
 
     // ✅ DataTable이 이미 초기화되어 있으면 destroy 후 재생성
-    if (window.quotationDetailDataTable) {
-      window.quotationDetailDataTable.destroy();
+    if (window.quotationManageViewDataTable) {
+      window.quotationManageViewDataTable.destroy();
     }
 
     // ✅ DataTable 초기화 (API 필드명에 맞게 수정)
-    window.quotationDetailDataTable = $('#quotationDetailTable').DataTable({
+    window.quotationManageViewDataTable = $('#quotationManageViewTable').DataTable({
       data: details,
       columns: [
         {
@@ -558,7 +575,7 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
     }, 0);
 
     // 합계 표시
-    $('#quotationDetailTotal').text(totalAmount.toLocaleString());
+    $('#quotationManageViewTotal').text(totalAmount.toLocaleString());
     console.log(`✅ 견적 합계 금액: ${totalAmount.toLocaleString()}원`);
   } catch (err) {
     console.error('❌ 견적 상세 조회 오류:', err);
@@ -567,11 +584,11 @@ async function openQuotationDetailModal(quotationDate, quotationNo) {
 }
 
 // 전역 함수로 노출
-window.openQuotationDetailModal = openQuotationDetailModal;
+window.openQuotationManageViewModal = openQuotationManageViewModal;
 
 // ✅ 상세 버튼 모달 닫기 함수
-function closeQuotationDetailModal() {
-  const modal = document.getElementById('quotationDetailModal');
+function closeQuotationManageViewModal() {
+  const modal = document.getElementById('quotationManageViewModal');
   if (modal) {
     modal.classList.add('hidden');
     modal.style.display = 'none';
@@ -593,38 +610,38 @@ function closeQuotationDetailModal() {
   });
 
   // DataTable 정리 (메모리 누수 방지)
-  if (window.quotationDetailDataTable) {
-    window.quotationDetailDataTable.destroy();
-    window.quotationDetailDataTable = null;
-    $('#quotationDetailTable tbody').empty();
+  if (window.quotationManageViewDataTable) {
+    window.quotationManageViewDataTable.destroy();
+    window.quotationManageViewDataTable = null;
+    $('#quotationManageViewTable tbody').empty();
   }
 }
 
 // 필터링 함수
 // function filterQuotations() {
-//   if (window.quotationTableInstance) {
-//     window.quotationTableInstance.ajax.reload();
+//   if (window.quotationManageTableInstance) {
+//     window.quotationManageTableInstance.ajax.reload();
 //   }
 // }
 
 // ✅ 견적 상세보기 함수 (DataTable 버튼에서 호출)
-function viewQuotationDetail(quotationDate, quotationNo) {
+function viewQuotationManageDetail(quotationDate, quotationNo) {
   console.log(`✅ 견적 상세보기 호출: ${quotationDate}-${quotationNo}`);
 
-  // openQuotationDetailModal 함수 호출
-  if (typeof window.openQuotationDetailModal === 'function') {
-    window.openQuotationDetailModal(quotationDate, quotationNo);
+  // openQuotationManageViewModal 함수 호출
+  if (typeof window.openQuotationManageViewModal === 'function') {
+    window.openQuotationManageViewModal(quotationDate, quotationNo);
   } else {
-    console.error('❌ openQuotationDetailModal 함수를 찾을 수 없습니다.');
+    console.error('❌ openQuotationManageViewModal 함수를 찾을 수 없습니다.');
     alert('견적 상세보기 기능을 사용할 수 없습니다.');
   }
 }
 
 // 전역 함수로 노출
-window.viewQuotationDetail = viewQuotationDetail;
+window.viewQuotationManageDetail = viewQuotationManageDetail;
 
 // ✅ 견적 수정 함수 - 모달 열기 (견적내역 포함)
-async function editQuotation(quotationDate, quotationNo) {
+async function editQuotationManage(quotationDate, quotationNo) {
   console.log(`✅ 견적 수정: ${quotationDate}-${quotationNo}`);
 
   try {
@@ -637,34 +654,40 @@ async function editQuotation(quotationDate, quotationNo) {
     }
 
     const master = result.data.master;
-    const details = result.data.detail || [];
+    const details = result.data.details || result.data.detail || [];
+
+    console.log('✅ API 응답 확인:', {
+      master: master ? '존재' : '없음',
+      detailCount: details.length,
+      detailFields: details.length > 0 ? Object.keys(details[0]) : '데이터 없음'
+    });
 
     // ✅ 기본 정보 표시 (Prefix Rule 적용)
-    document.getElementById('quotationEditNo').value = `${quotationDate}-${quotationNo}`;
-    document.getElementById('quotationEditDate').value = quotationDate.replace(
+    // span 요소 - textContent 사용
+    document.getElementById('quotationManageEditNo').textContent = `${quotationDate}-${quotationNo}`;
+    document.getElementById('quotationManageEditDate').textContent = quotationDate.replace(
       /(\d{4})(\d{2})(\d{2})/,
       '$1-$2-$3',
     );
-    document.getElementById('quotationEditCustomerName').value = master.매출처명 || '-';
+    document.getElementById('quotationManageEditCustomerName').textContent = master.매출처명 || '-';
 
-    // 유효일자, 상태, 담당자, 연락처
-    const validDate = master.유효일자 || '';
-    if (validDate && validDate.length === 8) {
-      document.getElementById('quotationEditValidDate').value = `${validDate.substring(
-        0,
-        4,
-      )}-${validDate.substring(4, 6)}-${validDate.substring(6, 8)}`;
-    } else {
-      document.getElementById('quotationEditValidDate').value = '';
+    // input/textarea 요소 - value 사용
+    const deliveryDateEl = document.getElementById('quotationManageEditDeliveryDate');
+    if (deliveryDateEl && master.출고희망일자) {
+      const deliveryDate = master.출고희망일자.toString();
+      if (deliveryDate.length === 8) {
+        deliveryDateEl.value = `${deliveryDate.substring(0, 4)}-${deliveryDate.substring(4, 6)}-${deliveryDate.substring(6, 8)}`;
+      }
     }
 
-    document.getElementById('quotationEditStatus').value = master.상태 || '작성';
-    document.getElementById('quotationEditManager').value = master.담당자 || '';
-    document.getElementById('quotationEditContact').value = master.연락처 || '';
-    document.getElementById('quotationEditRemark').value = master.적요 || '';
+    const titleEl = document.getElementById('quotationManageEditTitle');
+    if (titleEl) titleEl.value = master.제목 || '';
+
+    const remarkEl = document.getElementById('quotationManageEditRemark');
+    if (remarkEl) remarkEl.value = master.적요 || '';
 
     // 모달에 견적일자, 번호 저장 (submit 시 사용)
-    const modal = document.getElementById('quotationEditModal');
+    const modal = document.getElementById('quotationManageEditModal');
     modal.dataset.quotationDate = quotationDate;
     modal.dataset.quotationNo = quotationNo;
     modal.dataset.매출처코드 = master.매출처코드;
@@ -673,11 +696,11 @@ async function editQuotation(quotationDate, quotationNo) {
     modal.dataset.유효일수 = master.유효일수 || 0;
 
     // ✅ 견적내역 DataTable 초기화
-    if (window.quotationEditDetailDataTable) {
-      window.quotationEditDetailDataTable.destroy();
+    if (window.quotationManageEditDetailDataTable) {
+      window.quotationManageEditDetailDataTable.destroy();
     }
 
-    window.quotationEditDetailDataTable = $('#quotationEditDetailTable').DataTable({
+    window.quotationManageEditDetailDataTable = $('#quotationManageEditDetailTable').DataTable({
       data: details,
       columns: [
         {
@@ -714,7 +737,8 @@ async function editQuotation(quotationDate, quotationNo) {
           className: 'dt-right',
         },
         {
-          data: '출고단가',
+          // ✅ API에서 '단가'로 반환 (출고단가 as 단가)
+          data: '단가',
           defaultContent: 0,
           render: function (data) {
             return (data || 0).toLocaleString();
@@ -722,7 +746,8 @@ async function editQuotation(quotationDate, quotationNo) {
           className: 'dt-right',
         },
         {
-          data: '금액',
+          // ✅ API에서 '공급가액'으로 반환 (수량 * 출고단가)
+          data: '공급가액',
           defaultContent: 0,
           render: function (data) {
             return (data || 0).toLocaleString();
@@ -736,8 +761,8 @@ async function editQuotation(quotationDate, quotationNo) {
           className: 'dt-center',
           render: function (data, type, row, meta) {
             return `
-              <button class="btn-icon" onclick="editQuotationDetailRow(${meta.row})" style="background: #3b82f6; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;">수정</button>
-              <button class="btn-icon" onclick="deleteQuotationDetailRow(${meta.row})" style="background: #ef4444; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+              <button class="btn-icon" onclick="editQuotationManageMaterialRow(${meta.row})" style="background: #3b82f6; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;">수정</button>
+              <button class="btn-icon" onclick="deleteQuotationManageMaterialRow(${meta.row})" style="background: #ef4444; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
             `;
           },
         },
@@ -768,9 +793,9 @@ async function editQuotation(quotationDate, quotationNo) {
 
     console.log(`✅ 견적 수정 DataTable 초기화 완료 (${details.length}건)`);
 
-    // ✅ 합계 금액 계산
-    const totalAmount = details.reduce((sum, item) => sum + (item.금액 || 0), 0);
-    $('#quotationEditDetailTotal').text(totalAmount.toLocaleString());
+    // ✅ 합계 금액 계산 (API 필드명: 공급가액)
+    const totalAmount = details.reduce((sum, item) => sum + (item.공급가액 || 0), 0);
+    $('#quotationManageEditDetailTotal').text(totalAmount.toLocaleString());
 
     // ✅ 전체 선택 체크박스 이벤트
     $('#selectAllEditDetails')
@@ -784,9 +809,9 @@ async function editQuotation(quotationDate, quotationNo) {
     modal.style.display = 'block';
 
     // 드래그 기능 활성화 (최초 1회만 실행)
-    if (typeof makeModalDraggable === 'function' && !window.quotationEditModalDraggable) {
-      makeModalDraggable('quotationEditModal', 'quotationEditModalHeader');
-      window.quotationEditModalDraggable = true;
+    if (typeof makeModalDraggable === 'function' && !window.quotationManageEditModalDraggable) {
+      makeModalDraggable('quotationManageEditModal', 'quotationManageEditModalHeader');
+      window.quotationManageEditModalDraggable = true;
     }
   } catch (err) {
     console.error('❌ 견적 수정 모달 열기 오류:', err);
@@ -795,8 +820,8 @@ async function editQuotation(quotationDate, quotationNo) {
 }
 
 // ✅ 견적 수정 모달 닫기
-function closeQuotationEditModal() {
-  const modal = document.getElementById('quotationEditModal');
+function closeQuotationManageEditModal() {
+  const modal = document.getElementById('quotationManageEditModal');
   if (modal) {
     modal.style.display = 'none';
   }
@@ -816,23 +841,24 @@ function closeQuotationEditModal() {
   });
 
   // DataTable 정리
-  if (window.quotationEditDetailDataTable) {
-    window.quotationEditDetailDataTable.destroy();
-    window.quotationEditDetailDataTable = null;
-    $('#quotationEditDetailTable tbody').empty();
+  if (window.quotationManageEditDetailDataTable) {
+    window.quotationManageEditDetailDataTable.destroy();
+    window.quotationManageEditDetailDataTable = null;
+    $('#quotationManageEditDetailTable tbody').empty();
   }
 }
 
 // ✅ 선택된 자재 정보 (전역 변수)
 let selectedMaterial = null;
 
+// ✅ 신규/수정 모드 플래그 (전역 변수)
+let isNewQuotationMode = false;
+
 // ✅ 자재 추가 함수 - 모달 열기
-function addQuotationDetailRow() {
+function addQuotationManageEditModalRow() {
   // 초기화
   selectedMaterial = null;
-  document.getElementById('materialSearchCode').value = '';
-  document.getElementById('materialSearchName').value = '';
-  document.getElementById('materialSearchSpec').value = '';
+  document.getElementById('materialSearchInput').value = '';
   document.getElementById('materialSearchResults').style.display = 'none';
   document.getElementById('selectedMaterialInfo').style.display = 'none';
   document.getElementById('addDetailQuantity').value = '1';
@@ -840,7 +866,7 @@ function addQuotationDetailRow() {
   document.getElementById('addDetailAmount').value = '0';
 
   // 모달 표시
-  document.getElementById('quotationDetailAddModal').style.display = 'block';
+  document.getElementById('quotationManageMaterialAddModal').style.display = 'block';
 }
 
 // ✅ 자재 검색 함수
@@ -974,8 +1000,8 @@ async function showPriceHistory() {
       매출처코드 = document.getElementById('selectedCustomerCode').value;
     } else {
       // 견적 수정 모드
-      const quotationEditModal = document.getElementById('quotationEditModal');
-      매출처코드 = quotationEditModal.dataset.매출처코드;
+      const quotationManageEditModal = document.getElementById('quotationManageEditModal');
+      매출처코드 = quotationManageEditModal.dataset.매출처코드;
     }
 
     if (!매출처코드) {
@@ -1113,8 +1139,8 @@ async function loadActualPriceHistory() {
       매출처코드 = document.getElementById('selectedCustomerCode').value;
     } else {
       // 견적 수정 모드
-      const quotationEditModal = document.getElementById('quotationEditModal');
-      매출처코드 = quotationEditModal.dataset.매출처코드;
+      const quotationManageEditModal = document.getElementById('quotationManageEditModal');
+      매출처코드 = quotationManageEditModal.dataset.매출처코드;
     }
 
     if (!매출처코드) return;
@@ -1197,8 +1223,8 @@ async function loadQuotationPriceHistory() {
       매출처코드 = document.getElementById('selectedCustomerCode').value;
     } else {
       // 견적 수정 모드
-      const quotationEditModal = document.getElementById('quotationEditModal');
-      매출처코드 = quotationEditModal.dataset.매출처코드;
+      const quotationManageEditModal = document.getElementById('quotationManageEditModal');
+      매출처코드 = quotationManageEditModal.dataset.매출처코드;
     }
 
     if (!매출처코드) return;
@@ -1271,19 +1297,19 @@ async function loadQuotationPriceHistory() {
 }
 
 // ✅ 자재 추가 모달 닫기
-function closeQuotationDetailAddModal() {
-  document.getElementById('quotationDetailAddModal').style.display = 'none';
+function closeQuotationManageMaterialAddModal() {
+  document.getElementById('quotationManageMaterialAddModal').style.display = 'none';
 
   // 견적서 작성 모달 다시 표시
   if (isNewQuotationMode) {
-    const quotationModal = document.getElementById('quotationModal');
-    quotationModal.style.display = quotationModal.dataset.previousDisplay || 'block';
+    const quotationManageCreateModal = document.getElementById('quotationManageCreateModal');
+    quotationManageCreateModal.style.display = quotationManageCreateModal.dataset.previousDisplay || 'block';
     isNewQuotationMode = false;
   }
 }
 
 // ✅ 자재 추가 확인
-function confirmQuotationDetailAdd() {
+function confirmQuotationManageMaterialAdd() {
   try {
     // 선택된 자재 확인
     if (!selectedMaterial) {
@@ -1293,8 +1319,8 @@ function confirmQuotationDetailAdd() {
 
     const 자재코드 = selectedMaterial.분류코드 + selectedMaterial.세부코드;
     const 수량 = parseFloat(document.getElementById('addDetailQuantity').value) || 0;
-    const 출고단가 = parseFloat(document.getElementById('addDetailPrice').value) || 0;
-    const 금액 = 수량 * 출고단가;
+    const 단가 = parseFloat(document.getElementById('addDetailPrice').value) || 0;
+    const 공급가액 = 수량 * 단가;
 
     if (수량 <= 0) {
       alert('수량을 1 이상 입력해주세요.');
@@ -1309,38 +1335,40 @@ function confirmQuotationDetailAdd() {
         자재명: selectedMaterial.자재명,
         규격: selectedMaterial.규격,
         수량: 수량,
-        단가: 출고단가,
+        단가: 단가,
       });
 
       // 테이블 렌더링
       renderNewQuotationDetailTable();
 
       // 견적서 작성 모달 다시 표시
-      const quotationModal = document.getElementById('quotationModal');
-      quotationModal.style.display = quotationModal.dataset.previousDisplay || 'block';
+      const quotationManageCreateModal = document.getElementById('quotationManageCreateModal');
+      quotationManageCreateModal.style.display = quotationManageCreateModal.dataset.previousDisplay || 'block';
 
       // 모드 플래그 초기화
       isNewQuotationMode = false;
     } else {
       // 견적 수정 모드 - DataTable에 행 추가
+      // ✅ API 필드명 사용: 단가, 공급가액
       const newRow = {
         자재코드: 자재코드,
         자재명: selectedMaterial.자재명,
         규격: selectedMaterial.규격 || '-',
+        단위: selectedMaterial.단위 || '-',
         수량: 수량,
-        출고단가: 출고단가,
-        금액: 금액,
+        단가: 단가,
+        공급가액: 공급가액,
         _isNew: true,
       };
 
-      window.quotationEditDetailDataTable.row.add(newRow).draw();
+      window.quotationManageEditDetailDataTable.row.add(newRow).draw();
 
       // 합계 재계산
-      recalculateQuotationEditTotal();
+      recalculateQuotationManageEditTotal();
     }
 
     // 모달 닫기
-    closeQuotationDetailAddModal();
+    closeQuotationManageMaterialAddModal();
   } catch (err) {
     console.error('❌ 자재 추가 오류:', err);
     alert('자재 추가 중 오류가 발생했습니다: ' + err.message);
@@ -1348,9 +1376,9 @@ function confirmQuotationDetailAdd() {
 }
 
 // ✅ 견적내역 품목 수정 함수 - 모달 열기
-function editQuotationDetailRow(rowIndex) {
+function editQuotationManageMaterialRow(rowIndex) {
   try {
-    const table = window.quotationEditDetailDataTable;
+    const table = window.quotationManageEditDetailDataTable;
     if (!table) {
       alert('DataTable을 찾을 수 없습니다.');
       return;
@@ -1369,11 +1397,13 @@ function editQuotationDetailRow(rowIndex) {
     document.getElementById('editDetailName').textContent = rowData.자재명 || '-';
     document.getElementById('editDetailSpec').textContent = rowData.규격 || '-';
     document.getElementById('editDetailQuantity').value = rowData.수량 || 0;
-    document.getElementById('editDetailPrice').value = rowData.출고단가 || 0;
-    document.getElementById('editDetailAmount').value = (rowData.금액 || 0).toLocaleString();
+    // ✅ API에서 '단가'로 반환 (출고단가 as 단가)
+    document.getElementById('editDetailPrice').value = rowData.단가 || 0;
+    // ✅ API에서 '공급가액'으로 반환 (수량 * 출고단가)
+    document.getElementById('editDetailAmount').value = (rowData.공급가액 || 0).toLocaleString();
 
     // 모달에 rowIndex 저장
-    const modal = document.getElementById('quotationDetailEditModal');
+    const modal = document.getElementById('quotationManageMaterialEditModal');
     modal.dataset.rowIndex = rowIndex;
 
     // 모달 표시
@@ -1385,42 +1415,42 @@ function editQuotationDetailRow(rowIndex) {
 }
 
 // ✅ 견적내역 품목 수정 모달 닫기
-function closeQuotationDetailEditModal() {
-  document.getElementById('quotationDetailEditModal').style.display = 'none';
+function closeQuotationManageMaterialEditModal() {
+  document.getElementById('quotationManageMaterialEditModal').style.display = 'none';
 }
 
 // ✅ 견적내역 품목 수정 확인
-function confirmQuotationDetailEdit() {
+function confirmQuotationManageMaterialEdit() {
   try {
-    const modal = document.getElementById('quotationDetailEditModal');
+    const modal = document.getElementById('quotationManageMaterialEditModal');
     const rowIndex = parseInt(modal.dataset.rowIndex);
 
-    const table = window.quotationEditDetailDataTable;
+    const table = window.quotationManageEditDetailDataTable;
     const rowData = table.row(rowIndex).data();
 
     // 입력값 가져오기
     const 수량 = parseFloat(document.getElementById('editDetailQuantity').value) || 0;
-    const 출고단가 = parseFloat(document.getElementById('editDetailPrice').value) || 0;
-    const 금액 = 수량 * 출고단가;
+    const 단가 = parseFloat(document.getElementById('editDetailPrice').value) || 0;
+    const 공급가액 = 수량 * 단가;
 
     if (수량 <= 0) {
       alert('수량을 1 이상 입력해주세요.');
       return;
     }
 
-    // 행 데이터 업데이트
+    // 행 데이터 업데이트 (API 필드명에 맞춤)
     rowData.수량 = 수량;
-    rowData.출고단가 = 출고단가;
-    rowData.금액 = 금액;
+    rowData.단가 = 단가;
+    rowData.공급가액 = 공급가액;
 
     // DataTable 업데이트
     table.row(rowIndex).data(rowData).invalidate().draw(false);
 
     // 합계 재계산
-    recalculateQuotationEditTotal();
+    recalculateQuotationManageEditTotal();
 
     // 모달 닫기
-    closeQuotationDetailEditModal();
+    closeQuotationManageMaterialEditModal();
   } catch (err) {
     console.error('❌ 품목 수정 오류:', err);
     alert('품목 수정 중 오류가 발생했습니다: ' + err.message);
@@ -1428,9 +1458,9 @@ function confirmQuotationDetailEdit() {
 }
 
 // ✅ 견적내역 품목 삭제 함수 - 모달 열기
-function deleteQuotationDetailRow(rowIndex) {
+function deleteQuotationManageMaterialRow(rowIndex) {
   try {
-    const table = window.quotationEditDetailDataTable;
+    const table = window.quotationManageEditDetailDataTable;
     if (!table) {
       alert('DataTable을 찾을 수 없습니다.');
       return;
@@ -1450,7 +1480,7 @@ function deleteQuotationDetailRow(rowIndex) {
     ).textContent = `[${rowData.자재코드}] ${rowData.자재명}`;
 
     // 모달에 rowIndex 저장
-    const modal = document.getElementById('quotationDetailDeleteModal');
+    const modal = document.getElementById('quotationManageMaterialDeleteConfirmModal');
     modal.dataset.rowIndex = rowIndex;
 
     // 모달 표시
@@ -1462,28 +1492,28 @@ function deleteQuotationDetailRow(rowIndex) {
 }
 
 // ✅ 견적내역 품목 삭제 모달 닫기
-function closeQuotationDetailDeleteModal() {
-  document.getElementById('quotationDetailDeleteModal').style.display = 'none';
+function closeQuotationManageMaterialDeleteConfirmModal() {
+  document.getElementById('quotationManageMaterialDeleteConfirmModal').style.display = 'none';
 }
 
 // ✅ 견적내역 품목 삭제 확인
-function confirmQuotationDetailDelete() {
+function confirmQuotationManageMaterialDelete() {
   try {
-    const modal = document.getElementById('quotationDetailDeleteModal');
+    const modal = document.getElementById('quotationManageMaterialDeleteConfirmModal');
     const rowIndex = parseInt(modal.dataset.rowIndex);
 
-    const table = window.quotationEditDetailDataTable;
+    const table = window.quotationManageEditDetailDataTable;
 
     // 행 삭제
     table.row(rowIndex).remove().draw();
 
     // 합계 재계산
-    recalculateQuotationEditTotal();
+    recalculateQuotationManageEditTotal();
 
     console.log(`✅ 품목 삭제 완료 (행 인덱스: ${rowIndex})`);
 
     // 모달 닫기
-    closeQuotationDetailDeleteModal();
+    closeQuotationManageMaterialDeleteConfirmModal();
   } catch (err) {
     console.error('❌ 품목 삭제 오류:', err);
     alert('품목 삭제 중 오류가 발생했습니다: ' + err.message);
@@ -1491,7 +1521,7 @@ function confirmQuotationDetailDelete() {
 }
 
 // ✅ 선택된 견적내역 삭제 함수
-function deleteSelectedQuotationDetails() {
+function deleteSelectedQuotationManageMaterials() {
   const checkedBoxes = $('.editDetailCheckbox:checked');
 
   if (checkedBoxes.length === 0) {
@@ -1504,7 +1534,7 @@ function deleteSelectedQuotationDetails() {
   }
 
   // DataTable에서 선택된 행 제거
-  const table = window.quotationEditDetailDataTable;
+  const table = window.quotationManageEditDetailDataTable;
   checkedBoxes.each(function () {
     const row = table.row($(this).closest('tr'));
     row.remove();
@@ -1513,30 +1543,33 @@ function deleteSelectedQuotationDetails() {
   table.draw();
 
   // 합계 재계산
-  recalculateQuotationEditTotal();
+  recalculateQuotationManageEditTotal();
 
   console.log(`✅ ${checkedBoxes.length}개 항목 삭제 완료`);
 }
 
 // ✅ 견적 수정 모달 합계 재계산
-function recalculateQuotationEditTotal() {
-  if (!window.quotationEditDetailDataTable) return;
+function recalculateQuotationManageEditTotal() {
+  if (!window.quotationManageEditDetailDataTable) return;
 
-  const data = window.quotationEditDetailDataTable.rows().data().toArray();
-  const totalAmount = data.reduce((sum, item) => sum + (item.금액 || 0), 0);
-  $('#quotationEditDetailTotal').text(totalAmount.toLocaleString());
+  const data = window.quotationManageEditDetailDataTable.rows().data().toArray();
+  // ✅ API 필드명 '공급가액' 사용
+  const totalAmount = data.reduce((sum, item) => sum + (item.공급가액 || 0), 0);
+  $('#quotationManageEditDetailTotal').text(totalAmount.toLocaleString());
 }
 
 // ✅ 견적 수정 제출 (마스터 + 상세)
-async function submitQuotationEdit() {
-  const modal = document.getElementById('quotationEditModal');
+async function submitQuotationManageEdit() {
+  const modal = document.getElementById('quotationManageEditModal');
   const quotationDate = modal.dataset.quotationDate;
   const quotationNo = modal.dataset.quotationNo;
 
   try {
     // ✅ 1. 마스터 정보 업데이트 (Prefix Rule 적용)
-    const quotationDateInput = document.getElementById('quotationEditDate').value;
-    const validDateInput = document.getElementById('quotationEditValidDate').value;
+    const quotationDateText = document.getElementById('quotationManageEditDate').textContent;
+    const deliveryDateInput = document.getElementById('quotationManageEditDeliveryDate');
+    const titleInput = document.getElementById('quotationManageEditTitle');
+    const remarkInput = document.getElementById('quotationManageEditRemark');
 
     const masterResponse = await fetch(`/api/quotations/${quotationDate}/${quotationNo}`, {
       method: 'PUT',
@@ -1545,13 +1578,11 @@ async function submitQuotationEdit() {
       },
       credentials: 'include', // 세션 쿠키 포함
       body: JSON.stringify({
-        견적일자: quotationDateInput ? quotationDateInput.replace(/-/g, '') : '',
+        견적일자: quotationDateText ? quotationDateText.replace(/-/g, '') : quotationDate,
         매출처코드: modal.dataset.매출처코드,
-        유효일자: validDateInput ? validDateInput.replace(/-/g, '') : '',
-        상태: document.getElementById('quotationEditStatus').value,
-        담당자: document.getElementById('quotationEditManager').value,
-        연락처: document.getElementById('quotationEditContact').value,
-        적요: document.getElementById('quotationEditRemark').value,
+        출고희망일자: deliveryDateInput?.value ? deliveryDateInput.value.replace(/-/g, '') : '',
+        제목: titleInput?.value || '',
+        적요: remarkInput?.value || '',
       }),
     });
 
@@ -1562,7 +1593,7 @@ async function submitQuotationEdit() {
     }
 
     // 2. 견적 상세 정보 업데이트
-    const detailData = window.quotationEditDetailDataTable.rows().data().toArray();
+    const detailData = window.quotationManageEditDetailDataTable.rows().data().toArray();
 
     if (detailData.length > 0) {
       // 상세 정보를 서버 형식에 맞게 변환
@@ -1588,8 +1619,10 @@ async function submitQuotationEdit() {
         return {
           자재코드: 자재코드.trim(),
           수량: parseFloat(item.수량) || 0,
-          출고단가: parseFloat(item.출고단가) || 0,
-          금액: parseFloat(item.금액) || 0,
+          // ✅ API 필드명: '단가' (출고단가 as 단가)
+          출고단가: parseFloat(item.단가 || item.출고단가) || 0,
+          // ✅ API 필드명: '공급가액' (수량 * 출고단가)
+          금액: parseFloat(item.공급가액 || item.금액) || 0,
         };
       });
 
@@ -1613,11 +1646,11 @@ async function submitQuotationEdit() {
     }
 
     alert('✅ 견적이 성공적으로 수정되었습니다.');
-    closeQuotationEditModal();
+    closeQuotationManageEditModal();
 
     // DataTable 새로고침
-    if (window.quotationTableInstance) {
-      window.quotationTableInstance.ajax.reload();
+    if (window.quotationManageTableInstance) {
+      window.quotationManageTableInstance.ajax.reload();
     }
   } catch (err) {
     console.error('❌ 견적 수정 오류:', err);
@@ -1626,7 +1659,7 @@ async function submitQuotationEdit() {
 }
 
 // ✅ 견적 삭제 함수 - 모달 열기
-function deleteQuotation(quotationDate, quotationNo) {
+function deleteQuotationManage(quotationDate, quotationNo) {
   console.log(`✅ 견적 삭제 모달 열기: ${quotationDate}-${quotationNo}`);
 
   // 모달에 견적 정보 표시
@@ -1635,7 +1668,7 @@ function deleteQuotation(quotationDate, quotationNo) {
   ).textContent = `견적번호: ${quotationDate}-${quotationNo}`;
 
   // 모달에 데이터 저장
-  const modal = document.getElementById('quotationDeleteModal');
+  const modal = document.getElementById('quotationManageDeleteConfirmModal');
   modal.dataset.quotationDate = quotationDate;
   modal.dataset.quotationNo = quotationNo;
 
@@ -1643,23 +1676,23 @@ function deleteQuotation(quotationDate, quotationNo) {
   modal.style.display = 'flex';
 
   // 드래그 기능 활성화 (최초 1회만 실행)
-  if (typeof makeModalDraggable === 'function' && !window.quotationDeleteModalDraggable) {
-    makeModalDraggable('quotationDeleteModal', 'quotationDeleteModalHeader');
-    window.quotationDeleteModalDraggable = true;
+  if (typeof makeModalDraggable === 'function' && !window.quotationManageDeleteConfirmModalDraggable) {
+    makeModalDraggable('quotationManageDeleteConfirmModal', 'quotationDeleteModalHeader');
+    window.quotationManageDeleteConfirmModalDraggable = true;
   }
 }
 
 // ✅ 견적 삭제 모달 닫기
-function closeQuotationDeleteModal() {
-  const modal = document.getElementById('quotationDeleteModal');
+function closeQuotationManageDeleteConfirmModal() {
+  const modal = document.getElementById('quotationManageDeleteConfirmModal');
   if (modal) {
     modal.style.display = 'none';
   }
 }
 
 // ✅ 견적 삭제 확인
-async function confirmQuotationDelete() {
-  const modal = document.getElementById('quotationDeleteModal');
+async function confirmQuotationManageDelete() {
+  const modal = document.getElementById('quotationManageDeleteConfirmModal');
   const quotationDate = modal.dataset.quotationDate;
   const quotationNo = modal.dataset.quotationNo;
 
@@ -1672,11 +1705,11 @@ async function confirmQuotationDelete() {
 
     if (result.success) {
       alert('✅ 견적이 삭제되었습니다.');
-      closeQuotationDeleteModal();
+      closeQuotationManageDeleteConfirmModal();
 
       // DataTable 새로고침
-      if (window.quotationTableInstance) {
-        window.quotationTableInstance.ajax.reload();
+      if (window.quotationManageTableInstance) {
+        window.quotationManageTableInstance.ajax.reload();
       }
     } else {
       throw new Error(result.message || '견적 삭제 실패');
@@ -1688,7 +1721,7 @@ async function confirmQuotationDelete() {
 }
 
 // ✅ 견적 승인 함수 - 모달 열기
-function approveQuotation(quotationDate, quotationNo) {
+function approveQuotationManage(quotationDate, quotationNo) {
   console.log(`✅ 견적 승인 모달 열기: ${quotationDate}-${quotationNo}`);
 
   // 모달에 견적 정보 표시
@@ -1697,7 +1730,7 @@ function approveQuotation(quotationDate, quotationNo) {
   ).textContent = `견적번호: ${quotationDate}-${quotationNo}`;
 
   // 모달에 데이터 저장
-  const modal = document.getElementById('quotationApproveModal');
+  const modal = document.getElementById('quotationManageApproveConfirmModal');
   modal.dataset.quotationDate = quotationDate;
   modal.dataset.quotationNo = quotationNo;
 
@@ -1706,16 +1739,16 @@ function approveQuotation(quotationDate, quotationNo) {
 }
 
 // ✅ 견적 승인 모달 닫기
-function closeQuotationApproveModal() {
-  const modal = document.getElementById('quotationApproveModal');
+function closeQuotationManageApproveConfirmModal() {
+  const modal = document.getElementById('quotationManageApproveConfirmModal');
   if (modal) {
     modal.style.display = 'none';
   }
 }
 
 // ✅ 견적 승인 확인
-async function confirmQuotationApprove() {
-  const modal = document.getElementById('quotationApproveModal');
+async function confirmQuotationManageApprove() {
+  const modal = document.getElementById('quotationManageApproveConfirmModal');
   const quotationDate = modal.dataset.quotationDate;
   const quotationNo = modal.dataset.quotationNo;
 
@@ -1731,11 +1764,11 @@ async function confirmQuotationApprove() {
 
     if (result.success) {
       alert('✅ 견적이 승인되었습니다.');
-      closeQuotationApproveModal();
+      closeQuotationManageApproveConfirmModal();
 
       // DataTable 새로고침
-      if (window.quotationTableInstance) {
-        window.quotationTableInstance.ajax.reload();
+      if (window.quotationManageTableInstance) {
+        window.quotationManageTableInstance.ajax.reload();
       }
     } else {
       throw new Error(result.message || '견적 승인 실패');
@@ -1746,7 +1779,7 @@ async function confirmQuotationApprove() {
   }
 }
 
-async function onEditQuotation(selectedQuotation) {
+async function onEditQuotationManage(selectedQuotation) {
   const { 견적일자, 견적번호 } = selectedQuotation;
 
   // 1. 기존 견적내역 조회
@@ -1754,10 +1787,10 @@ async function onEditQuotation(selectedQuotation) {
   const detailData = await res.json();
 
   // 2. 모달에 내역 표시
-  openQuotationEditModal(detailData);
+  openQuotationManageEditModal(detailData);
 }
 
-async function openQuotationEditModal(quotationDate, quotationNo) {
+async function openQuotationManageEditModal(quotationDate, quotationNo) {
   try {
     // ✅ 모드 설정
     currentQuotationMode = 'edit';
@@ -1778,7 +1811,7 @@ async function openQuotationEditModal(quotationDate, quotationNo) {
     renderEditDetailTable(details);
 
     // 4) 모달 오픈
-    document.getElementById('quotationEditModal').style.display = 'block';
+    document.getElementById('quotationManageEditModal').style.display = 'block';
   } catch (err) {
     console.error('❌ openQuotationEditModal 오류:', err);
     alert(err.message || '견적 수정 정보를 불러오는 중 오류가 발생했습니다.');
@@ -1786,7 +1819,7 @@ async function openQuotationEditModal(quotationDate, quotationNo) {
 }
 
 // 전역 함수로 노출
-window.openQuotationEditModal = openQuotationEditModal;
+window.openQuotationManageEditModal = openQuotationManageEditModal;
 
 // ==================== 견적서 작성 모달 ====================
 
@@ -1794,37 +1827,37 @@ window.openQuotationEditModal = openQuotationEditModal;
 let newQuotationDetails = [];
 
 // ✅ 견적서 작성 모달 열기
-function openNewQuotationModal() {
+function openQuotationManageCreateModal() {
   // 모달 제목 설정
-  document.getElementById('quotationModalTitle').textContent = '견적서 작성';
+  document.getElementById('quotationManageCreateModalTitle').textContent = '견적서 작성';
 
   // 폼 초기화
-  document.getElementById('quotationForm').reset();
+  document.getElementById('quotationManageCreateForm').reset();
 
   // 매출처 정보 초기화
-  document.getElementById('selectedCustomerCode').value = '';
-  document.getElementById('selectedCustomerName').value = '';
-  const infoDiv = document.getElementById('selectedCustomerInfo');
+  document.getElementById('quotationManageCreateCustomerCode').value = '';
+  document.getElementById('quotationManageCreateCustomerName').value = '';
+  const infoDiv = document.getElementById('quotationManageCreateCustomerInfo');
   if (infoDiv) {
     infoDiv.style.display = 'none';
   }
 
   // 견적일자를 오늘 날짜로 설정
   const today = new Date().toISOString().split('T')[0];
-  document.getElementById('quotationDate').value = today;
+  document.getElementById('quotationManageCreateDate').value = today;
 
   // 상세내역 초기화
   newQuotationDetails = [];
   renderNewQuotationDetailTable();
 
   // 모달 표시
-  const modal = document.getElementById('quotationModal');
+  const modal = document.getElementById('quotationManageCreateModal');
   modal.style.display = 'block';
   modal.style.position = 'fixed';
 
   // ✅ 드래그 기능 활성화 (최초 1회만 실행)
   const modalContent = document.getElementById('quotationModalContent');
-  if (!window.quotationModalDraggable) {
+  if (!window.quotationManageCreateModalDraggable) {
     // 최초 실행시에만 modal-content에 드래그를 위한 positioning 설정
     if (modalContent) {
       modalContent.style.position = 'absolute';
@@ -1836,8 +1869,8 @@ function openNewQuotationModal() {
 
     // makeModalDraggable 함수 호출 (modal-draggable.js에서 로드됨)
     if (typeof makeModalDraggable === 'function') {
-      makeModalDraggable('quotationModal', 'quotationModalHeader');
-      window.quotationModalDraggable = true;
+      makeModalDraggable('quotationManageCreateModal', 'quotationModalHeader');
+      window.quotationManageCreateModalDraggable = true;
     } else {
       console.error('❌ makeModalDraggable 함수를 찾을 수 없습니다. modal-draggable.js가 로드되었는지 확인하세요.');
     }
@@ -1845,10 +1878,10 @@ function openNewQuotationModal() {
 }
 
 // ✅ 견적서 작성 모달 닫기
-function closeQuotationModal() {
-  document.getElementById('quotationModal').style.display = 'none';
+function closeQuotationManageCreateModal() {
+  document.getElementById('quotationManageCreateModal').style.display = 'none';
   // 견적 체크박스만 초기화
-  $('#quotationSelectAll').prop('checked', false);
+  $('#quotationManageSelectAll').prop('checked', false);
   $('.quotationRowCheck').prop('checked', false);
   // 버튼 상태도 초기화
   $('.quotationRowCheck').each(function () {
@@ -1865,9 +1898,9 @@ function closeQuotationModal() {
 }
 
 // ✅ 견적서 작성용 매출처 검색 모달 열기 (공통 모달 1개 사용)
-function openQuotationCustomerSearchModal() {
+function openQuotationManageCreateCustomerSearchModal() {
   // 견적 입력값을 공통 검색창에 전달
-  const searchValue = document.getElementById('selectedCustomerName').value.trim();
+  const searchValue = document.getElementById('quotationManageCreateCustomerName').value.trim();
 
   // [핵심] customer.js의 공통 모달 열기 사용
   // callerContext = 'quotation' (선택 결과를 견적에 주입하기 위한 컨텍스트)
@@ -1889,7 +1922,7 @@ function openQuotationCustomerSearchModal() {
 }
 
 // ✅ 전역으로 노출 (HTML에서 호출할 수 있도록)
-window.openQuotationCustomerSearchModal = openQuotationCustomerSearchModal;
+window.openQuotationManageCreateCustomerSearchModal = openQuotationManageCreateCustomerSearchModal;
 // ❌ 절대 두지 마세요: 공통 openCustomerSearchModal을 덮어씀 (충돌 원인)
 // window.openCustomerSearchModal = openQuotationCustomerSearchModal;
 
@@ -2143,8 +2176,8 @@ function closeTestSimpleModal() {
   document.getElementById('testSimpleModal').style.display = 'none';
 
   // 견적서 작성 모달의 z-index 복원
-  const quotationModal = document.getElementById('quotationModal');
-  quotationModal.style.zIndex = '1050';
+  const quotationModal = document.getElementById('quotationManageCreateModal');
+  quotationManageCreateModal.style.zIndex = '1050';
 }
 
 // ✅ 자재 검색 (견적서 작성용)
@@ -2492,7 +2525,7 @@ function removeNewQuotationDetail(index) {
 }
 
 // ✅ 견적서 저장
-async function submitQuotation(event) {
+async function submitQuotationManageCreate(event) {
   event.preventDefault();
 
   try {
@@ -2548,11 +2581,11 @@ async function submitQuotation(event) {
     }
 
     alert('견적서가 성공적으로 저장되었습니다.');
-    closeQuotationModal();
+    closeQuotationManageCreateModal();
 
     // 견적 목록 새로고침 (DataTable reload)
-    if ($.fn.DataTable.isDataTable('#quotationTable')) {
-      $('#quotationTable').DataTable().ajax.reload();
+    if ($.fn.DataTable.isDataTable('#quotationManageTable')) {
+      $('#quotationManageTable').DataTable().ajax.reload();
     }
   } catch (err) {
     console.error('❌ 견적서 저장 오류:', err);
@@ -3059,10 +3092,10 @@ function makeModalDraggable(modalContentId, dragHandleId) {
 
 // 견적 필터링 함수 (상태, 시작일, 종료일 기준으로 데이터 재조회)
 function filterQuotations() {
-  if (quotationTable) {
-    quotationTable.ajax.reload();
+  if (quotationManageTable) {
+    quotationManageTable.ajax.reload();
   } else {
-    console.warn('⚠️ quotationTable이 초기화되지 않았습니다.');
+    console.warn('⚠️ quotationManageTable이 초기화되지 않았습니다.');
   }
 }
 
@@ -3544,14 +3577,14 @@ function printQuotationFromDetail() {
 }
 
 // 전역 함수 노출
-window.editQuotation = editQuotation;
-window.deleteQuotation = deleteQuotation;
-window.approveQuotation = approveQuotation;
+window.editQuotationManage = editQuotationManage;
+window.deleteQuotationManage = deleteQuotationManage;
+window.approveQuotationManage = approveQuotationManage;
 window.makeModalDraggable = makeModalDraggable;
 window.filterQuotations = filterQuotations;
 window.printQuotation = printQuotation;
 window.printQuotationFromDetail = printQuotationFromDetail;
-window.closeQuotationDetailModal = closeQuotationDetailModal;
+window.closeQuotationManageViewModal = closeQuotationDetailModal;
 
 // ========================================================================
 // 새로운 HTML 구조(251215)에 맞춘 함수들
@@ -3588,14 +3621,14 @@ function openQuotationModal() {
   renderQuotationMaterialTable();
 
   // 모달 표시
-  document.getElementById('quotationModal').style.display = 'flex';
+  document.getElementById('quotationManageCreateModal').style.display = 'flex';
 }
 
 /**
  * 견적서 작성 모달 닫기
  */
-function closeQuotationModal() {
-  document.getElementById('quotationModal').style.display = 'none';
+function closeQuotationManageCreateModal() {
+  document.getElementById('quotationManageCreateModal').style.display = 'none';
   quotationMaterials = [];
   selectedMaterialForAdd = null;
 }
@@ -3725,7 +3758,7 @@ async function saveQuotation() {
   try {
     // API 호출 코드 추가 필요
     alert('견적서가 저장되었습니다.');
-    closeQuotationModal();
+    closeQuotationManageCreateModal();
 
     // 견적 목록 새로고침
     if (typeof loadQuotations === 'function') {
@@ -3737,89 +3770,21 @@ async function saveQuotation() {
   }
 }
 
-// ========== 견적 상세 보기 모달 ==========
+// ❌ [중복 제거 완료] 견적 상세 보기 모달 함수들은 lines 437-600에 이미 완벽하게 구현됨
+// - async function openQuotationManageViewModal(quotationDate, quotationNo) (line 437)
+// - function closeQuotationManageViewModal() (line 573)
+// 이 함수들은 API 호출, DataTable 초기화, 드래그 기능 등을 모두 포함하고 있음
 
-/**
- * 견적 상세 보기 모달 열기
- */
-function openQuotationDetailModal() {
-  // 선택된 견적 확인
-  const selectedRow = document.querySelector('#quotationTableBody input[type="checkbox"]:checked');
-
-  if (!selectedRow) {
-    alert('견적을 선택해주세요.');
-    return;
-  }
-
-  // TODO: 선택된 견적 데이터 로드
-  const quotationNo = selectedRow.value;
-
-  // 테스트 데이터
-  document.getElementById('detailQuotationNo').textContent = quotationNo;
-  document.getElementById('detailQuotationDate').textContent = '2025-12-15';
-  document.getElementById('detailValidDate').textContent = '2025-12-30';
-  document.getElementById('detailStatus').textContent = '작성';
-  document.getElementById('detailCustomerName').textContent = '[C001] 테스트 매출처';
-  document.getElementById('detailManager').textContent = '홍길동';
-  document.getElementById('detailContact').textContent = '010-1234-5678';
-  document.getElementById('detailRemark').textContent = '테스트 비고';
-
-  // 모달 표시
-  document.getElementById('quotationDetailModal').style.display = 'flex';
-}
-
-/**
- * 견적 상세 보기 모달 닫기
- */
-function closeQuotationDetailModal() {
-  document.getElementById('quotationDetailModal').style.display = 'none';
-}
-
-// ========== 견적 수정 모달 ==========
-
-/**
- * 견적 수정 모달 열기
- */
-function openQuotationEditModal() {
-  // 선택된 견적 확인
-  const selectedRow = document.querySelector('#quotationTableBody input[type="checkbox"]:checked');
-
-  if (!selectedRow) {
-    alert('견적을 선택해주세요.');
-    return;
-  }
-
-  currentQuotationMode = 'edit';
-
-  // TODO: 선택된 견적 데이터 로드
-  const quotationNo = selectedRow.value;
-
-  // ✅ 테스트 데이터 (Prefix Rule 적용)
-  document.getElementById('quotationEditNo').value = quotationNo;
-  document.getElementById('quotationEditDate').value = '2025-12-15';
-  document.getElementById('quotationEditValidDate').value = '2025-12-30';
-  document.getElementById('quotationEditStatus').value = '작성';
-  document.getElementById('quotationEditCustomerName').value = '[C001] 테스트 매출처';
-  document.getElementById('quotationEditManager').value = '홍길동';
-  document.getElementById('quotationEditContact').value = '010-1234-5678';
-  document.getElementById('quotationEditRemark').value = '테스트 비고';
-
-  // 모달 표시
-  document.getElementById('quotationEditModal').style.display = 'flex';
-}
-
-/**
- * 견적 수정 모달 닫기
- */
-function closeQuotationEditModal() {
-  document.getElementById('quotationEditModal').style.display = 'none';
-}
+// ❌ [중복 제거 완료] 견적 수정 모달 함수들은 lines 627-825에 이미 완벽하게 구현됨
+// - async function openQuotationManageEditModal(quotationDate, quotationNo) (line 1760)
+// - function closeQuotationManageEditModal() (line 798)
+// 이 함수들은 API 호출, DataTable 초기화, 드래그 기능 등을 모두 포함하고 있음
 
 /**
  * 수정용 매출처 검색 모달 열기 (Prefix Rule 적용)
  */
 function openEditCustomerSearchModal() {
-  const searchValue = document.getElementById('quotationEditCustomerName').value.trim();
+  const searchValue = document.getElementById('quotationManageEditCustomerName').value.trim();
 
   // 공통 매출처 검색 모달 열기
   if (typeof window.openCustomerSearchModal === 'function') {
@@ -3840,7 +3805,7 @@ function openEditCustomerSearchModal() {
  * 수정용 매출처 선택 (Prefix Rule 적용)
  */
 window.selectCustomerForQuotationEdit = function(customerCode, customerName) {
-  document.getElementById('quotationEditCustomerName').value = `[${customerCode}] ${customerName}`;
+  document.getElementById('quotationManageEditCustomerName').value = `[${customerCode}] ${customerName}`;
 
   // 공통 모달 닫기
   if (typeof window.closeCustomerSearchModal === 'function') {
@@ -3867,14 +3832,14 @@ function openMaterialSearchModalForEdit() {
  */
 async function updateQuotation() {
   // ✅ 입력값 검증 (Prefix Rule 적용)
-  const quotationNo = document.getElementById('quotationEditNo').value;
-  const quotationDate = document.getElementById('quotationEditDate').value;
-  const validDate = document.getElementById('quotationEditValidDate').value;
-  const status = document.getElementById('quotationEditStatus').value;
-  const customerName = document.getElementById('quotationEditCustomerName').value;
-  const manager = document.getElementById('quotationEditManager').value;
-  const contact = document.getElementById('quotationEditContact').value;
-  const remark = document.getElementById('quotationEditRemark').value;
+  const quotationNo = document.getElementById('quotationManageEditNo').value;
+  const quotationDate = document.getElementById('quotationManageEditDate').value;
+  const validDate = document.getElementById('quotationManageEditValidDate').value;
+  const status = document.getElementById('quotationManageEditStatus').value;
+  const customerName = document.getElementById('quotationManageEditCustomerName').value;
+  const manager = document.getElementById('quotationManageEditManager').value;
+  const contact = document.getElementById('quotationManageEditContact').value;
+  const remark = document.getElementById('quotationManageEditRemark').value;
 
   if (!quotationDate) {
     alert('견적일자를 선택해주세요.');
@@ -3903,7 +3868,7 @@ async function updateQuotation() {
   try {
     // API 호출 코드 추가 필요
     alert('견적이 수정되었습니다.');
-    closeQuotationEditModal();
+    closeQuotationManageEditModal();
 
     // 견적 목록 새로고침
     if (typeof loadQuotations === 'function') {
@@ -3918,8 +3883,8 @@ async function updateQuotation() {
 /**
  * 견적 삭제
  */
-async function deleteQuotation() {
-  const selectedRows = document.querySelectorAll('#quotationTableBody input[type="checkbox"]:checked');
+async function deleteQuotationManage() {
+  const selectedRows = document.querySelectorAll('#quotationManageTableBody input[type="checkbox"]:checked');
 
   if (selectedRows.length === 0) {
     alert('삭제할 견적을 선택해주세요.');
@@ -3948,7 +3913,7 @@ async function deleteQuotation() {
  * 견적 인쇄
  */
 function printQuotation() {
-  const selectedRow = document.querySelector('#quotationTableBody input[type="checkbox"]:checked');
+  const selectedRow = document.querySelector('#quotationManageTableBody input[type="checkbox"]:checked');
 
   if (!selectedRow) {
     alert('인쇄할 견적을 선택해주세요.');
@@ -3963,7 +3928,7 @@ function printQuotation() {
  * 전체 체크박스 토글
  */
 function toggleAllQuotations(checkbox) {
-  const checkboxes = document.querySelectorAll('#quotationTableBody input[type="checkbox"]');
+  const checkboxes = document.querySelectorAll('#quotationManageTableBody input[type="checkbox"]');
   checkboxes.forEach(cb => {
     cb.checked = checkbox.checked;
   });
@@ -3971,8 +3936,8 @@ function toggleAllQuotations(checkbox) {
 
 // 전역 함수 노출
 window.openQuotationModal = openQuotationModal;
-window.closeQuotationModal = closeQuotationModal;
-window.openQuotationCustomerSearchModal = openQuotationCustomerSearchModal;
+window.closeQuotationManageCreateModal = closeQuotationManageCreateModal;
+window.openQuotationManageCreateCustomerSearchModal = openQuotationManageCreateCustomerSearchModal;
 window.openMaterialSearchModalForQuotation = openMaterialSearchModalForQuotation;
 // ❌ [중복 제거] 아래 함수들은 lines 1988-2052에서 이미 window 객체에 직접 할당됨
 // window.openQuotationMaterialAddModal (line 1988)
@@ -3981,14 +3946,14 @@ window.openMaterialSearchModalForQuotation = openMaterialSearchModalForQuotation
 // window.confirmQuotationMaterialAdd (line 2052) - 이전 이름: addMaterialToQuotation
 window.removeQuotationMaterial = removeQuotationMaterial;
 window.saveQuotation = saveQuotation;
-window.openQuotationDetailModal = openQuotationDetailModal;
-window.closeQuotationDetailModal = closeQuotationDetailModal;
-window.openQuotationEditModal = openQuotationEditModal;
-window.closeQuotationEditModal = closeQuotationEditModal;
+// ❌ [중복 제거] 아래 함수들은 이미 앞에서 window 객체에 할당됨
+// window.openQuotationManageViewModal (line 570)
+// window.closeQuotationManageViewModal (line 600)
+// window.openQuotationManageEditModal (line 1789)
 window.openEditCustomerSearchModal = openEditCustomerSearchModal;
 window.openMaterialSearchModalForEdit = openMaterialSearchModalForEdit;
 window.updateQuotation = updateQuotation;
-window.deleteQuotation = deleteQuotation;
+window.deleteQuotationManage = deleteQuotation;
 window.printQuotation = printQuotation;
 window.toggleAllQuotations = toggleAllQuotations;
 
@@ -4000,13 +3965,13 @@ function exportQuotationsToExcel() {
   try {
     console.log('===== 견적 Google Sheets 내보내기 시작 =====');
 
-    if (!quotationTable) {
+    if (!quotationManageTable) {
       alert('견적 테이블이 초기화되지 않았습니다.');
       return;
     }
 
     // DataTable에서 현재 표시된 데이터 가져오기
-    const dataToExport = quotationTable.rows({ search: 'applied' }).data().toArray();
+    const dataToExport = quotationManageTable.rows({ search: 'applied' }).data().toArray();
 
     if (dataToExport.length === 0) {
       alert('내보낼 견적 데이터가 없습니다.');

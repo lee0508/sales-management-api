@@ -16,6 +16,11 @@ window.searchMaterialsForModal = async function() {
   try {
     const keyword = document.getElementById('materialSearchModalInput').value.trim();
 
+    // ✅ 검색 조건 체크박스 확인
+    const searchByCategory = document.getElementById('materialSearchByCategory')?.checked || false;
+    const searchByCode = document.getElementById('materialSearchByCode')?.checked || false;
+    const searchByName = document.getElementById('materialSearchByName')?.checked || false;
+
     // API 호출
     let apiUrl = API_BASE_URL + '/materials?pageSize=1000';
     if (keyword) {
@@ -24,7 +29,27 @@ window.searchMaterialsForModal = async function() {
 
     const response = await fetch(apiUrl, { credentials: 'include' });
     const result = await response.json();
-    const materials = result.data || [];
+    let materials = result.data || [];
+
+    // ✅ 체크박스 조건에 따라 클라이언트 측 필터링
+    if (keyword && (searchByCategory || searchByCode || searchByName)) {
+      materials = materials.filter(material => {
+        const keywordLower = keyword.toLowerCase();
+        let matches = false;
+
+        if (searchByCategory && material.분류코드) {
+          matches = matches || material.분류코드.toLowerCase().includes(keywordLower);
+        }
+        if (searchByCode && material.세부코드) {
+          matches = matches || material.세부코드.toLowerCase().includes(keywordLower);
+        }
+        if (searchByName && material.자재명) {
+          matches = matches || material.자재명.toLowerCase().includes(keywordLower);
+        }
+
+        return matches;
+      });
+    }
 
     // ✅ 품목코드 필드 생성 (분류코드 + 세부코드)
     const processedMaterials = materials.map(material => ({
@@ -110,6 +135,18 @@ window.searchMaterialsForModal = async function() {
         searching: false, // DataTable 자체 검색 비활성화 (별도 검색창 사용)
         info: true, // 정보 표시
         dom: 'lrtip', // length, processing, table, info, pagination (검색창 제외)
+        rowCallback: function(row, data) {
+          // 행 클릭 시 선택 버튼 클릭과 동일한 효과
+          $(row).css('cursor', 'pointer');
+          $(row).off('click').on('click', function(e) {
+            // 선택 버튼을 직접 클릭한 경우는 제외 (중복 실행 방지)
+            if ($(e.target).hasClass('btn-view') || $(e.target).closest('.btn-view').length > 0) {
+              return;
+            }
+            // 행 클릭 시 선택 함수 호출
+            selectMaterialFromModal(data);
+          });
+        }
       });
     }
 

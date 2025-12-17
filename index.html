@@ -21,10 +21,10 @@
   <script src="js/modal-draggable.js?v=251216_drag_fix" defer></script>
 
   <script src="js/customer.js?v=251212_improvement" defer></script>
-  <script src="js/material.js?v=251216_add_context" defer></script>
+  <script src="js/material.js?v=251217_row_click" defer></script>
   <script src="js/account.js" defer></script>
   <script src="js/supplier.js?v=251212_improvement" defer></script>
-  <script src="js/quotation.js?v=251216_dedup" defer></script>
+  <script src="js/quotation.js?v=251217_customer_fix" defer></script>
   <script src="js/order.js?v=251212_improvement" defer></script>
   <script src="js/postoffice.js?v=1031M" defer></script>
   <!-- print.js를 transaction.js, quotation.js보다 먼저 로드하여 각 모듈의 인쇄 함수를 덮어쓸 수 있도록 함 -->
@@ -489,24 +489,24 @@
         <!-- Please write the page display code corresponding to the menu click from here. N:490 -->
 
         <!-- 견적관리 페이지 -->
-        <div class="page-content hidden" id="quotationPage">
+        <div class="page-content hidden" id="quotationManagePage">
           <h2 style="display: none">견적관리</h2>
           <div class="toolbar" style="justify-content: space-between">
             <div class="toolbar-left" style="display: flex; gap: 12px; align-items: center">
-              <select id="quotationStatusFilter" class="form-control" style="width: 150px"
+              <select id="quotationManageStatusFilter" class="form-control" style="width: 150px"
                 onchange="filterQuotations()">
                 <option value="">전체 상태</option>
                 <option value="1">작성중</option>
                 <option value="2">승인</option>
                 <option value="3">반려</option>
               </select>
-              <input type="date" id="quotationStartDate" class="form-control" style="width: 150px" />
+              <input type="date" id="quotationManageStartDate" class="form-control" style="width: 150px" />
               <span>~</span>
-              <input type="date" id="quotationEndDate" class="form-control" style="width: 150px" />
-              <button id="quotationBtnFilter" class="btn btn-secondary" onclick="filterQuotations()">조회</button>
+              <input type="date" id="quotationManageEndDate" class="form-control" style="width: 150px" />
+              <button id="quotationManageFilterBtn" class="btn btn-secondary" onclick="filterQuotations()">조회</button>
             </div>
             <div class="toolbar-right">
-              <button id="quotationBtnNew" class="btn btn-success" onclick="openNewQuotationModal()" style="
+              <button id="quotationManageCreateBtn" class="btn btn-success" onclick="openQuotationManageCreateModal()" style="
                                     padding: 10px 20px;
                                     background: #28a745;
                                     color: white;
@@ -518,7 +518,7 @@
                                   ">
                 <span style="font-size: 18px; margin-right: 4px">+</span> 견적서 작성
               </button>
-              <button id="quotationBtnExport" class="btn btn-secondary" onclick="exportQuotationsToExcel()" style="
+              <button id="quotationManageExportBtn" class="btn btn-secondary" onclick="exportQuotationsToExcel()" style="
                                     padding: 10px 20px;
                                     background: #6c757d;
                                     color: white;
@@ -535,14 +535,14 @@
 
           <!-- ✅ 견적 요약 정보 -->
           <div class="summary-bar" style="margin: 10px 0; font-size: 14px">
-            총 견적 수: <span id="quotationCount" style="font-weight: bold">0</span> 건
+            총 견적 수: <span id="quotationManageCount" style="font-weight: bold">0</span> 건
           </div>
 
           <!-- DataTable -->
-          <table id="quotationTable" class="display" style="width: 100%">
+          <table id="quotationManageTable" class="display" style="width: 100%">
             <thead>
               <tr>
-                <th style="width: 40px"><input type="checkbox" id="quotationSelectAll" /></th>
+                <th style="width: 40px"><input type="checkbox" id="quotationManageSelectAll" /></th>
                 <th>순번</th>
                 <th>견적번호</th>
                 <th>매출처명</th>
@@ -554,7 +554,7 @@
                 <th>관리</th>
               </tr>
             </thead>
-            <tbody id="quotationTableBody"></tbody>
+            <tbody id="quotationManageTableBody"></tbody>
           </table>
         </div>
 
@@ -632,7 +632,7 @@
               loadFunc: null,
             },
             quotation: {
-              element: 'quotationPage',
+              element: 'quotationManagePage',
               title: '견적관리',
               menu: 'sales',
               loadFunc: () => {
@@ -1261,744 +1261,1753 @@
 
   <!-- Write code for page modal here N:1260  -->
 
-  <!-- 견적서관리 작성/수정 모달 -->
-  <div id="quotationModal" class="modal" style="display: none; z-index: 1050">
-    <div id="quotationModalContent" class="modal-content" style="
-              max-width: 1200px;
-              max-height: 90vh;
-              overflow-y: auto;
-              padding: 32px;
-              position: relative;
-            ">
-      <!-- 헤더 -->
-      <div id="quotationModalHeader" style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 24px;
-                padding-bottom: 16px;
-                border-bottom: 2px solid var(--border);
-                cursor: move;
-                user-select: none;
-              ">
-        <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: var(--text-dark)" id="quotationModalTitle">
-          견적서 작성
-        </h2>
-        <button onclick="closeQuotationModal()" style="
-                  background: #f0f0f0;
-                  border: none;
-                  font-size: 24px;
-                  cursor: pointer;
-                  color: #666;
-                  width: 36px;
-                  height: 36px;
-                  border-radius: 50%;
+
+  <!-- [중복 제거] quotationManageEditModal - Line 2146의 백업 파일 버전 사용 -->
+
+
+  <!-- ❌ [중복 제거 완료] quotationMaterialAddModal은 Line 1618에 Prefix Rule 준수 버전으로 이미 정의됨 -->
+
+  <!-- ✅ 견적관리 모달 섹션 (백업 파일에서 복사) -->
+        <div id="quotationManageViewModal" class="modal hidden">
+          <div id="quotationManageViewModalContent" class="modal-content large"
+            style="max-width: 1000px; max-height: 90vh; overflow-y: auto; position: relative">
+            <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) -->
+            <div id="quotationManageViewModalHeader" style="
                   display: flex;
+                  justify-content: space-between;
                   align-items: center;
-                  justify-content: center;
-                  transition: all 0.2s ease;
-                " onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
-          onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';">
-          ×
-        </button>
-      </div>
-
-      <form id="quotationForm" onsubmit="submitQuotation(event)">
-        <!-- 마스터 정보 섹션 -->
-        <div style="
-                  background: #f8f9fa;
-                  padding: 20px;
-                  border-radius: 8px;
                   margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                  cursor: move;
+                  user-select: none;
                 ">
-          <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600">기본 정보</h3>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
-            <!-- 견적일자 -->
-            <div>
-              <label style="
-                        display: block;
-                        margin-bottom: 8px;
-                        font-weight: 500;
-                        font-size: 14px;
-                      ">견적일자 *</label>
-              <input type="date" id="quotationDate" required style="
-                        width: 100%;
-                        padding: 12px 16px;
-                        border: 2px solid var(--border);
-                        border-radius: 8px;
-                        font-size: 14px;
-                      " />
+              <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
+                견적 상세 보기
+              </h2>
+              <button id="closeQuotationManageViewModal" onclick="closeQuotationManageViewModal()" style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
             </div>
 
-            <!-- 출고희망일자 -->
-            <div>
-              <label style="
-                        display: block;
-                        margin-bottom: 8px;
-                        font-weight: 500;
-                        font-size: 14px;
-                      ">출고희망일자</label>
-              <input type="date" id="deliveryDate" style="
-                        width: 100%;
-                        padding: 12px 16px;
-                        border: 2px solid var(--border);
-                        border-radius: 8px;
-                        font-size: 14px;
-                      " />
-            </div>
-
-            <!-- 매출처 선택 -->
-            <div style="grid-column: 1 / -1">
-              <label style="
-                        display: block;
-                        margin-bottom: 8px;
-                        font-weight: 500;
-                        font-size: 14px;
-                      ">매출처 *</label>
-              <div style="display: flex; gap: 8px">
-                <!-- 숨겨진 매출처 코드 필드 (실제 값 저장용) -->
-                <input type="hidden" id="selectedCustomerCode" />
-
-                <!-- 통합 검색 입력란 -->
-                <input type="text" id="selectedCustomerName" required style="
-                          flex: 1;
-                          padding: 12px 16px;
-                          border: 2px solid var(--border);
-                          border-radius: 8px;
-                          font-size: 14px;
-                        " placeholder="매출처 코드 또는 이름 입력 후 엔터"
-                  onkeypress="if(event.key === 'Enter') { event.preventDefault(); openQuotationCustomerSearchModal(); }" />
-                <button type="button" onclick="openQuotationCustomerSearchModal()" style="
-                          padding: 10px 20px;
-                          background: var(--primary);
-                          color: white;
-                          border: none;
-                          border-radius: 8px;
-                          font-size: 14px;
-                          font-weight: 500;
-                          cursor: pointer;
-                          white-space: nowrap;
-                        ">
-                  검색
-                </button>
-              </div>
-              <!-- 선택된 매출처 정보 표시 -->
-              <div id="selectedCustomerInfo" style="
-                        display: none;
-                        margin-top: 8px;
-                        padding: 8px 12px;
-                        background: #f0f9ff;
-                        border-radius: 6px;
-                        border: 1px solid #bfdbfe;
-                      ">
-                <span style="font-size: 12px; color: #3b82f6; font-weight: 600">선택된 매출처:</span>
-                <span id="selectedCustomerDisplay" style="margin-left: 8px; font-weight: 600; color: #1e40af"></span>
+            <!-- ✅ 견적 기본 정보 (카드 스타일) -->
+            <div id="quotationManageViewHeaderSection" style="
+                  background: #f9fafb;
+                  padding: 20px;
+                  border-radius: 12px;
+                  margin-bottom: 24px;
+                  border: 1px solid #e5e7eb;
+                ">
+              <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
+                기본 정보
+              </h3>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
+                <div style="display: flex; align-items: center">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280">견적번호</span>
+                  <span id="quotationManageViewNo" style="color: #1f2937; font-weight: 600">-</span>
+                </div>
+                <div style="display: flex; align-items: center">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280">견적일자</span>
+                  <span id="quotationManageViewDate" style="color: #1f2937">-</span>
+                </div>
+                <div style="display: flex; align-items: center">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280">매출처명</span>
+                  <span id="quotationManageViewCustomer" style="color: #1f2937">-</span>
+                </div>
+                <div style="display: flex; align-items: center">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280">비고</span>
+                  <span id="quotationManageViewRemark" style="color: #1f2937">-</span>
+                </div>
               </div>
             </div>
 
-            <!-- 제목 -->
-            <div style="grid-column: 1 / -1">
-              <label style="
-                        display: block;
-                        margin-bottom: 8px;
-                        font-weight: 500;
-                        font-size: 14px;
-                      ">제목</label>
-              <input type="text" id="quotationTitle" style="
-                        width: 100%;
-                        padding: 12px 16px;
-                        border: 2px solid var(--border);
-                        border-radius: 8px;
-                        font-size: 14px;
-                      " placeholder="견적서 제목을 입력하세요" />
+            <!-- ✅ 견적 상세 목록 -->
+            <div id="quotationManageViewMaterialSection" style="
+                  background: #f9fafb;
+                  padding: 20px;
+                  border-radius: 12px;
+                  border: 1px solid #e5e7eb;
+                ">
+              <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
+                견적 품목 내역
+              </h3>
+              <table id="quotationManageViewTable" class="display" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th>품목코드</th>
+                    <th>품명</th>
+                    <th>규격</th>
+                    <th>단위</th>
+                    <th>수량</th>
+                    <th>단가</th>
+                    <th>금액</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+
+              <!-- ✅ 합계 금액 표시 -->
+              <div style="
+                    margin-top: 16px;
+                    padding: 12px;
+                    background: white;
+                    border-radius: 8px;
+                    display: flex;
+                    justify-content: flex-end;
+                    align-items: center;
+                    gap: 12px;
+                  ">
+                <span style="font-weight: 600; color: #374151; font-size: 16px">합계 금액:</span>
+                <span id="quotationManageViewTotal" style="
+                      font-weight: 700;
+                      color: #2563eb;
+                      font-size: 18px;
+                    ">0</span>
+                <span style="font-weight: 600; color: #374151; font-size: 16px">원</span>
+              </div>
             </div>
 
-            <!-- 적요 -->
-            <div style="grid-column: 1 / -1">
-              <label style="
-                        display: block;
-                        margin-bottom: 8px;
-                        font-weight: 500;
-                        font-size: 14px;
-                      ">적요</label>
-              <textarea id="quotationRemark" style="
-                        width: 100%;
-                        padding: 12px 16px;
-                        border: 2px solid var(--border);
-                        border-radius: 8px;
-                        font-size: 14px;
-                        resize: vertical;
-                        min-height: 80px;
-                      " placeholder="비고사항을 입력하세요"></textarea>
+            <!-- ✅ 출력 버튼 영역 -->
+            <div style="
+                  margin-top: 24px;
+                  display: flex;
+                  justify-content: flex-end;
+                  gap: 12px;
+                  padding-top: 16px;
+                  border-top: 1px solid #e5e7eb;
+                ">
+              <button id="quotationManageViewModalCloseBtn" onclick="closeQuotationManageViewModal()" style="
+                    padding: 10px 24px;
+                    background: #dc2626;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+                  "
+                onmouseover="this.style.background='#b91c1c'; this.style.boxShadow='0 4px 8px rgba(220, 38, 38, 0.3)';"
+                onmouseout="this.style.background='#dc2626'; this.style.boxShadow='0 2px 4px rgba(220, 38, 38, 0.2)';">
+                ✕ 닫기
+              </button>
+              <button id="quotationManageViewModalPrintBtn" onclick="printQuotationFromDetail()" style="
+                    padding: 10px 24px;
+                    background: #9333ea;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    box-shadow: 0 2px 4px rgba(147, 51, 234, 0.2);
+                  "
+                onmouseover="this.style.background='#7c3aed'; this.style.boxShadow='0 4px 8px rgba(147, 51, 234, 0.3)';"
+                onmouseout="this.style.background='#9333ea'; this.style.boxShadow='0 2px 4px rgba(147, 51, 234, 0.2)';">
+                📄 출력
+              </button>
             </div>
           </div>
-        </div>
+        </div> <!-- 상세 버튼에 대한 코드 끝!!!  -->
 
-        <!-- 상세내역 섹션 -->
-        <div style="margin-bottom: 24px">
-          <div style="
+        <!-- ✅ 견적 수정 모달 -->
+        <div id="quotationManageEditModal" class="modal" style="display: none">
+          <div id="quotationManageEditModalContent" class="modal-content large" style="
+                max-width: 1200px;
+                max-height: 90vh;
+                overflow-y: auto;
+                padding: 32px;
+                position: relative;
+              ">
+            <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) -->
+            <div id="quotationManageEditModalHeader" style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                  cursor: move;
+                  user-select: none;
+                ">
+              <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #1f2937">
+                견적 수정
+              </h2>
+              <button id="closeQuotationManageEditModalBtn" onclick="closeQuotationManageEditModal()" style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <!-- ✅ 견적 기본 정보 (카드 스타일) -->
+            <div id="quotationManageEditHeaderSection" style="
+                  background: #f9fafb;
+                  padding: 20px;
+                  border-radius: 12px;
+                  margin-bottom: 24px;
+                  border: 1px solid #e5e7eb;
+                ">
+              <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
+                기본 정보
+              </h3>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px">
+                <div style="display: flex; align-items: center">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280">견적번호</span>
+                  <span id="quotationManageEditNo" style="color: #1f2937; font-weight: 600">-</span>
+                </div>
+                <div style="display: flex; align-items: center">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280">견적일자</span>
+                  <span id="quotationManageEditDate" style="color: #1f2937">-</span>
+                </div>
+                <div style="display: flex; align-items: center">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280">매출처명</span>
+                  <span id="quotationManageEditCustomerName" style="color: #1f2937">-</span>
+                </div>
+                <div style="display: flex; align-items: center">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280">출고희망일자</span>
+                  <input type="date" id="quotationManageEditDeliveryDate" style="
+                        padding: 8px 12px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 6px;
+                        font-size: 14px;
+                      " />
+                </div>
+                <div style="display: flex; align-items: center; grid-column: 1 / -1">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280">제목</span>
+                  <input type="text" id="quotationManageEditTitle" style="
+                        flex: 1;
+                        padding: 8px 12px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 6px;
+                        font-size: 14px;
+                      " placeholder="견적 제목" />
+                </div>
+                <div style="display: flex; align-items: flex-start; grid-column: 1 / -1">
+                  <span style="min-width: 100px; font-weight: 500; color: #6b7280; padding-top: 8px">적요</span>
+                  <textarea id="quotationManageEditRemark" rows="2" style="
+                        flex: 1;
+                        padding: 8px 12px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 6px;
+                        font-size: 14px;
+                        resize: vertical;
+                      " placeholder="견적 적요"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- ✅ 견적 품목 상세 목록 -->
+            <div id="quotationManageEditMaterialSection" style="
+                  background: #f9fafb;
+                  padding: 20px;
+                  border-radius: 12px;
+                  border: 1px solid #e5e7eb;
+                ">
+              <div style="
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 16px;
                   ">
-            <h3 style="margin: 0; font-size: 18px; font-weight: 600">견적 상세내역</h3>
-            <button type="button" onclick="openQuotationMaterialAddModal()" style="
-                      padding: 8px 16px;
-                      background: #007bff;
-                      color: white;
-                      border: none;
-                      border-radius: 6px;
-                      font-size: 14px;
-                      font-weight: 500;
-                      cursor: pointer;
-                    ">
-              + 자재 추가
-            </button>
-          </div>
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #374151">
+                  견적 품목 내역
+                </h3>
+                <div style="display: flex; gap: 8px">
+                  <button type="button" onclick="addQuotationManageEditModalRow()" style="
+                        padding: 8px 16px;
+                        background: #10b981;
+                        border: none;
+                        border-radius: 6px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        color: white;
+                        transition: all 0.2s;
+                      " onmouseover="this.style.background='#059669';" onmouseout="this.style.background='#10b981';">
+                    + 자재 추가
+                  </button>
+                </div>
+              </div>
 
-          <!-- 상세내역 테이블 -->
-          <div style="overflow-x: auto; border: 1px solid var(--border); border-radius: 8px">
-            <table id="quotationCreateDetailTable" style="width: 100%; border-collapse: collapse">
-              <thead style="background: #f8f9fa">
-                <tr>
-                  <th style="
-                            padding: 12px;
-                            text-align: left;
-                            border-bottom: 2px solid var(--border);
-                            width: 40px;
-                          ">
-                    순번
-                  </th>
-                  <th style="
-                            padding: 12px;
-                            text-align: left;
-                            border-bottom: 2px solid var(--border);
-                          ">
-                    자재코드
-                  </th>
-                  <th style="
-                            padding: 12px;
-                            text-align: left;
-                            border-bottom: 2px solid var(--border);
-                          ">
-                    자재명
-                  </th>
-                  <th style="
-                            padding: 12px;
-                            text-align: left;
-                            border-bottom: 2px solid var(--border);
-                          ">
-                    규격
-                  </th>
-                  <th style="
-                            padding: 12px;
-                            text-align: right;
-                            border-bottom: 2px solid var(--border);
-                            width: 100px;
-                          ">
-                    수량
-                  </th>
-                  <th style="
-                            padding: 12px;
-                            text-align: right;
-                            border-bottom: 2px solid var(--border);
-                            width: 120px;
-                          ">
-                    단가
-                  </th>
-                  <th style="
-                            padding: 12px;
-                            text-align: right;
-                            border-bottom: 2px solid var(--border);
-                            width: 120px;
-                          ">
-                    공급가
-                  </th>
-                  <th style="
-                            padding: 12px;
-                            text-align: right;
-                            border-bottom: 2px solid var(--border);
-                            width: 100px;
-                          ">
-                    부가세
-                  </th>
-                  <th style="
-                            padding: 12px;
-                            text-align: center;
-                            border-bottom: 2px solid var(--border);
-                            width: 60px;
-                          ">
-                    삭제
-                  </th>
-                </tr>
-              </thead>
-              <tbody id="quotationCreateDetailTableBody">
-                <tr>
-                  <td colspan="9" style="padding: 40px; text-align: center; color: #999">
-                    자재 추가 버튼을 클릭하여 견적 상세내역을 입력하세요
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot style="background: #f8f9fa; font-weight: 600">
-                <tr>
-                  <td colspan="6" style="
-                            padding: 12px;
-                            text-align: right;
-                            border-top: 2px solid var(--border);
-                          ">
-                    합계
-                  </td>
-                  <td id="totalSupplyPrice" style="
-                            padding: 12px;
-                            text-align: right;
-                            border-top: 2px solid var(--border);
-                          ">
-                    0
-                  </td>
-                  <td id="totalVat" style="
-                            padding: 12px;
-                            text-align: right;
-                            border-top: 2px solid var(--border);
-                          ">
-                    0
-                  </td>
-                  <td style="padding: 12px; border-top: 2px solid var(--border)"></td>
-                </tr>
-                <tr>
-                  <td colspan="6" style="padding: 12px; text-align: right">총액</td>
-                  <td colspan="2" id="grandTotal" style="
-                            padding: 12px;
-                            text-align: right;
-                            color: #007bff;
-                            font-size: 16px;
-                          ">
-                    0
-                  </td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
+              <table id="quotationManageEditDetailTable" class="display" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th style="width: 50px">순번</th>
+                    <th>품목코드</th>
+                    <th>품명</th>
+                    <th>규격</th>
+                    <th>단위</th>
+                    <th>수량</th>
+                    <th>단가</th>
+                    <th>금액</th>
+                    <th style="width: 80px">관리</th>
+                  </tr>
+                </thead>
+                <tbody id="quotationManageEditDetailTableBody"></tbody>
+              </table>
 
-        <!-- 버튼 영역 -->
-        <div style="display: flex; gap: 12px; justify-content: flex-end">
-          <button type="button" onclick="closeQuotationModal()" style="
-                    padding: 10px 24px;
-                    background: var(--bg-light);
-                    border: 1px solid var(--border);
+              <!-- ✅ 합계 금액 표시 -->
+              <div style="
+                    margin-top: 16px;
+                    padding: 12px;
+                    background: white;
+                    border-radius: 8px;
+                    display: flex;
+                    justify-content: flex-end;
+                    align-items: center;
+                    gap: 12px;
+                  ">
+                <span style="font-weight: 600; color: #374151; font-size: 16px">합계 금액:</span>
+                <span id="quotationManageEditDetailTotal" style="
+                      font-weight: 700;
+                      color: #2563eb;
+                      font-size: 18px;
+                    ">0</span>
+                <span style="font-weight: 600; color: #374151; font-size: 16px">원</span>
+              </div>
+            </div>
+
+            <!-- ✅ 버튼 영역 -->
+            <div style="
+                  display: flex;
+                  gap: 12px;
+                  justify-content: flex-end;
+                  margin-top: 24px;
+                  padding-top: 24px;
+                  border-top: 2px solid #e5e7eb;
+                ">
+              <button type="button" onclick="closeQuotationManageEditModal()" style="
+                    padding: 12px 24px;
+                    background: #f3f4f6;
+                    border: none;
                     border-radius: 8px;
                     font-size: 14px;
                     font-weight: 500;
                     cursor: pointer;
-                    color: var(--text-dark);
-                  ">
-            취소
-          </button>
-          <button type="submit" style="
-                    padding: 10px 24px;
-                    background: var(--primary);
+                    color: #374151;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button type="button" onclick="submitQuotationManageEdit()" style="
+                    padding: 12px 24px;
+                    background: #2563eb;
                     border: none;
                     border-radius: 8px;
                     font-size: 14px;
                     font-weight: 500;
                     cursor: pointer;
                     color: white;
-                  ">
-            견적서 등록
-          </button>
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#1d4ed8';" onmouseout="this.style.background='#2563eb';">
+                수정 완료
+              </button>
+            </div>
+          </div>
         </div>
-      </form>
-    </div>
-  </div>
 
-  <!-- ✅ 견적 품목 추가 모달 (Prefix: quotationMaterialAddModal) -->
-  <div id="quotationMaterialAddModal" class="modal" style="display: none; z-index: 1060">
-    <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto">
-      <div style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 2px solid #e5e7eb;
-          ">
-        <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
-          품목 추가
-        </h2>
-        <button onclick="closeQuotationMaterialAddModal()" style="
-              width: 36px;
-              height: 36px;
-              border-radius: 50%;
-              background: #f3f4f6;
-              border: none;
-              cursor: pointer;
-              display: flex;
+        <!-- ✅ 견적 삭제 확인 모달 -->
+        <div id="quotationManageDeleteConfirmModal" style="
+              display: none;
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 1000;
               align-items: center;
               justify-content: center;
-              font-size: 20px;
-              color: #6b7280;
-              transition: all 0.2s;
-            " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
-          onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
-          &times;
-        </button>
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 16px">
-        <!-- ✅ 품목명 검색 영역 -->
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">품목명</label>
-          <div style="display: flex; gap: 8px">
-            <input type="text" id="quotationMaterialAddName" style="
-                  flex: 1;
-                  padding: 10px 12px;
-                  border: 2px solid #e5e7eb;
-                  border-radius: 8px;
-                  font-size: 14px;
-                " placeholder="품목명 입력 또는 검색" />
-            <button onclick="openMaterialSearchModal('quotation_material_add', document.getElementById('quotationMaterialAddName').value)" style="
-                  padding: 10px 20px;
-                  background: #3b82f6;
-                  border: none;
-                  border-radius: 8px;
-                  font-size: 14px;
-                  font-weight: 500;
-                  cursor: pointer;
-                  color: white;
-                  transition: all 0.2s;
-                  white-space: nowrap;
-                " onmouseover="this.style.background='#2563eb';" onmouseout="this.style.background='#3b82f6';">
-              검색
-            </button>
-          </div>
-        </div>
-
-        <!-- ✅ 선택된 품목 정보 -->
-        <div id="quotationMaterialAddSelectedInfo" style="
-              display: none;
-              background: #f0f9ff;
-              padding: 12px;
-              border-radius: 8px;
-              border: 2px solid #bfdbfe;
             ">
-          <div style="display: flex; justify-content: space-between; align-items: center">
-            <div>
-              <div style="
-                    font-size: 12px;
-                    color: #3b82f6;
-                    font-weight: 600;
-                    margin-bottom: 4px;
-                  ">
-                선택된 품목
-              </div>
-              <div style="font-weight: 600; color: #1e40af" id="quotationMaterialAddSelectedName">
-                -
-              </div>
-              <div style="font-size: 12px; color: #6b7280; margin-top: 2px" id="quotationMaterialAddSelectedCode">
-                -
-              </div>
-            </div>
-            <button onclick="clearQuotationMaterialAddSelected()" style="
-                  padding: 6px 12px;
-                  background: #ef4444;
-                  border: none;
-                  border-radius: 6px;
-                  font-size: 12px;
-                  font-weight: 500;
-                  cursor: pointer;
-                  color: white;
+          <div style="
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                width: 90%;
+                max-width: 450px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              ">
+            <div id="quotationManageDeleteConfirmModalHeader" style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #fee2e2;
+                  cursor: move;
+                  user-select: none;
                 ">
-              취소
-            </button>
+              <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: #dc2626">
+                견적 삭제
+              </h2>
+              <button onclick="closeQuotationManageDeleteConfirmModal()" style="
+                    background: #f0f0f0;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                  " onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
+                onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';">
+                ×
+              </button>
+            </div>
+
+            <div style="margin-bottom: 24px">
+              <p style="font-size: 16px; color: #1f2937; margin: 0 0 16px 0">
+                다음 견적을 삭제하시겠습니까?
+              </p>
+              <div id="quotationManageDeleteInfo" style="
+                    padding: 16px;
+                    background: #fef2f2;
+                    border: 1px solid #fecaca;
+                    border-radius: 8px;
+                    font-weight: 500;
+                    color: #991b1b;
+                  ">
+                견적번호: -
+              </div>
+              <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0">
+                ※ 삭제된 견적은 복구할 수 없습니다.
+              </p>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px">
+              <button onclick="closeQuotationManageDeleteConfirmModal()" style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                  ">
+                취소
+              </button>
+              <button onclick="confirmQuotationManageDelete()" style="
+                    padding: 10px 20px;
+                    background: #dc2626;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                  ">
+                삭제
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- ✅ 수량 입력 -->
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">수량</label>
-          <input type="number" id="quotationMaterialAddQuantity" style="
-                width: 100%;
-                padding: 10px 12px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-              " placeholder="수량 입력" value="1" min="0" step="0.01" oninput="calculateQuotationMaterialAddAmount()" />
-        </div>
+        <!-- ✅ 견적 승인 확인 모달 -->
+        <div id="quotationManageApproveConfirmModal" style="
+              display: none;
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 1000;
+              align-items: center;
+              justify-content: center;
+            ">
+          <div style="
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                width: 90%;
+                max-width: 400px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              ">
+            <!-- 아이콘 -->
+            <div style="text-align: center; margin-bottom: 20px">
+              <div style="
+                    width: 64px;
+                    height: 64px;
+                    background: #dbeafe;
+                    border-radius: 50%;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 16px;
+                  ">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #1f2937">
+                견적 승인
+              </h2>
+              <p id="quotationManageApproveInfo" style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px">
+                견적번호: -
+              </p>
+              <p style="margin: 0; color: #2563eb; font-size: 14px; font-weight: 500">
+                이 견적을 승인하시겠습니까?
+              </p>
+              <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 12px">
+                승인 후에는 상태가 변경됩니다.
+              </p>
+            </div>
 
-        <!-- ✅ 출고단가 입력 + 이전단가 버튼 -->
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">출고단가</label>
-          <div style="display: flex; gap: 8px">
-            <input type="number" id="quotationMaterialAddPrice" style="
-                  flex: 1;
-                  padding: 10px 12px;
-                  border: 2px solid #e5e7eb;
-                  border-radius: 8px;
-                  font-size: 14px;
-                " placeholder="단가 입력" value="0" min="0" step="0.01" oninput="calculateQuotationMaterialAddAmount()" />
-            <button onclick="showQuotationMaterialPriceHistory()" style="
-                  padding: 10px 16px;
-                  background: #8b5cf6;
-                  border: none;
-                  border-radius: 8px;
-                  font-size: 13px;
-                  font-weight: 500;
-                  cursor: pointer;
-                  color: white;
-                  transition: all 0.2s;
-                  white-space: nowrap;
-                " onmouseover="this.style.background='#7c3aed';" onmouseout="this.style.background='#8b5cf6';">
-              이전 단가
-            </button>
+            <!-- 버튼 -->
+            <div style="display: flex; gap: 12px">
+              <button onclick="closeQuotationManageApproveConfirmModal()" style="
+                    flex: 1;
+                    padding: 12px 24px;
+                    background: #f3f4f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: #374151;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button onclick="confirmQuotationManageApprove()" style="
+                    flex: 1;
+                    padding: 12px 24px;
+                    background: #2563eb;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#1d4ed8';" onmouseout="this.style.background='#2563eb';">
+                승인하기
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- ✅ 금액 자동계산 -->
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">금액 (자동계산)</label>
-          <input type="text" id="quotationMaterialAddAmount" style="
-                width: 100%;
-                padding: 10px 12px;
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                font-size: 14px;
-                background: #f9fafb;
-              " readonly value="0" />
-        </div>
-      </div>
+        <!-- ❌ [사용 중지] 신규 견적서용 품목 추가 모달 (quotationDetailAddModal로 통합됨) -->
+        <!-- <div id="newQuotationMaterialModal" class="modal" style="display: none">
+          <div class="modal-content" style="max-width: 600px">
+            <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                ">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
+                품목 추가
+              </h2>
+              <button onclick="closeNewQuotationMaterialModal()" style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
 
-      <!-- ✅ 버튼 영역 -->
-      <div style="
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-            margin-top: 24px;
-            padding-top: 24px;
-            border-top: 2px solid #e5e7eb;
-          ">
-        <button onclick="closeQuotationMaterialAddModal()" style="
-              padding: 12px 24px;
-              background: #f3f4f6;
-              border: none;
-              border-radius: 8px;
-              font-size: 14px;
-              font-weight: 500;
-              cursor: pointer;
-              color: #374151;
-              transition: all 0.2s;
-            " onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">
-          취소
-        </button>
-        <button onclick="confirmQuotationMaterialAdd()" style="
-              padding: 12px 24px;
-              background: #10b981;
-              border: none;
-              border-radius: 8px;
-              font-size: 14px;
-              font-weight: 500;
-              cursor: pointer;
-              color: white;
-              transition: all 0.2s;
-            " onmouseover="this.style.background='#059669';" onmouseout="this.style.background='#10b981';">
-          추가
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 견적관리 상세 보기 모달 -->
-  <div id="quotationDetailModal" class="modal" style="display: none">
-    <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px">
-        <h3 style="margin: 0">견적 상세 보기</h3>
-        <button onclick="closeQuotationDetailModal()"
-          style="background: #f0f0f0; border: none; font-size: 24px; cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 4px">×</button>
-      </div>
-
-      <!-- 기본 정보 섹션 -->
-      <div id="quotationDetailHeaderSection" style="margin-bottom: 20px">
-        <table class="table table-bordered">
-          <tbody>
-            <tr>
-              <th style="width: 120px; background-color: #f8f9fa">견적번호</th>
-              <td style="width: 250px" id="detailQuotationNo"></td>
-              <th style="width: 120px; background-color: #f8f9fa">견적일자</th>
-              <td id="detailQuotationDate"></td>
-            </tr>
-            <tr>
-              <th style="background-color: #f8f9fa">유효일자</th>
-              <td id="detailValidDate"></td>
-              <th style="background-color: #f8f9fa">상태</th>
-              <td id="detailStatus"></td>
-            </tr>
-            <tr>
-              <th style="background-color: #f8f9fa">매출처</th>
-              <td colspan="3" id="detailCustomerName"></td>
-            </tr>
-            <tr>
-              <th style="background-color: #f8f9fa">담당자</th>
-              <td id="detailManager"></td>
-              <th style="background-color: #f8f9fa">연락처</th>
-              <td id="detailContact"></td>
-            </tr>
-            <tr>
-              <th style="background-color: #f8f9fa">비고</th>
-              <td colspan="3" id="detailRemark"></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- 품목 내역 섹션 -->
-      <div id="quotationDetailMaterialSection">
-        <h5 style="margin-bottom: 10px">품목 내역</h5>
-        <table class="table table-bordered">
-          <thead>
-            <tr>
-              <th style="width: 50px">No</th>
-              <th style="width: 150px">품목코드</th>
-              <th>품목명</th>
-              <th style="width: 100px">수량</th>
-              <th style="width: 120px">단가</th>
-              <th style="width: 120px">금액</th>
-            </tr>
-          </thead>
-          <tbody id="quotationDetailMaterialTableBody">
-            <!-- 품목 데이터가 동적으로 추가됩니다 -->
-          </tbody>
-          <tfoot>
-            <tr>
-              <th colspan="5" style="text-align: right; background-color: #f8f9fa">합계</th>
-              <th id="detailTotalAmount" style="text-align: right; background-color: #fff3cd"></th>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <!-- 버튼 영역 -->
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px">
-        <button type="button" class="btn btn-secondary" onclick="closeQuotationDetailModal()">닫기</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 견적관리 수정 모달 -->
-  <div id="quotationEditModal" class="modal" style="display: none">
-    <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px">
-        <h3 style="margin: 0">견적 수정</h3>
-        <button onclick="closeQuotationEditModal()"
-          style="background: #f0f0f0; border: none; font-size: 24px; cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 4px">×</button>
-      </div>
-
-      <!-- 기본 정보 섹션 -->
-      <div id="quotationEditHeaderSection" style="margin-bottom: 20px">
-        <table class="table table-bordered">
-          <tbody>
-            <tr>
-              <th style="width: 120px; background-color: #f8f9fa">견적번호</th>
-              <td style="width: 250px">
-                <input type="text" id="quotationEditNo" class="form-control" readonly />
-              </td>
-              <th style="width: 120px; background-color: #f8f9fa">견적일자</th>
-              <td>
-                <input type="date" id="quotationEditDate" class="form-control" />
-              </td>
-            </tr>
-            <tr>
-              <th style="background-color: #f8f9fa">유효일자</th>
-              <td>
-                <input type="date" id="quotationEditValidDate" class="form-control" />
-              </td>
-              <th style="background-color: #f8f9fa">상태</th>
-              <td>
-                <select id="quotationEditStatus" class="form-control">
-                  <option value="작성">작성</option>
-                  <option value="발행">발행</option>
-                  <option value="승인">승인</option>
-                  <option value="취소">취소</option>
-                </select>
-              </td>
-            </tr>
-            <tr>
-              <th style="background-color: #f8f9fa">매출처</th>
-              <td colspan="3">
-                <div style="display: flex; gap: 10px">
-                  <input type="text" id="quotationEditCustomerName" class="form-control" readonly placeholder="매출처를 선택하세요"
-                    style="flex: 1" />
-                  <button type="button" class="btn btn-secondary" onclick="openEditCustomerSearchModal()"
-                    style="min-width: 100px">
-                    <i class="bi bi-search"></i> 검색
+            <div style="display: flex; flex-direction: column; gap: 16px">
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">자재 검색</label>
+                <div style="display: flex; gap: 8px">
+                  <input type="text" id="newMaterialSearchInput" style="
+                        flex: 1;
+                        padding: 10px 12px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 8px;
+                        font-size: 14px;
+                      " placeholder="자재명 또는 품목코드로 검색" onkeypress="if(event.key === 'Enter') searchNewMaterials()" />
+                  <button onclick="searchNewMaterials()" style="
+                        padding: 10px 20px;
+                        background: #3b82f6;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        color: white;
+                        transition: all 0.2s;
+                        white-space: nowrap;
+                      " onmouseover="this.style.background='#2563eb';" onmouseout="this.style.background='#3b82f6';">
+                    검색
                   </button>
                 </div>
-              </td>
-            </tr>
-            <tr>
-              <th style="background-color: #f8f9fa">담당자</th>
-              <td>
-                <input type="text" id="quotationEditManager" class="form-control" />
-              </td>
-              <th style="background-color: #f8f9fa">연락처</th>
-              <td>
-                <input type="text" id="quotationEditContact" class="form-control" />
-              </td>
-            </tr>
-            <tr>
-              <th style="background-color: #f8f9fa">비고</th>
-              <td colspan="3">
-                <textarea id="quotationEditRemark" class="form-control" rows="2"></textarea>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              </div>
 
-      <!-- 품목 내역 섹션 -->
-      <div id="quotationEditMaterialSection">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
-          <h5 style="margin: 0">품목 내역</h5>
-          <button type="button" class="btn btn-sm btn-primary" onclick="openMaterialSearchModalForEdit()">
-            <i class="bi bi-plus-circle"></i> 품목 추가
-          </button>
+              <div id="newMaterialSearchResults" style="display: none">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">검색 결과 (클릭하여
+                  선택)</label>
+                <div style="
+                      max-height: 200px;
+                      overflow-y: auto;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                    ">
+                  <table style="width: 100%; border-collapse: collapse">
+                    <thead style="background: #f9fafb; position: sticky; top: 0">
+                      <tr>
+                        <th style="
+                              padding: 8px;
+                              text-align: left;
+                              border-bottom: 1px solid #e5e7eb;
+                              font-size: 13px;
+                            ">
+                          품목코드
+                        </th>
+                        <th style="
+                              padding: 8px;
+                              text-align: left;
+                              border-bottom: 1px solid #e5e7eb;
+                              font-size: 13px;
+                            ">
+                          품명
+                        </th>
+                        <th style="
+                              padding: 8px;
+                              text-align: left;
+                              border-bottom: 1px solid #e5e7eb;
+                              font-size: 13px;
+                            ">
+                          규격
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="newMaterialSearchTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div id="newSelectedMaterialInfo" style="
+                    display: none;
+                    background: #f0f9ff;
+                    padding: 12px;
+                    border-radius: 8px;
+                    border: 2px solid #bfdbfe;
+                  ">
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                  <div>
+                    <div style="
+                          font-size: 12px;
+                          color: #3b82f6;
+                          font-weight: 600;
+                          margin-bottom: 4px;
+                        ">
+                      선택된 자재
+                    </div>
+                    <div style="font-weight: 600; color: #1e40af" id="newSelectedMaterialName">
+                      -
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 2px" id="newSelectedMaterialCode">
+                      -
+                    </div>
+                  </div>
+                  <button onclick="clearNewSelectedMaterial()" style="
+                        padding: 6px 12px;
+                        background: #ef4444;
+                        border: none;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        color: white;
+                      ">
+                    취소
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">수량</label>
+                <input type="number" id="newDetailQuantity" style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                    " placeholder="수량 입력" value="1" min="0" step="0.01" />
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">출고단가</label>
+                <div style="display: flex; gap: 8px">
+                  <input type="number" id="newDetailPrice" style="
+                        flex: 1;
+                        padding: 10px 12px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 8px;
+                        font-size: 14px;
+                      " placeholder="단가 입력" value="0" min="0" step="0.01" />
+                  <button onclick="showNewPriceHistory()" style="
+                        padding: 10px 16px;
+                        background: #8b5cf6;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 13px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        color: white;
+                        transition: all 0.2s;
+                        white-space: nowrap;
+                      " onmouseover="this.style.background='#7c3aed';" onmouseout="this.style.background='#8b5cf6';">
+                    이전 단가
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">금액 (자동계산)</label>
+                <input type="text" id="newDetailAmount" style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      background: #f9fafb;
+                    " readonly value="0" />
+              </div>
+            </div>
+
+            <div style="
+                  display: flex;
+                  gap: 12px;
+                  justify-content: flex-end;
+                  margin-top: 24px;
+                  padding-top: 24px;
+                  border-top: 2px solid #e5e7eb;
+                ">
+              <button onclick="closeNewQuotationMaterialModal()" style="
+                    padding: 12px 24px;
+                    background: #f3f4f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: #374151;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button onclick="confirmNewQuotationMaterialAdd()" style="
+                    padding: 12px 24px;
+                    background: #10b981;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#059669';" onmouseout="this.style.background='#10b981';">
+                추가하기
+              </button>
+            </div>
+          </div>
+        </div> -->
+
+        <!-- 견적서 작성/수정 모달 -->
+        <div id="quotationManageCreateModal" class="modal" style="display: none">
+          <div id="quotationManageCreateModalContent" class="modal-content" style="
+                max-width: 1200px;
+                max-height: 90vh;
+                overflow-y: auto;
+                padding: 32px;
+                position: relative;
+              ">
+            <!-- 헤더 -->
+            <div id="quotationManageCreateModalHeader" style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid var(--border);
+                  cursor: move;
+                  user-select: none;
+                ">
+              <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: var(--text-dark)"
+                id="quotationManageCreateModalTitle">
+                견적서 작성
+              </h2>
+              <button onclick="closeQuotationManageCreateModal()" style="
+                    background: #f0f0f0;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                  " onmouseover="this.style.background='#e0e0e0'; this.style.color='#333';"
+                onmouseout="this.style.background='#f0f0f0'; this.style.color='#666';">
+                ×
+              </button>
+            </div>
+
+            <form id="quotationManageCreateForm" onsubmit="submitQuotationManageCreate(event)">
+              <!-- 마스터 정보 섹션 -->
+              <div style="
+                    background: #f8f9fa;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin-bottom: 24px;
+                  ">
+                <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600">기본 정보</h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
+                  <!-- 견적일자 -->
+                  <div>
+                    <label style="
+                          display: block;
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                          font-size: 14px;
+                        ">견적일자 *</label>
+                    <input type="date" id="quotationManageCreateDate" required style="
+                          width: 100%;
+                          padding: 12px 16px;
+                          border: 2px solid var(--border);
+                          border-radius: 8px;
+                          font-size: 14px;
+                        " />
+                  </div>
+
+                  <!-- 출고희망일자 -->
+                  <div>
+                    <label style="
+                          display: block;
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                          font-size: 14px;
+                        ">출고희망일자</label>
+                    <input type="date" id="quotationManageCreateDeliveryDate" style="
+                          width: 100%;
+                          padding: 12px 16px;
+                          border: 2px solid var(--border);
+                          border-radius: 8px;
+                          font-size: 14px;
+                        " />
+                  </div>
+
+                  <!-- 매출처 선택 -->
+                  <div style="grid-column: 1 / -1">
+                    <label style="
+                          display: block;
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                          font-size: 14px;
+                        ">매출처 *</label>
+                    <div style="display: flex; gap: 8px">
+                      <!-- 숨겨진 매출처 코드 필드 (실제 값 저장용) -->
+                      <input type="hidden" id="quotationManageCreateCustomerCode" />
+
+                      <!-- 통합 검색 입력란 -->
+                      <input type="text" id="quotationManageCreateCustomerName" required style="
+                            flex: 1;
+                            padding: 12px 16px;
+                            border: 2px solid var(--border);
+                            border-radius: 8px;
+                            font-size: 14px;
+                          " placeholder="매출처 코드 또는 이름 입력 후 엔터"
+                        onkeypress="if(event.key === 'Enter') { event.preventDefault(); openQuotationManageCreateCustomerSearchModal(); }" />
+                      <button type="button" onclick="openQuotationManageCreateCustomerSearchModal()" style="
+                            padding: 10px 20px;
+                            background: var(--primary);
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            white-space: nowrap;
+                          ">
+                        검색
+                      </button>
+                    </div>
+                    <!-- 선택된 매출처 정보 표시 -->
+                    <div id="quotationManageCreateCustomerInfo" style="
+                          display: none;
+                          margin-top: 8px;
+                          padding: 8px 12px;
+                          background: #f0f9ff;
+                          border-radius: 6px;
+                          border: 1px solid #bfdbfe;
+                        ">
+                      <span style="font-size: 12px; color: #3b82f6; font-weight: 600">선택된 매출처:</span>
+                      <span id="quotationManageCreateCustomerDisplay"
+                        style="margin-left: 8px; font-weight: 600; color: #1e40af"></span>
+                    </div>
+                  </div>
+
+                  <!-- 제목 -->
+                  <div style="grid-column: 1 / -1">
+                    <label style="
+                          display: block;
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                          font-size: 14px;
+                        ">제목</label>
+                    <input type="text" id="quotationManageCreateTitle" style="
+                          width: 100%;
+                          padding: 12px 16px;
+                          border: 2px solid var(--border);
+                          border-radius: 8px;
+                          font-size: 14px;
+                        " placeholder="견적서 제목을 입력하세요" />
+                  </div>
+
+                  <!-- 적요 -->
+                  <div style="grid-column: 1 / -1">
+                    <label style="
+                          display: block;
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                          font-size: 14px;
+                        ">적요</label>
+                    <textarea id="quotationManageCreateRemark" style="
+                          width: 100%;
+                          padding: 12px 16px;
+                          border: 2px solid var(--border);
+                          border-radius: 8px;
+                          font-size: 14px;
+                          resize: vertical;
+                          min-height: 80px;
+                        " placeholder="비고사항을 입력하세요"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 상세내역 섹션 -->
+              <div style="margin-bottom: 24px">
+                <div style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      margin-bottom: 16px;
+                    ">
+                  <h3 style="margin: 0; font-size: 18px; font-weight: 600">견적 상세내역</h3>
+                  <button type="button" onclick="openMaterialSearchModal()" style="
+                        padding: 8px 16px;
+                        background: #007bff;
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        cursor: pointer;
+                      ">
+                    + 자재 추가
+                  </button>
+                </div>
+
+                <!-- 상세내역 테이블 -->
+                <div style="overflow-x: auto; border: 1px solid var(--border); border-radius: 8px">
+                  <table id="quotationManageCreateDetailTable" style="width: 100%; border-collapse: collapse">
+                    <thead style="background: #f8f9fa">
+                      <tr>
+                        <th style="
+                              padding: 12px;
+                              text-align: left;
+                              border-bottom: 2px solid var(--border);
+                              width: 40px;
+                            ">
+                          순번
+                        </th>
+                        <th style="
+                              padding: 12px;
+                              text-align: left;
+                              border-bottom: 2px solid var(--border);
+                            ">
+                          자재코드
+                        </th>
+                        <th style="
+                              padding: 12px;
+                              text-align: left;
+                              border-bottom: 2px solid var(--border);
+                            ">
+                          자재명
+                        </th>
+                        <th style="
+                              padding: 12px;
+                              text-align: left;
+                              border-bottom: 2px solid var(--border);
+                            ">
+                          규격
+                        </th>
+                        <th style="
+                              padding: 12px;
+                              text-align: right;
+                              border-bottom: 2px solid var(--border);
+                              width: 100px;
+                            ">
+                          수량
+                        </th>
+                        <th style="
+                              padding: 12px;
+                              text-align: right;
+                              border-bottom: 2px solid var(--border);
+                              width: 120px;
+                            ">
+                          단가
+                        </th>
+                        <th style="
+                              padding: 12px;
+                              text-align: right;
+                              border-bottom: 2px solid var(--border);
+                              width: 120px;
+                            ">
+                          공급가
+                        </th>
+                        <th style="
+                              padding: 12px;
+                              text-align: right;
+                              border-bottom: 2px solid var(--border);
+                              width: 100px;
+                            ">
+                          부가세
+                        </th>
+                        <th style="
+                              padding: 12px;
+                              text-align: center;
+                              border-bottom: 2px solid var(--border);
+                              width: 60px;
+                            ">
+                          삭제
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="quotationManageCreateDetailTableBody">
+                      <tr>
+                        <td colspan="9" style="padding: 40px; text-align: center; color: #999">
+                          자재 추가 버튼을 클릭하여 견적 상세내역을 입력하세요
+                        </td>
+                      </tr>
+                    </tbody>
+                    <tfoot style="background: #f8f9fa; font-weight: 600">
+                      <tr>
+                        <td colspan="6" style="
+                              padding: 12px;
+                              text-align: right;
+                              border-top: 2px solid var(--border);
+                            ">
+                          합계
+                        </td>
+                        <td id="totalSupplyPrice" style="
+                              padding: 12px;
+                              text-align: right;
+                              border-top: 2px solid var(--border);
+                            ">
+                          0
+                        </td>
+                        <td id="totalVat" style="
+                              padding: 12px;
+                              text-align: right;
+                              border-top: 2px solid var(--border);
+                            ">
+                          0
+                        </td>
+                        <td style="padding: 12px; border-top: 2px solid var(--border)"></td>
+                      </tr>
+                      <tr>
+                        <td colspan="6" style="padding: 12px; text-align: right">총액</td>
+                        <td colspan="2" id="grandTotal" style="
+                              padding: 12px;
+                              text-align: right;
+                              color: #007bff;
+                              font-size: 16px;
+                            ">
+                          0
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 버튼 영역 -->
+              <div style="display: flex; gap: 12px; justify-content: flex-end">
+                <button type="button" onclick="closeQuotationManageCreateModal()" style="
+                      padding: 10px 24px;
+                      background: var(--bg-light);
+                      border: 1px solid var(--border);
+                      border-radius: 8px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      cursor: pointer;
+                      color: var(--text-dark);
+                    ">
+                  취소
+                </button>
+                <button type="submit" style="
+                      padding: 10px 24px;
+                      background: var(--primary);
+                      border: none;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      cursor: pointer;
+                      color: white;
+                    ">
+                  견적서 등록
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
 
-        <table class="table table-bordered">
-          <thead>
-            <tr>
-              <th style="width: 50px">No</th>
-              <th style="width: 150px">품목코드</th>
-              <th>품목명</th>
-              <th style="width: 100px">수량</th>
-              <th style="width: 120px">단가</th>
-              <th style="width: 120px">금액</th>
-              <th style="width: 80px">삭제</th>
-            </tr>
-          </thead>
-          <tbody id="quotationEditMaterialTableBody">
-            <!-- 품목 데이터가 동적으로 추가됩니다 -->
-          </tbody>
-          <tfoot>
-            <tr>
-              <th colspan="5" style="text-align: right; background-color: #f8f9fa">합계</th>
-              <th id="quotationEditTotalAmount" style="text-align: right; background-color: #fff3cd">0</th>
-              <th></th>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+        <!-- ✅ 견적 품목 추가 모달 -->
+        <div id="quotationManageMaterialAddModal" class="modal" style="display: none">
+          <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto">
+            <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                ">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
+                품목 추가
+              </h2>
+              <button id="closeQuotationManageMaterialAddModal" style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
 
-      <!-- 버튼 영역 -->
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px">
-        <button type="button" class="btn btn-secondary" onclick="closeQuotationEditModal()">취소</button>
-        <button type="button" class="btn btn-primary" onclick="updateQuotation()">저장</button>
-      </div>
-    </div>
-  </div>
+            <div style="display: flex; flex-direction: column; gap: 16px">
+              <!-- ✅ 자재 검색 영역 -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">자재 검색</label>
+                <div style="display: flex; gap: 8px">
+                  <input type="text" id="materialSearchInput" style="
+                        flex: 1;
+                        padding: 10px 12px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 8px;
+                        font-size: 14px;
+                      " placeholder="자재명 또는 품목코드로 검색" onkeypress="if(event.key === 'Enter') searchMaterials()" />
+                  <button onclick="searchMaterials()" style="
+                        padding: 10px 20px;
+                        background: #3b82f6;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        color: white;
+                        transition: all 0.2s;
+                        white-space: nowrap;
+                      " onmouseover="this.style.background='#2563eb';" onmouseout="this.style.background='#3b82f6';">
+                    검색
+                  </button>
+                </div>
+              </div>
 
-  <!-- ❌ [중복 제거 완료] quotationMaterialAddModal은 Line 1618에 Prefix Rule 준수 버전으로 이미 정의됨 -->
+              <!-- ✅ 검색 결과 테이블 -->
+              <div id="materialSearchResults" style="display: none">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">검색 결과 (클릭하여
+                  선택)</label>
+                <div style="
+                      max-height: 200px;
+                      overflow-y: auto;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                    ">
+                  <table id="materialSearchTable" style="width: 100%; border-collapse: collapse">
+                    <thead style="background: #f9fafb; position: sticky; top: 0">
+                      <tr>
+                        <th style="
+                              padding: 8px;
+                              text-align: left;
+                              border-bottom: 1px solid #e5e7eb;
+                              font-size: 13px;
+                            ">
+                          품목코드
+                        </th>
+                        <th style="
+                              padding: 8px;
+                              text-align: left;
+                              border-bottom: 1px solid #e5e7eb;
+                              font-size: 13px;
+                            ">
+                          품명
+                        </th>
+                        <th style="
+                              padding: 8px;
+                              text-align: left;
+                              border-bottom: 1px solid #e5e7eb;
+                              font-size: 13px;
+                            ">
+                          규격
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="materialSearchTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- ✅ 선택된 자재 정보 -->
+              <div id="selectedMaterialInfo" style="
+                    display: none;
+                    background: #f0f9ff;
+                    padding: 12px;
+                    border-radius: 8px;
+                    border: 2px solid #bfdbfe;
+                  ">
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                  <div>
+                    <div style="
+                          font-size: 12px;
+                          color: #3b82f6;
+                          font-weight: 600;
+                          margin-bottom: 4px;
+                        ">
+                      선택된 자재
+                    </div>
+                    <div style="font-weight: 600; color: #1e40af" id="selectedMaterialName">
+                      -
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 2px" id="selectedMaterialCode">
+                      -
+                    </div>
+                  </div>
+                  <button onclick="clearSelectedMaterial()" style="
+                        padding: 6px 12px;
+                        background: #ef4444;
+                        border: none;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        color: white;
+                      ">
+                    취소
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">수량</label>
+                <input type="number" id="addDetailQuantity" style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                    " placeholder="수량 입력" value="1" min="0" step="0.01" oninput="calculateDetailAmount()" />
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">출고단가</label>
+                <div style="display: flex; gap: 8px">
+                  <input type="number" id="addDetailPrice" style="
+                        flex: 1;
+                        padding: 10px 12px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 8px;
+                        font-size: 14px;
+                      " placeholder="단가 입력" value="0" min="0" step="0.01" oninput="calculateDetailAmount()" />
+                  <button onclick="showPriceHistory()" style="
+                        padding: 10px 16px;
+                        background: #8b5cf6;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 13px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        color: white;
+                        transition: all 0.2s;
+                        white-space: nowrap;
+                      " onmouseover="this.style.background='#7c3aed';" onmouseout="this.style.background='#8b5cf6';">
+                    이전 단가
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">금액 (자동계산)</label>
+                <input type="text" id="addDetailAmount" style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      background: #f9fafb;
+                    " readonly value="0" />
+              </div>
+            </div>
+
+            <div style="
+                  display: flex;
+                  gap: 12px;
+                  justify-content: flex-end;
+                  margin-top: 24px;
+                  padding-top: 24px;
+                  border-top: 2px solid #e5e7eb;
+                ">
+              <button onclick="closeQuotationManageMaterialAddModal()" style="
+                    padding: 12px 24px;
+                    background: #f3f4f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: #374151;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button onclick="confirmQuotationManageMaterialAdd()" style="
+                    padding: 12px 24px;
+                    background: #10b981;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#059669';" onmouseout="this.style.background='#10b981';">
+                추가하기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 견적 품목 수정 모달 -->
+        <div id="quotationManageMaterialEditModal" class="modal" style="display: none">
+          <div class="modal-content" style="max-width: 500px">
+            <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                ">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
+                품목 수정
+              </h2>
+              <button id="closeQuotationManageMaterialEditModal" style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 16px">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px">
+                <span style="font-weight: 500; color: #6b7280">품목코드:</span>
+                <span id="editDetailCode" style="color: #1f2937; font-weight: 600">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px">
+                <span style="font-weight: 500; color: #6b7280">품명:</span>
+                <span id="editDetailName" style="color: #1f2937">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between">
+                <span style="font-weight: 500; color: #6b7280">규격:</span>
+                <span id="editDetailSpec" style="color: #1f2937">-</span>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px">
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">수량</label>
+                <input type="number" id="editDetailQuantity" style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                    " min="0" step="0.01" />
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">출고단가</label>
+                <input type="number" id="editDetailPrice" style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                    " min="0" step="0.01" />
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">금액 (자동계산)</label>
+                <input type="text" id="editDetailAmount" style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      border: 2px solid #e5e7eb;
+                      border-radius: 8px;
+                      font-size: 14px;
+                      background: #f9fafb;
+                    " readonly />
+              </div>
+            </div>
+
+            <div style="
+                  display: flex;
+                  gap: 12px;
+                  justify-content: flex-end;
+                  margin-top: 24px;
+                  padding-top: 24px;
+                  border-top: 2px solid #e5e7eb;
+                ">
+              <button onclick="closeQuotationManageMaterialEditModal()" style="
+                    padding: 12px 24px;
+                    background: #f3f4f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: #374151;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button onclick="confirmQuotationManageMaterialEdit()" style="
+                    padding: 12px 24px;
+                    background: #3b82f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#2563eb';" onmouseout="this.style.background='#3b82f6';">
+                수정하기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 견적 품목 삭제 확인 모달 -->
+        <div id="quotationManageMaterialDeleteConfirmModal" class="modal" style="display: none">
+          <div class="modal-content" style="max-width: 400px">
+            <div style="text-align: center; padding: 20px">
+              <div style="
+                    width: 64px;
+                    height: 64px;
+                    background: #fee2e2;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0 auto 20px;
+                  ">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6">
+                  </path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </div>
+
+              <h2 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #1f2937">
+                품목 삭제
+              </h2>
+              <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px">
+                이 품목을 삭제하시겠습니까?
+              </p>
+              <p id="deleteDetailInfo" style="margin: 0; color: #374151; font-weight: 600; font-size: 14px">
+                -
+              </p>
+            </div>
+
+            <div style="display: flex; gap: 12px; padding: 0 20px 20px">
+              <button onclick="closeQuotationManageMaterialDeleteConfirmModal()" style="
+                    flex: 1;
+                    padding: 12px 24px;
+                    background: #f3f4f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: #374151;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">
+                취소
+              </button>
+              <button onclick="confirmQuotationManageMaterialDelete()" style="
+                    flex: 1;
+                    padding: 12px 24px;
+                    background: #ef4444;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#dc2626';" onmouseout="this.style.background='#ef4444';">
+                삭제하기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ 출고단가 이력 모달 -->
+        <div id="priceHistoryModal" class="modal" style="display: none">
+          <div class="modal-content" style="max-width: 700px">
+            <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 24px;
+                  padding-bottom: 16px;
+                  border-top: 2px solid #e5e7eb;
+                ">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
+                출고단가 이력
+              </h2>
+              <button id="closePriceHistoryModal" style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb'; this.style.color='#1f2937';"
+                onmouseout="this.style.background='#f3f4f6'; this.style.color='#6b7280';">
+                &times;
+              </button>
+            </div>
+
+            <!-- 자재 정보 -->
+            <div style="
+                  background: #fef3c7;
+                  padding: 12px;
+                  border-radius: 8px;
+                  margin-bottom: 16px;
+                  border: 2px solid #fbbf24;
+                ">
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <div>
+                  <div style="font-size: 12px; color: #92400e; font-weight: 600; margin-bottom: 4px">
+                    선택된 자재
+                  </div>
+                  <div style="font-weight: 600; color: #78350f" id="priceHistoryMaterialName">
+                    -
+                  </div>
+                  <div style="font-size: 12px; color: #92400e; margin-top: 2px" id="priceHistoryMaterialCode">
+                    -
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ✅ 탭 메뉴 -->
+            <div style="
+                  display: flex;
+                  gap: 8px;
+                  margin-bottom: 16px;
+                  border-bottom: 2px solid #e5e7eb;
+                ">
+              <button id="tabActualPrice" onclick="switchPriceHistoryTab('actual')" style="
+                    padding: 12px 20px;
+                    background: #3b82f6;
+                    border: none;
+                    border-bottom: 3px solid #3b82f6;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    color: white;
+                    transition: all 0.2s;
+                    flex: 1;
+                  ">
+                실제 출고가
+              </button>
+              <button id="tabQuotationPrice" onclick="switchPriceHistoryTab('quotation')" style="
+                    padding: 12px 20px;
+                    background: transparent;
+                    border: none;
+                    border-bottom: 3px solid transparent;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    color: #6b7280;
+                    transition: all 0.2s;
+                    flex: 1;
+                  "
+                onmouseover="if(this.id !== 'tabActualPrice' || this.style.background === 'transparent') this.style.color='#1f2937';"
+                onmouseout="if(this.style.background === 'transparent') this.style.color='#6b7280';">
+                견적 제안가
+              </button>
+            </div>
+
+            <!-- 이력 테이블 -->
+            <div style="margin-bottom: 16px">
+              <label id="priceHistoryLabel"
+                style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">
+                이 거래처에 실제 출고한 이력 (클릭하여 단가 선택)
+              </label>
+              <div style="
+                    max-height: 300px;
+                    overflow-y: auto;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                  ">
+                <table id="priceHistoryTable" style="width: 100%; border-collapse: collapse">
+                  <thead id="priceHistoryTableHead" style="background: #f9fafb; position: sticky; top: 0">
+                    <tr>
+                      <th style="
+                            padding: 10px;
+                            text-align: left;
+                            border-bottom: 2px solid #e5e7eb;
+                            font-size: 13px;
+                          ">
+                        출고일자
+                      </th>
+                      <th style="
+                            padding: 10px;
+                            text-align: right;
+                            border-bottom: 2px solid #e5e7eb;
+                            font-size: 13px;
+                          ">
+                        출고단가
+                      </th>
+                      <th style="
+                            padding: 10px;
+                            text-align: right;
+                            border-bottom: 2px solid #e5e7eb;
+                            font-size: 13px;
+                          ">
+                        출고수량
+                      </th>
+                      <th style="
+                            padding: 10px;
+                            text-align: center;
+                            border-bottom: 2px solid #e5e7eb;
+                            font-size: 13px;
+                          ">
+                        적요
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactionPriceHistoryTableBody">
+                    <tr>
+                      <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af">
+                        이력이 없습니다
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div style="
+                  display: flex;
+                  gap: 12px;
+                  justify-content: flex-end;
+                  padding-top: 16px;
+                  border-top: 2px solid #e5e7eb;
+                ">
+              <button onclick="closePriceHistoryModal()" style="
+                    padding: 12px 24px;
+                    background: #f3f4f6;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    color: #374151;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+
 
   <!-- 매출처관리 신규등록/수정 모달 -->
   <div id="salesCustomerManageEditModal" class="modal" style="display: none; z-index: 1050">
@@ -2266,8 +3275,26 @@
           style="background: #f0f0f0; border: none; font-size: 24px; cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%">×</button>
       </div>
 
+      <!-- ✅ 검색 조건 체크박스 -->
+      <div
+        style="display: flex; gap: 16px; margin-bottom: 12px; padding: 12px; background: #f8f9fa; border-radius: 6px">
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px">
+          <input type="checkbox" id="materialSearchByCategory" checked
+            style="width: 16px; height: 16px; cursor: pointer" />
+          <span>자재분류</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px">
+          <input type="checkbox" id="materialSearchByCode" checked style="width: 16px; height: 16px; cursor: pointer" />
+          <span>세부코드</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px">
+          <input type="checkbox" id="materialSearchByName" checked style="width: 16px; height: 16px; cursor: pointer" />
+          <span>자재명</span>
+        </label>
+      </div>
+
       <div style="display: flex; gap: 10px; margin-bottom: 16px">
-        <input type="text" id="materialSearchModalInput" placeholder="품목명 또는 품목코드 검색"
+        <input type="text" id="materialSearchModalInput" placeholder="검색어 입력 (체크한 항목에서 검색)"
           onkeypress="if(event.key === 'Enter') searchMaterialsForModal()"
           style="flex: 1; padding: 10px 12px; border: 2px solid #e5e7eb; border-radius: 6px" />
         <button onclick="searchMaterialsForModal()" style="
@@ -2795,7 +3822,8 @@
               },
             },
             {
-              data: '합계금액',
+              // ✅ API에서 '견적금액'으로 반환
+              data: '견적금액',
               defaultContent: '0',
               render: (data) => formatCurrencyKRW(data || 0),
               className: 'dt-right',
@@ -3173,7 +4201,7 @@
     // ✅ exportCustomersToGoogleSheets → customer.js:342 (window.exportCustomersToGoogleSheets)
     // ✅ viewCustomer → customer.js:348 (window.viewCustomerDetail)
     // ✅ viewSupplier → supplier.js:365 (viewSupplierDetail)
-    // ✅ viewQuotation → quotation.js:624 (window.viewQuotationDetail)
+    // ✅ viewQuotation → quotation.js:624 (window.viewQuotationManageDetail)
     // ✅ viewOrder → order.js:520 (viewOrderDetail)
 
     // ==================== Google Sheets 내보내기 기능 ====================
