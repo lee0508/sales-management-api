@@ -30,6 +30,7 @@ nul
 *.md
 *.json
 *.backup
+*_backup_*
 *.txt
 # Production config (keep templates only)
 config/production.js
