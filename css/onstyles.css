@@ -747,96 +747,324 @@ body {
 
 /* ===== 페이지별 전용 버튼 클래스 (기존 스타일 상속) ===== */
 /* 매출처관리 */
-.customerBtnView { background: var(--primary); }
-.customerBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.customerBtnEdit { background: #28a745; }
-.customerBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.customerBtnDelete { background: #dc3545; }
-.customerBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.customerBtnView {
+  background: var(--primary);
+}
+.customerBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.customerBtnEdit {
+  background: #28a745;
+}
+.customerBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.customerBtnDelete {
+  background: #dc3545;
+}
+.customerBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
 
 /* 거래명세서관리 */
-.transactionBtnView { background: var(--primary); }
-.transactionBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.transactionBtnEdit { background: #28a745; }
-.transactionBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.transactionBtnDelete { background: #dc3545; }
-.transactionBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
-.transactionBtnApprove { background: #28a745; }
-.transactionBtnApprove:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.transactionBtnView {
+  background: var(--primary);
+}
+.transactionBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.transactionBtnEdit {
+  background: #28a745;
+}
+.transactionBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.transactionBtnDelete {
+  background: #dc3545;
+}
+.transactionBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
+.transactionBtnApprove {
+  background: #28a745;
+}
+.transactionBtnApprove:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
 
 /* 견적관리 */
-.quotationBtnView { background: var(--primary); }
-.quotationBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.quotationBtnEdit { background: #28a745; }
-.quotationBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.quotationBtnDelete { background: #dc3545; }
-.quotationBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
-.quotationBtnApprove { background: #28a745; }
-.quotationBtnApprove:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
+.quotationBtnView {
+  background: var(--primary);
+}
+.quotationBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.quotationBtnEdit {
+  background: #28a745;
+}
+.quotationBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.quotationBtnDelete {
+  background: #dc3545;
+}
+.quotationBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
+.quotationBtnApprove {
+  background: #28a745;
+}
+.quotationBtnApprove:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
 
 /* 매입처관리 */
-.supplierBtnView { background: var(--primary); }
-.supplierBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.supplierBtnEdit { background: #28a745; }
-.supplierBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.supplierBtnDelete { background: #dc3545; }
-.supplierBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.supplierBtnView {
+  background: var(--primary);
+}
+.supplierBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.supplierBtnEdit {
+  background: #28a745;
+}
+.supplierBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.supplierBtnDelete {
+  background: #dc3545;
+}
+.supplierBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
 
 /* 매입전표관리 */
-.purchaseBtnView { background: var(--primary); }
-.purchaseBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.purchaseBtnEdit { background: #28a745; }
-.purchaseBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.purchaseBtnDelete { background: #dc3545; }
-.purchaseBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.purchaseBtnView {
+  background: var(--primary);
+}
+.purchaseBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.purchaseBtnEdit {
+  background: #28a745;
+}
+.purchaseBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.purchaseBtnDelete {
+  background: #dc3545;
+}
+.purchaseBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
 
 /* 발주관리 */
-.orderBtnView { background: var(--primary); }
-.orderBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.orderBtnEdit { background: #28a745; }
-.orderBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.orderBtnDelete { background: #dc3545; }
-.orderBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.orderBtnView {
+  background: var(--primary);
+}
+.orderBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.orderBtnEdit {
+  background: #28a745;
+}
+.orderBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.orderBtnDelete {
+  background: #dc3545;
+}
+.orderBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
 
 /* 자재분류관리 */
-.categoryBtnView { background: var(--primary); }
-.categoryBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.categoryBtnEdit { background: #28a745; }
-.categoryBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.categoryBtnDelete { background: #dc3545; }
-.categoryBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.categoryBtnView {
+  background: var(--primary);
+}
+.categoryBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.categoryBtnEdit {
+  background: #28a745;
+}
+.categoryBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.categoryBtnDelete {
+  background: #dc3545;
+}
+.categoryBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
 
 /* 자재내역관리 */
-.historyBtnView { background: #17a2b8; color: white; padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
-.historyBtnView:hover { background: #138496; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(23, 162, 184, 0.3); }
-.historyBtnEdit { background: #ffc107; color: #333; padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
-.historyBtnEdit:hover { background: #e0a800; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(255, 193, 7, 0.3); }
-.historyBtnDelete { background: #dc3545; color: white; padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
-.historyBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.historyBtnView {
+  background: #17a2b8;
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.historyBtnView:hover {
+  background: #138496;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(23, 162, 184, 0.3);
+}
+.historyBtnEdit {
+  background: #ffc107;
+  color: #333;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.historyBtnEdit:hover {
+  background: #e0a800;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(255, 193, 7, 0.3);
+}
+.historyBtnDelete {
+  background: #dc3545;
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.historyBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
 
 /* 계정과목관리 */
-.accountBtnView { background: var(--primary); }
-.accountBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.accountBtnEdit { background: #28a745; }
-.accountBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.accountBtnDelete { background: #dc3545; }
-.accountBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.accountBtnView {
+  background: var(--primary);
+}
+.accountBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.accountBtnEdit {
+  background: #28a745;
+}
+.accountBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.accountBtnDelete {
+  background: #dc3545;
+}
+.accountBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
 
 /* 미수금관리 */
-.receivableBtnView { background: var(--primary); }
-.receivableBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.receivableBtnEdit { background: #28a745; }
-.receivableBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.receivableBtnDelete { background: #dc3545; }
-.receivableBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.receivableBtnView {
+  background: var(--primary);
+}
+.receivableBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.receivableBtnEdit {
+  background: #28a745;
+}
+.receivableBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.receivableBtnDelete {
+  background: #dc3545;
+}
+.receivableBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
 
 /* 미지급금관리 */
-.payableBtnView { background: var(--primary); }
-.payableBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.payableBtnEdit { background: #28a745; }
-.payableBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.payableBtnDelete { background: #dc3545; }
-.payableBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.payableBtnView {
+  background: var(--primary);
+}
+.payableBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.payableBtnEdit {
+  background: #28a745;
+}
+.payableBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.payableBtnDelete {
+  background: #dc3545;
+}
+.payableBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
 
 /* 버튼 클릭 효과 */
 .btn-icon:active {
@@ -1544,6 +1772,31 @@ input[type='checkbox'] {
   /* animation: fadeIn 0.3s; */
 }
 
+/* 매출처관리 상세 모달 전용 반응형 스타일 */
+#salesCustomerManageViewModalContent {
+  width: 500px;
+  max-width: 95vw;
+}
+
+/* 태블릿 (768px 이하) */
+@media (max-width: 768px) {
+  #salesCustomerManageViewModalContent {
+    width: 90vw;
+    max-width: 90vw;
+    margin: 20px auto;
+  }
+}
+
+/* 모바일 (480px 이하) */
+@media (max-width: 480px) {
+  #salesCustomerManageViewModalContent {
+    width: 95vw;
+    max-width: 95vw;
+    margin: 10px auto;
+    padding: 15px;
+  }
+}
+
 .close {
   float: right;
   font-size: 24px;
@@ -1987,9 +2240,27 @@ input[type='checkbox'] {
 }
 
 /* 계산서관리 */
-.taxinvoiceBtnView { background: var(--primary); }
-.taxinvoiceBtnView:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3); }
-.taxinvoiceBtnEdit { background: #28a745; }
-.taxinvoiceBtnEdit:hover { background: #218838; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3); }
-.taxinvoiceBtnDelete { background: #dc3545; }
-.taxinvoiceBtnDelete:hover { background: #c82333; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3); }
+.taxinvoiceBtnView {
+  background: var(--primary);
+}
+.taxinvoiceBtnView:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+.taxinvoiceBtnEdit {
+  background: #28a745;
+}
+.taxinvoiceBtnEdit:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+.taxinvoiceBtnDelete {
+  background: #dc3545;
+}
+.taxinvoiceBtnDelete:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}

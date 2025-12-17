@@ -1,13 +1,21 @@
-// ✅ 매출처관리 스크립트 (sales-customer.js)
-// ✅ Prefix 규칙 준수: salesCustomer prefix 적용, DataTable 재사용 패턴 적용
+// ✅ 매출처관리 스크립트 (customer.js)
+// ✅ Prefix 규칙 준수 (Prefix_Rule_Customer.MD, Prefix_Rule_CustomerDetail.MD 참조)
+//
+// 📌 네이밍 규칙:
+// - 페이지 전용 요소: salesCustomerManage prefix (예: salesCustomerManagePage, salesCustomerManageTable)
+// - 공용 엔티티 컴포넌트: customer prefix (예: customerSearchModal, selectCustomer)
+//
+// 📌 변경 이력:
+// - 2025-12-15: Prefix 규칙 적용 완료 (salesCustomerManage prefix로 통일)
+//
 $(document).ready(function () {
-  // ✅ Prefix 규칙: window.salesCustomerTable
-  window.salesCustomerTable = null;
+  // ✅ Prefix 규칙: window.salesCustomerManageTable (페이지 전용)
+  window.salesCustomerManageTable = null;
   let currentSalesCustomerSearchKeyword = ''; // 현재 검색 키워드 저장
   let currentSalesCustomerCode = ''; // 현재 선택된 매출처코드
   let currentSalesCustomerName = ''; // 현재 선택된 매출처명
-  // ✅ Prefix 규칙: window.salesCustomerTransactionHistoryTable
-  window.salesCustomerTransactionHistoryTable = null;
+  // ✅ Prefix 규칙: window.salesCustomerManageViewTransactionTable (페이지 전용)
+  window.salesCustomerManageViewTransactionTable = null;
 
   async function loadSalesCustomers(searchKeyword = '') {
     try {
@@ -23,15 +31,15 @@ $(document).ready(function () {
       const tableData = result.data || [];
 
       // ✅ DataTable 재사용 패턴: 없으면 생성, 있으면 데이터만 업데이트
-      if (!window.salesCustomerTable || typeof window.salesCustomerTable.clear !== 'function') {
+      if (!window.salesCustomerManageTable || typeof window.salesCustomerManageTable.clear !== 'function') {
         // ✅ DataTable 인스턴스가 손상된 경우 복구
-        if ($.fn.DataTable.isDataTable('#salesCustomerTable')) {
-          $('#salesCustomerTable').DataTable().destroy();
-          $('#salesCustomerTable').empty();
+        if ($.fn.DataTable.isDataTable('#salesCustomerManageTable')) {
+          $('#salesCustomerManageTable').DataTable().destroy();
+          $('#salesCustomerManageTable').empty();
         }
 
         // ✅ DataTable 초기화 (최초 1회만)
-        window.salesCustomerTable = $('#salesCustomerTable').DataTable({
+        window.salesCustomerManageTable = $('#salesCustomerManageTable').DataTable({
           data: [],
           columns: [
       {
@@ -150,7 +158,7 @@ $(document).ready(function () {
             }
           },
           drawCallback: function() {
-            const isSelectAllChecked = $('#salesCustomerSelectAll').prop('checked');
+            const isSelectAllChecked = $('#salesCustomerManageSelectAll').prop('checked');
 
             // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
             $('.customerRowCheck').prop('checked', isSelectAllChecked);
@@ -176,7 +184,7 @@ $(document).ready(function () {
       }
 
       // ✅ DataTable에 데이터 업데이트 (재사용 패턴)
-      window.salesCustomerTable.clear().rows.add(tableData).draw();
+      window.salesCustomerManageTable.clear().rows.add(tableData).draw();
 
     } catch (err) {
       console.error('❌ 매출처 조회 오류:', err);
@@ -184,7 +192,10 @@ $(document).ready(function () {
     }
   }
 
-  // 전역 함수로 노출 (페이지 표시될 때 showPage()에서 호출됨)
+  // ✅ 표준 함수명 (salesCustomerManage prefix)
+  window.loadSalesCustomerManagePage = loadSalesCustomers;
+
+  // ✅ 하위 호환성: 기존 함수명 유지
   window.loadSalesCustomers = loadSalesCustomers;
 
   // 새로고침 버튼 (현재 HTML에 없음 - 필요시 추가)
@@ -192,8 +203,8 @@ $(document).ready(function () {
 
   // 전체 선택 체크박스 (이벤트 네임스페이스 적용)
   $(document)
-    .off('change.customerPage', '#salesCustomerSelectAll')
-    .on('change.customerPage', '#salesCustomerSelectAll', function () {
+    .off('change.customerPage', '#salesCustomerManageSelectAll')
+    .on('change.customerPage', '#salesCustomerManageSelectAll', function () {
       const isChecked = $(this).prop('checked');
       $('.customerRowCheck').prop('checked', isChecked).trigger('change');
     });
@@ -205,7 +216,7 @@ $(document).ready(function () {
       // 전체 선택 체크박스 상태 업데이트
       const totalCheckboxes = $('.customerRowCheck').length;
       const checkedCheckboxes = $('.customerRowCheck:checked').length;
-      $('#salesCustomerSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
+      $('#salesCustomerManageSelectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
 
       // 현재 행의 버튼 표시/숨김 처리
       const customerCode = $(this).data('code');
@@ -226,49 +237,51 @@ $(document).ready(function () {
     });
 
   // Enter 키 이벤트 처리 (이벤트 네임스페이스 적용)
-  $('#salesCustomerSearchInput')
+  $('#salesCustomerManageSearchInput')
     .off('keypress.customerPage')
     .on('keypress.customerPage', function (e) {
       if (e.which === 13) { // Enter key
         e.preventDefault();
-        searchCustomers();
+        searchSalesCustomerManage();
       }
     });
 
-  // 검색 함수를 전역으로 노출
-  window.searchCustomers = function () {
-    const keyword = $('#salesCustomerSearchInput').val().trim();
+  // ✅ 표준 검색 함수 (salesCustomerManage prefix)
+  window.searchSalesCustomerManage = function () {
+    const keyword = $('#salesCustomerManageSearchInput').val().trim();
     console.log('🔍 매출처 검색:', keyword);
     currentSalesCustomerSearchKeyword = keyword;
     loadSalesCustomers(keyword);
   };
 
-  // ✅ 표준 함수명 별칭 (HTML onclick에서 사용)
-  window.searchSalesCustomers = window.searchCustomers;
+  // ✅ 하위 호환성: 기존 함수명 유지
+  window.searchCustomers = window.searchSalesCustomerManage;
+  window.searchSalesCustomers = window.searchSalesCustomerManage;
 
-  // 검색 초기화 함수를 전역으로 노출
-  window.resetCustomerSearch = function () {
+  // ✅ 표준 검색 초기화 함수 (salesCustomerManage prefix)
+  window.resetSalesCustomerManageSearch = function () {
     console.log('🔄 매출처 검색 초기화');
-    $('#salesCustomerSearchInput').val('');
+    $('#salesCustomerManageSearchInput').val('');
     currentSalesCustomerSearchKeyword = '';
     loadSalesCustomers('');
   };
 
-  // ✅ 표준 함수명 별칭
-  window.resetSalesCustomerSearch = window.resetCustomerSearch;
+  // ✅ 하위 호환성: 기존 함수명 유지
+  window.resetCustomerSearch = window.resetSalesCustomerManageSearch;
+  window.resetSalesCustomerSearch = window.resetSalesCustomerManageSearch;
 
-  // Google Sheets로 내보내기 (CSV 다운로드)
-  window.exportCustomersToGoogleSheets = function() {
+  // ✅ 표준 엑셀 내보내기 함수 (salesCustomerManage prefix)
+  window.exportSalesCustomerManageToGoogleSheets = function() {
     try {
       console.log('===== Google Sheets로 내보내기 시작 =====');
 
       // 1. DataTable에서 현재 표시된 데이터 가져오기
-      if (!window.salesCustomerTable) {
+      if (!window.salesCustomerManageTable) {
         alert('데이터 테이블이 초기화되지 않았습니다.');
         return;
       }
 
-      const dataToExport = window.salesCustomerTable.rows().data().toArray();
+      const dataToExport = window.salesCustomerManageTable.rows().data().toArray();
 
       if (dataToExport.length === 0) {
         alert('내보낼 데이터가 없습니다.');
@@ -325,8 +338,9 @@ $(document).ready(function () {
     }
   };
 
-  // ✅ 표준 함수명 별칭
-  window.exportSalesCustomersToGoogleSheets = window.exportCustomersToGoogleSheets;
+  // ✅ 하위 호환성: 기존 함수명 유지
+  window.exportCustomersToGoogleSheets = window.exportSalesCustomerManageToGoogleSheets;
+  window.exportSalesCustomersToGoogleSheets = window.exportSalesCustomerManageToGoogleSheets;
 
   // ==================== 매출처 상세보기/수정/삭제 기능 ====================
 
@@ -411,27 +425,35 @@ $(document).ready(function () {
         </div>
       `;
 
-      document.getElementById('salesCustomerViewContent').innerHTML = detailHtml;
-      document.getElementById('salesCustomerViewModal').style.display = 'flex';
+      document.getElementById('salesCustomerManageViewContent').innerHTML = detailHtml;
+      document.getElementById('salesCustomerManageViewModal').style.display = 'flex';
 
       // 모달 드래그 기능 적용
-      makeModalDraggable('salesCustomerViewModal', 'salesCustomerViewModalHeader');
+      makeModalDraggable('salesCustomerManageViewModal', 'salesCustomerManageViewModalHeader');
     } catch (error) {
       console.error('매출처 상세 조회 오류:', error);
       alert('매출처 정보를 불러오는 중 오류가 발생했습니다.');
     }
   };
 
-  // 매출처 상세보기 모달 닫기
-  window.closeCustomerViewModal = function () {
-    document.getElementById('salesCustomerViewModal').style.display = 'none';
+  // ✅ 표준 상세보기 모달 닫기 함수 (salesCustomerManage prefix)
+  window.closeSalesCustomerManageViewModal = function () {
+    const modal = document.getElementById('salesCustomerManageViewModal');
+    if (modal) {
+      modal.style.display = 'none';
+
+      // 드래그로 이동된 위치 초기화 (transform 제거)
+      const modalContent = document.getElementById('salesCustomerManageViewModalContent');
+      if (modalContent) {
+        modalContent.style.transform = '';
+      }
+    }
   };
 
-  // ✅ 표준 함수명 (salesCustomer prefix)
-  window.closeSalesCustomerViewModal = window.closeCustomerViewModal;
-
   // ✅ 하위 호환성: 기존 함수명 유지
-  window.closeCustomerDetailModal = window.closeCustomerViewModal;
+  window.closeSalesCustomerViewModal = window.closeSalesCustomerManageViewModal;
+  window.closeCustomerViewModal = window.closeSalesCustomerManageViewModal;
+  window.closeCustomerDetailModal = window.closeSalesCustomerManageViewModal;
 
   // 매출처 수정
   window.editCustomer = async function (customerCode) {
@@ -447,14 +469,14 @@ $(document).ready(function () {
       const data = result.data;
 
       // 2. 모달 열기 (신규/수정 공용 모달)
-      const modal = document.getElementById('salesCustomerEditModal');
+      const modal = document.getElementById('salesCustomerManageEditModal');
       if (!modal) {
         console.error('매출처 모달을 찾을 수 없습니다.');
         return;
       }
 
       // 3. 모달 제목 변경
-      const modalTitle = modal.querySelector('h2');
+      const modalTitle = modal.querySelector('h3');
       if (modalTitle) {
         modalTitle.textContent = '매출처 수정';
       }
@@ -479,7 +501,7 @@ $(document).ready(function () {
       document.getElementById('remark').value = data.비고란 || '';
 
       // 5. 폼에 수정 모드 표시를 위한 데이터 속성 추가
-      const form = document.getElementById('salesCustomerEditForm');
+      const form = document.getElementById('salesCustomerManageEditForm');
       form.dataset.mode = 'edit';
       form.dataset.code = customerCode;
 
@@ -487,19 +509,19 @@ $(document).ready(function () {
       modal.style.display = 'flex';
 
       // 7. 모달 드래그 기능 적용
-      makeModalDraggable('salesCustomerEditModal', 'salesCustomerEditModalHeader');
+      makeModalDraggable('salesCustomerManageEditModal', 'salesCustomerManageEditModalHeader');
     } catch (error) {
       console.error('매출처 수정 준비 오류:', error);
       alert('매출처 정보를 불러오는 중 오류가 발생했습니다.');
     }
   };
 
-  // 매출처 등록/수정 폼 제출
-  window.submitCustomer = async function (event) {
+  // ✅ 표준 폼 제출 함수 (salesCustomerManage prefix)
+  window.submitSalesCustomerManage = async function (event) {
     event.preventDefault();
 
     try {
-      const form = document.getElementById('salesCustomerEditForm');
+      const form = document.getElementById('salesCustomerManageEditForm');
       const isEditMode = form.dataset.mode === 'edit';
       const customerCode = form.dataset.code;
 
@@ -544,7 +566,7 @@ $(document).ready(function () {
 
       if (result.success) {
         alert(isEditMode ? '매출처가 수정되었습니다.' : '매출처가 등록되었습니다.');
-        closeCustomerEditModal();
+        closeSalesCustomerManageEditModal();
 
         // DataTable 새로고침
         try {
@@ -561,34 +583,34 @@ $(document).ready(function () {
     }
   };
 
-  // ✅ 표준 함수명 별칭
-  window.submitSalesCustomer = window.submitCustomer;
+  // ✅ 하위 호환성: 기존 함수명 유지
+  window.submitSalesCustomer = window.submitSalesCustomerManage;
+  window.submitCustomer = window.submitSalesCustomerManage;
 
-  // 매출처 모달 닫기 (신규/수정 공용)
-  window.closeCustomerEditModal = function () {
-    const modal = document.getElementById('salesCustomerEditModal');
+  // ✅ 표준 모달 닫기 함수 (salesCustomerManage prefix)
+  window.closeSalesCustomerManageEditModal = function () {
+    const modal = document.getElementById('salesCustomerManageEditModal');
     if (modal) {
       modal.style.display = 'none';
 
       // 폼 초기화
-      const form = document.getElementById('salesCustomerEditForm');
+      const form = document.getElementById('salesCustomerManageEditForm');
       form.reset();
       delete form.dataset.mode;
       delete form.dataset.code;
 
       // 모달 제목 복원
-      const modalTitle = modal.querySelector('h2');
+      const modalTitle = modal.querySelector('h3');
       if (modalTitle) {
         modalTitle.textContent = '매출처 신규등록';
       }
     }
   };
 
-  // ✅ 표준 함수명 (salesCustomer prefix)
-  window.closeSalesCustomerEditModal = window.closeCustomerEditModal;
-
   // ✅ 하위 호환성: 기존 함수명 유지
-  window.closeCustomerModal = window.closeCustomerEditModal;
+  window.closeSalesCustomerEditModal = window.closeSalesCustomerManageEditModal;
+  window.closeCustomerEditModal = window.closeSalesCustomerManageEditModal;
+  window.closeCustomerModal = window.closeSalesCustomerManageEditModal;
 
   // 매출처 검색 모달 닫기 (견적서 등에서 사용)
   window.closeCustomerSearchModal = function () {
@@ -690,8 +712,8 @@ $(document).ready(function () {
     }
   };
 
-  // 매출처 삭제 (모달 열기)
-  window.deleteCustomer = async function (customerCode) {
+  // ✅ 표준 매출처 삭제 모달 열기 함수 (salesCustomerManage prefix)
+  window.deleteSalesCustomerManage = async function (customerCode) {
     try {
       console.log('===== 매출처 삭제 모달 열기 =====');
       console.log('매출처코드:', customerCode);
@@ -707,7 +729,7 @@ $(document).ready(function () {
       console.log('✅ 매출처 정보 로드 성공:', customer);
 
       // 2. 삭제할 매출처 정보를 모달에 표시
-      const deleteContent = document.getElementById('customerDeleteContent');
+      const deleteContent = document.getElementById('salesCustomerManageDeleteContent');
       deleteContent.innerHTML = `
         <div style="
               background: #f8f9fa;
@@ -736,11 +758,11 @@ $(document).ready(function () {
 
       // 3. 모달에 매출처코드 저장 (삭제 시 사용)
       document
-        .getElementById('customerDeleteModal')
+        .getElementById('salesCustomerManageDeleteModal')
         .setAttribute('data-customer-code', customerCode);
 
       // 4. 모달 표시
-      document.getElementById('customerDeleteModal').style.display = 'flex';
+      document.getElementById('salesCustomerManageDeleteModal').style.display = 'flex';
       console.log('✅ 삭제 모달 표시 완료');
     } catch (error) {
       console.error('❌ 매출처 삭제 모달 열기 오류:', error);
@@ -748,19 +770,25 @@ $(document).ready(function () {
     }
   };
 
-  // 매출처 삭제 모달 닫기
-  window.closeCustomerDeleteModal = function () {
-    document.getElementById('customerDeleteModal').style.display = 'none';
-    document.getElementById('customerDeleteContent').innerHTML = '';
-    document.getElementById('customerDeleteModal').removeAttribute('data-customer-code');
+  // ✅ 하위 호환성: 기존 함수명 유지
+  window.deleteCustomer = window.deleteSalesCustomerManage;
+
+  // ✅ 표준 매출처 삭제 모달 닫기 함수 (salesCustomerManage prefix)
+  window.closeSalesCustomerManageDeleteModal = function () {
+    document.getElementById('salesCustomerManageDeleteModal').style.display = 'none';
+    document.getElementById('salesCustomerManageDeleteContent').innerHTML = '';
+    document.getElementById('salesCustomerManageDeleteModal').removeAttribute('data-customer-code');
     console.log('✅ 삭제 모달 닫기 완료');
   };
 
-  // 매출처 삭제 확인 (실제 삭제)
-  window.confirmDeleteCustomer = async function () {
+  // ✅ 하위 호환성: 기존 함수명 유지
+  window.closeCustomerDeleteModal = window.closeSalesCustomerManageDeleteModal;
+
+  // ✅ 표준 매출처 삭제 확인 함수 (salesCustomerManage prefix)
+  window.confirmSalesCustomerManageDelete = async function () {
     try {
       const customerCode = document
-        .getElementById('customerDeleteModal')
+        .getElementById('salesCustomerManageDeleteModal')
         .getAttribute('data-customer-code');
 
       if (!customerCode) {
@@ -783,14 +811,14 @@ $(document).ready(function () {
       alert('매출처가 성공적으로 삭제되었습니다.');
 
       // 3. 모달 닫기
-      closeCustomerDeleteModal();
+      closeSalesCustomerManageDeleteModal();
 
-      // 4. 목록 새로고침 (DataTable)
+      // 4. 목록 새로고침
       try {
-        $('#customerTable').DataTable().ajax.reload(null, false);
+        window.loadSalesCustomers();
         console.log('✅ 매출처 목록 새로고침 완료');
       } catch (e) {
-        console.warn('⚠️ DataTable 새로고침 실패 (수동 새로고침 필요):', e);
+        console.warn('⚠️ 목록 새로고침 실패 (수동 새로고침 필요):', e);
       }
     } catch (error) {
       console.error('❌ 매출처 삭제 오류:', error);
@@ -798,8 +826,11 @@ $(document).ready(function () {
     }
   };
 
-  // 신규 매출처 등록 모달 열기
-  window.openNewCustomerModal = async function () {
+  // ✅ 하위 호환성: 기존 함수명 유지
+  window.confirmDeleteCustomer = window.confirmSalesCustomerManageDelete;
+
+  // ✅ 표준 신규 등록 모달 열기 함수 (salesCustomerManage prefix)
+  window.openSalesCustomerManageCreateModal = async function () {
     try {
       console.log('===== 신규 매출처 등록 모달 열기 =====');
 
@@ -814,19 +845,19 @@ $(document).ready(function () {
       console.log('✅ 생성된 매출처코드:', newCustomerCode);
 
       // 2. 모달 열기
-      const modal = document.getElementById('salesCustomerEditModal');
+      const modal = document.getElementById('salesCustomerManageEditModal');
       if (!modal) {
         throw new Error('모달을 찾을 수 없습니다.');
       }
 
       // 3. 폼 초기화
-      const form = document.getElementById('salesCustomerEditForm');
+      const form = document.getElementById('salesCustomerManageEditForm');
       form.reset();
       form.removeAttribute('data-mode');
       form.removeAttribute('data-customer-code');
 
       // 4. 모달 제목 설정
-      const modalTitle = modal.querySelector('h2');
+      const modalTitle = modal.querySelector('h3');
       if (modalTitle) {
         modalTitle.textContent = '매출처 신규등록';
       }
@@ -839,7 +870,7 @@ $(document).ready(function () {
       modal.style.display = 'flex';
 
       // 7. 모달 드래그 기능 적용
-      makeModalDraggable('salesCustomerEditModal', 'salesCustomerEditModalHeader');
+      makeModalDraggable('salesCustomerManageEditModal', 'salesCustomerManageEditModalHeader');
 
       console.log('✅ 신규 등록 모달 열기 완료');
     } catch (error) {
@@ -848,8 +879,69 @@ $(document).ready(function () {
     }
   };
 
-  // ✅ 표준 함수명 별칭
-  window.openNewSalesCustomerModal = window.openNewCustomerModal;
+  // ✅ 하위 호환성: 기존 함수명 유지
+  window.openNewSalesCustomerModal = window.openSalesCustomerManageCreateModal;
+  window.openNewCustomerModal = window.openSalesCustomerManageCreateModal;
+
+  // ==================== 매출처 검색 모달 (신규 등록에서 호출) ====================
+
+  /**
+   * 신규 등록 모달에서 매출처 검색 모달 열기
+   */
+  window.openCustomerSearchFromEditModal = function() {
+    console.log('🔍 매출처 검색 모달 열기 (신규 등록에서 호출)');
+
+    // 신규등록 모달의 매출처명 입력란에서 값 가져오기
+    const customerNameInput = document.getElementById('customerName');
+    const initialSearchValue = customerNameInput ? customerNameInput.value : '';
+
+    // 매출처 검색 모달 열기 (customer.js의 공통 함수 사용)
+    if (typeof window.openCustomerSearchModal === 'function') {
+      window.openCustomerSearchModal('customer_edit', initialSearchValue);
+    } else {
+      console.error('❌ openCustomerSearchModal 함수를 찾을 수 없습니다.');
+      alert('매출처 검색 기능을 사용할 수 없습니다.');
+    }
+  };
+
+  /**
+   * 매출처 검색 모달에서 선택 시 신규 등록 폼 자동 입력
+   */
+  window.selectCustomerForEdit = function(customer) {
+    console.log('✅ 매출처 선택:', customer);
+
+    try {
+      // 매출처코드와 매출처명 설정
+      const customerCode = customer.매출처코드 || customer.customer_code || '';
+      const customerName = customer.매출처명 || customer.customer_name || '';
+
+      // 폼 필드에 데이터 채우기
+      document.getElementById('customerCode').value = customerCode;
+      document.getElementById('customerName').value = customerName;
+      document.getElementById('ceoName').value = customer.대표자명 || customer.ceo_name || '';
+      document.getElementById('businessNo').value = customer.사업자번호 || customer.business_no || '';
+      document.getElementById('phoneNo').value = customer.전화번호 || customer.phone_no || '';
+      document.getElementById('faxNo').value = customer.팩스번호 || customer.fax_no || '';
+      document.getElementById('zipCode').value = customer.우편번호 || customer.zip_code || '';
+      document.getElementById('address').value = customer.주소 || customer.address || '';
+      document.getElementById('addressDetail').value = customer.번지 || customer.address_detail || '';
+      document.getElementById('bankCode').value = customer.은행코드 || customer.bank_code || '';
+      document.getElementById('accountNo').value = customer.계좌번호 || customer.account_no || '';
+      document.getElementById('managerName').value = customer.담당자명 || customer.manager_name || '';
+      document.getElementById('status').value = customer.사용구분 !== undefined ? customer.사용구분 : (customer.status || 0);
+      document.getElementById('remark').value = customer.비고란 || customer.remark || '';
+
+      // 매출처 검색 모달 닫기
+      if (typeof window.closeCustomerSearchModal === 'function') {
+        window.closeCustomerSearchModal();
+      }
+
+      console.log('✅ 매출처 정보 자동 입력 완료');
+    } catch (error) {
+      console.error('❌ 매출처 정보 입력 오류:', error);
+      alert('매출처 정보를 입력하는 중 오류가 발생했습니다.');
+    }
+  };
 
   // ==================== 거래내역 모달 기능 ====================
 
@@ -1013,7 +1105,7 @@ window.searchCustomersForModal = async function() {
     const keyword = document.getElementById('customerSearchModalInput').value.trim();
 
     // API 호출
-    let apiUrl = API_BASE_URL + '/customers?pageSize=100';
+    let apiUrl = API_BASE_URL + '/customers?pageSize=1000';
     if (keyword) {
       apiUrl += `&search=${encodeURIComponent(keyword)}`;
     }
@@ -1022,47 +1114,73 @@ window.searchCustomersForModal = async function() {
     const result = await response.json();
     const customers = result.data || [];
 
-    // 검색 결과 렌더링
-    const tbody = document.getElementById('customerSearchTableBody');
-    tbody.innerHTML = '';
+    // DataTable 재사용 패턴
+    if (!window.customerSearchTable || typeof window.customerSearchTable.clear !== 'function') {
+      // DataTable 인스턴스가 없거나 손상된 경우 재생성
+      if ($.fn.DataTable.isDataTable('#customerSearchTable')) {
+        $('#customerSearchTable').DataTable().destroy();
+      }
 
-    if (customers.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="4" style="padding: 40px; text-align: center; color: #999">
-            검색 결과가 없습니다
-          </td>
-        </tr>
-      `;
-      return;
+      // DataTable 초기화
+      window.customerSearchTable = $('#customerSearchTable').DataTable({
+        data: [],
+        columns: [
+          {
+            data: '매출처코드',
+            title: '코드',
+            width: '150px'
+          },
+          {
+            data: '매출처명',
+            title: '매출처명',
+            width: '400px'
+          },
+          {
+            data: '전화번호',
+            title: '전화번호',
+            defaultContent: '-',
+            width: '200px'
+          },
+          {
+            data: null,
+            title: '선택',
+            orderable: false,
+            className: 'text-center',
+            width: '120px',
+            render: function(data, type, row) {
+              return `<button onclick='selectCustomerFromModal(${JSON.stringify(row).replace(/'/g, "&#39;")})'
+                        class="btn-icon btn-view" style="padding: 6px 12px; font-size: 13px;">
+                      선택
+                    </button>`;
+            }
+          }
+        ],
+        language: {
+          lengthMenu: '페이지당 _MENU_ 개씩 보기',
+          zeroRecords: '검색 결과가 없습니다',
+          info: '전체 _TOTAL_개 중 _START_ - _END_',
+          infoEmpty: '데이터 없음',
+          infoFiltered: '(전체 _MAX_개 중 검색결과)',
+          search: '검색:',
+          paginate: {
+            first: '처음',
+            last: '마지막',
+            next: '다음',
+            previous: '이전',
+          },
+        },
+        order: [[1, 'asc']], // 매출처명 오름차순
+        pageLength: 10,
+        lengthMenu: [10, 25, 50, 100],
+        responsive: false,
+        autoWidth: false,
+        scrollCollapse: false,
+      });
     }
 
-    customers.forEach(customer => {
-      const row = document.createElement('tr');
-      row.style.cursor = 'pointer';
-      row.style.transition = 'background-color 0.2s';
-      row.onmouseenter = function() { this.style.backgroundColor = '#f8f9fa'; };
-      row.onmouseleave = function() { this.style.backgroundColor = ''; };
+    // DataTable에 데이터 업데이트
+    window.customerSearchTable.clear().rows.add(customers).draw();
 
-      // API 필드명 사용 (매출처코드, 매출처명, 전화번호)
-      const code = customer.매출처코드 || '';
-      const name = customer.매출처명 || '';
-      const phone = customer.전화번호 || '';
-
-      row.innerHTML = `
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb">${code}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb">${name}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb">${phone}</td>
-        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e5e7eb">
-          <button onclick="selectCustomerFromModal('${code}', '${name}')"
-                  style="padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer">
-            선택
-          </button>
-        </td>
-      `;
-
-      tbody.appendChild(row);
-    });
   } catch (error) {
     console.error('매출처 검색 오류:', error);
     alert('매출처 검색 중 오류가 발생했습니다.');
@@ -1071,40 +1189,58 @@ window.searchCustomersForModal = async function() {
 
 /**
  * 매출처 선택 함수 (공용)
- * @param {string} code - 매출처 코드
- * @param {string} name - 매출처명
+ * @param {Object|string} customerOrCode - 매출처 객체 또는 매출처 코드
+ * @param {string} name - 매출처명 (코드로 호출 시)
  * @description 매출처 검색 모달에서 매출처 선택 시 호출되는 공용 함수
  */
-window.selectCustomerFromModal = function(code, name) {
+window.selectCustomerFromModal = function(customerOrCode, name) {
   // 호출한 모듈에 따라 다른 처리 (callerContext 활용 가능)
   // 현재는 간단하게 window.currentCallerContext로 판단
 
-  if (window.currentCustomerSearchCaller === 'editForm') {
-    // 매출처 편집 폼에서 호출한 경우
+  // 객체로 전달된 경우와 개별 파라미터로 전달된 경우 모두 지원
+  let customer, code, customerName;
+
+  if (typeof customerOrCode === 'object' && customerOrCode !== null) {
+    // 객체로 전달된 경우
+    customer = customerOrCode;
+    code = customer.매출처코드 || customer.customer_code || '';
+    customerName = customer.매출처명 || customer.customer_name || '';
+  } else {
+    // 개별 파라미터로 전달된 경우 (하위 호환성)
+    code = customerOrCode;
+    customerName = name;
+    customer = { 매출처코드: code, 매출처명: customerName };
+  }
+
+  if (window.currentCustomerSearchCaller === 'customer_edit') {
+    // 매출처 신규 등록 폼에서 호출한 경우
+    if (typeof window.selectCustomerForEdit === 'function') {
+      window.selectCustomerForEdit(customer);
+    }
+  } else if (window.currentCustomerSearchCaller === 'editForm') {
+    // 매출처 편집 폼에서 호출한 경우 (하위 호환)
     if (typeof window.selectCustomerForEditForm === 'function') {
-      window.selectCustomerForEditForm(code, name);
+      window.selectCustomerForEditForm(code, customerName);
     }
   } else if (window.currentCustomerSearchCaller === 'quotation') {
     // 견적관리에서 호출한 경우
     if (typeof window.selectQuotationCustomer === 'function') {
-      window.selectQuotationCustomer(code, name);
+      window.selectQuotationCustomer(code, customerName);
     }
   } else if (window.currentCustomerSearchCaller === 'transaction') {
     // 거래명세서에서 호출한 경우
     if (typeof window.selectTransactionCustomer === 'function') {
-      window.selectTransactionCustomer(code, name);
+      window.selectTransactionCustomer(code, customerName);
     }
   } else if (window.currentCustomerSearchCaller === 'taxinvoice') {
     // 세금계산서에서 호출한 경우
     if (typeof window.selectTaxInvoiceCustomer === 'function') {
-      window.selectTaxInvoiceCustomer(code, name);
+      window.selectTaxInvoiceCustomer(code, customerName);
     }
   }
 
-  // 모달 닫기 (editForm의 경우 selectCustomerForEditForm 내부에서 처리하므로 중복 호출 방지)
-  if (window.currentCustomerSearchCaller !== 'editForm') {
-    window.closeCustomerSearchModal();
-  }
+  // 모달 닫기는 각 선택 함수 내부에서 처리하지 않으므로 여기서 처리
+  // (customer_edit의 경우 selectCustomerForEdit 내부에서 처리)
 };
 
 /**
@@ -1118,13 +1254,46 @@ window.openCustomerSearchModal = function(callerContext, initialSearchValue) {
   const modal = document.getElementById('customerSearchModal') ||
                 document.getElementById('quotationCustomerSearchModal');
   if (modal) {
+    // ✅ Prefix_Rule_Customer2.MD: 모달 위치 보장
     modal.style.display = 'block';
+    modal.style.position = 'fixed';
+
+    // ✅ modal-content에 드래그를 위한 positioning 설정
+    const modalContent = document.getElementById('customerSearchModalContent');
+    if (modalContent) {
+      modalContent.style.position = 'absolute';
+      modalContent.style.top = '50%';
+      modalContent.style.left = '50%';
+      modalContent.style.transform = 'translate(-50%, -50%)';
+      modalContent.style.margin = '0';
+    }
+
+    // ✅ 드래그 기능 활성화
+    if (typeof window.makeModalDraggable === 'function') {
+      window.makeModalDraggable('customerSearchModalContent', 'customerSearchModalHeader');
+    }
+
+    // ✅ DataTable 칼럼 너비 안정화 (모달 표시 후 조정)
+    setTimeout(() => {
+      if (window.customerSearchTable && typeof window.customerSearchTable.columns === 'object') {
+        window.customerSearchTable.columns.adjust().draw(false);
+      }
+    }, 50);
+
     // 입력 필드 설정
     const input = document.getElementById('customerSearchModalInput');
     if (input) {
       // 초기 검색어가 제공되면 설정, 아니면 빈 값
       input.value = initialSearchValue || '';
       input.focus();
+
+      // 초기 검색어가 있으면 자동으로 검색 실행
+      if (initialSearchValue && typeof window.searchCustomersForModal === 'function') {
+        // 모달이 표시된 후 검색 실행 (약간의 딜레이)
+        setTimeout(() => {
+          window.searchCustomersForModal();
+        }, 100);
+      }
     }
   }
 };
@@ -1145,20 +1314,25 @@ window.closeCustomerSearchModal = function() {
 // ========================================
 // 하위 호환성 레이어 (Backward Compatibility Layer)
 // ========================================
-// 다른 파일(quotation.js, taxinvoice.js 등)에서 기존 customer 이름으로 접근할 수 있도록 별칭 설정
+// 다른 파일(quotation.js, taxinvoice.js 등)에서 기존 이름으로 접근할 수 있도록 별칭 설정
 
-// DataTable 변수
-window.customerTable = window.salesCustomerTable;
-window.customerTransactionHistoryTable = window.salesCustomerTransactionHistoryTable;
+// ✅ DataTable 변수 (표준 → 레거시 별칭)
+window.salesCustomerTable = window.salesCustomerManageTable;
+window.customerTable = window.salesCustomerManageTable;
+window.salesCustomerTransactionHistoryTable = window.salesCustomerManageViewTransactionTable;
+window.customerTransactionHistoryTable = window.salesCustomerManageViewTransactionTable;
 
-// 함수 별칭 (레거시 호환 - 이미 정의된 함수들의 별칭만 추가)
-// 위에서 정의된 실제 함수들:
-// - window.searchCustomers, window.resetCustomerSearch (이미 정의됨)
-// - window.loadSalesCustomers, window.searchSalesCustomers (별칭 추가됨)
-// - window.resetSalesCustomerSearch, window.submitSalesCustomer (별칭 추가됨)
-// - window.openNewSalesCustomerModal (별칭 추가됨)
+// ✅ 페이지 함수 별칭 (이미 위에서 정의됨)
+// - loadSalesCustomerManagePage → loadSalesCustomers, loadCustomers
+// - searchSalesCustomerManage → searchSalesCustomers, searchCustomers
+// - resetSalesCustomerManageSearch → resetSalesCustomerSearch, resetCustomerSearch
+// - exportSalesCustomerManageToGoogleSheets → exportSalesCustomersToGoogleSheets, exportCustomersToGoogleSheets
+// - closeSalesCustomerManageViewModal → closeSalesCustomerViewModal, closeCustomerViewModal, closeCustomerDetailModal
+// - closeSalesCustomerManageEditModal → closeSalesCustomerEditModal, closeCustomerEditModal, closeCustomerModal
+// - submitSalesCustomerManage → submitSalesCustomer, submitCustomer
+// - openSalesCustomerManageCreateModal → openNewSalesCustomerModal, openNewCustomerModal
 
-// 레거시 이름으로도 접근 가능하도록 유지 (이미 정의된 함수 사용)
+// 레거시 이름으로도 접근 가능하도록 유지
 if (!window.loadCustomers) {
   window.loadCustomers = window.loadSalesCustomers;
 }
