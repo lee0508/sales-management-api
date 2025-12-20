@@ -1128,25 +1128,37 @@ window.searchCustomersForModal = async function() {
           {
             data: '매출처코드',
             title: '코드',
-            width: '150px'
+            width: '120px'
           },
           {
             data: '매출처명',
             title: '매출처명',
-            width: '400px'
+            width: '250px'
+          },
+          {
+            data: '대표자명',
+            title: '대표자명',
+            defaultContent: '-',
+            width: '150px'
+          },
+          {
+            data: '사업자번호',
+            title: '사업자번호',
+            defaultContent: '-',
+            width: '150px'
           },
           {
             data: '전화번호',
             title: '전화번호',
             defaultContent: '-',
-            width: '200px'
+            width: '150px'
           },
           {
             data: null,
             title: '선택',
             orderable: false,
             className: 'text-center',
-            width: '120px',
+            width: '100px',
             render: function(data, type, row) {
               return `<button onclick='selectCustomerFromModal(${JSON.stringify(row).replace(/'/g, "&#39;")})'
                         class="btn-icon btn-view" style="padding: 6px 12px; font-size: 13px;">

@@ -119,9 +119,16 @@ function selectTransactionPriceFromHistory(price) {
     return;
   }
 
+  // 자재코드에서 분류코드(2자리)만 제거, 세부코드 표시
+  const 세부코드 =
+    tempTransactionMaterial.자재코드.length > 2
+      ? tempTransactionMaterial.자재코드.substring(2)
+      : tempTransactionMaterial.자재코드;
+
   // 상세내역 추가
   newTransactionDetails.push({
     자재코드: tempTransactionMaterial.자재코드,
+    세부코드: 세부코드,
     자재명: tempTransactionMaterial.자재명,
     규격: tempTransactionMaterial.규격,
     수량: parseFloat(수량),
