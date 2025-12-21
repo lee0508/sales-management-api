@@ -32,7 +32,7 @@ async function loadPurchaseStatements() {
   // ✅ 다른 페이지의 체크박스 이벤트 핸들러 제거
   $(document).off('change.quotationPage');
   $(document).off('change.orderPage');
-  $(document).off('change.transactionPage');
+  $(document).off('change.transactionManagePage');
   try {
     const startDate = document.getElementById('purchaseStatementStartDate').value;
     const endDate = document.getElementById('purchaseStatementEndDate').value;

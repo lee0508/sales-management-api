@@ -62,7 +62,7 @@ async function loadOrderList() {
 
   // ✅ 다른 페이지의 이벤트 핸들러 제거 (네임스페이스 패턴)
   $(document).off('change.quotationPage');
-  $(document).off('change.transactionPage');
+  $(document).off('change.transactionManagePage');
   $(document).off('change.purchasePage');
 
   // ✅ 발주관리 페이지 이벤트 핸들러 초기화 (중복 등록 방지)

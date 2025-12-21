@@ -559,9 +559,9 @@
           </table>
         </div>
 
-        <!-- 거래명세서관리 섹션 transactionManage-->
+        <!-- 거래명세서관리 섹션 transactionManagePage-->
         <!-- 거래명세서관리 메뉴 페이지 -->
-        <div class="page-content hidden" id="transactionPage">
+        <div class="page-content hidden" id="transactionManagePage">
           <h2 style="display: none">거래명세서관리</h2>
 
           <!-- 🔹 상단 툴바 -->
@@ -581,7 +581,7 @@
             </div>
 
             <div class="toolbar-right">
-              <button id="transactionBtnNew" class="btn btn-success" onclick="openNewTransactionModal()" style="
+              <button id="transactionBtnNew" class="btn btn-success" onclick="openTransactionCreateModal()" style="
                     padding: 10px 20px;
                     background: #28a745;
                     color: white;
@@ -636,11 +636,11 @@
 
         <!-- ✅ 거래명세서 상세보기 모달 -->
         <!-- ✅ 거래명세서 상세보기 모달 (Prefix 규칙: transactionViewModal) -->
-        <div id="transactionViewModal" class="modal hidden">
+        <div id="openTransactionViewModal" class="modal hidden">
           <div class="modal-content large"
             style="max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column; position: relative; overflow: hidden;">
             <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) - 고정 -->
-            <div id="transactionViewModalHeader" style="
+            <div id="openTransactionViewModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -673,9 +673,9 @@
             </div>
 
             <!-- ✅ 스크롤 가능한 본문 영역 -->
-            <div style="flex: 1; overflow-y: auto; padding: 24px 32px;">
+            <div id="openTransactionViewModalInfo" style="flex: 1; overflow-y: auto; padding: 24px 32px;">
               <!-- ✅ 거래명세서 기본 정보 (카드 스타일) -->
-              <div style="
+              <div id="openTransactionViewModalBasicInfo" style="
                   background: #f9fafb;
                   padding: 20px;
                   border-radius: 12px;
@@ -705,24 +705,24 @@
                 </div>
               </div>
 
-              <!-- ✅ 거래명세서 상세 목록 -->
-              <div style="
+              <!-- ✅ 거래명세서 상세내역 목록 -->
+              <div id="openTransactionViewModalDetailInfo" style="
                   background: #f9fafb;
                   padding: 20px;
                   border-radius: 12px;
                   border: 1px solid #e5e7eb;
                 ">
                 <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #374151">
-                  거래 품목 내역
+                  거래명세서 상세내역
                 </h3>
                 <table id="transactionViewDetailTable" class="display" style="width: 100%">
                   <thead>
                     <tr>
                       <th style="
                               padding: 12px;
-                              text-align: left;
+                              text-align: center;
                               border-bottom: 2px solid var(--border);
-                              width: 54px;
+                              width: 70px;
                             ">순번</th>
                       <th>품목코드</th>
                       <th>품명</th>
@@ -793,12 +793,12 @@
           </div>
         </div>
 
-        <!-- ✅ 거래명세서 수정버튼 모달창 -->
-        <div id="transactionEditModal" class="modal" style="display: none">
-          <div id="transactionEditModalContent" class="modal-content large"
+        <!-- ✅ 거래명세서 수정버튼 모달 -->
+        <div id="openTransactionEditModal" class="modal" style="display: none">
+          <div id="openTransactionEditModalContent" class="modal-content large"
             style="max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column; position: relative; overflow: hidden;">
             <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) - 고정 -->
-            <div id="transactionEditModalHeader" style="
+            <div id="openTransactionEditModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -861,7 +861,8 @@
                 </div>
               </div>
 
-              <!-- ✅ 거래명세서 수정 모달창 자재 목록 -->
+              <!-- ✅ 거래명세서 페이지 데이타테이블에서 개별 데이타 대한 수정버튼에 대한 모달 -->
+              <!-- 거래명세서 상세내역에 대한 품목추가 -->
               <div id="transactionEditModalDetailMaterial">
                 <div style="
                     display: flex;
@@ -870,7 +871,7 @@
                     margin-bottom: 16px;
                   ">
                   <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #374151">
-                    거래 품목 내역
+                    거래명세서 상세내역
                   </h3>
                   <div style="display: flex; gap: 8px">
                     <button type="button" onclick="addTransactionDetailRow()" style="
@@ -960,7 +961,7 @@
         </div>
 
         <!-- ✅ 거래명세서 수정 - 품목 추가 모달 (Prefix 규칙: transactionItemCreateModal) -->
-        <!-- 거래명세서 수정 모달에서 거래상세내역 추가 모달 -->
+        <!-- 거래명세서관리 페이지에서 데이타테이블에 있는 수정버튼 클릭시 표시하는 모달에서 자재 추가버튼에 대한 모달 -->
         <div id="transactionItemCreateModal" class="modal" style="display: none">
           <div class="modal-content" style="max-width: 600px">
             <div id="transactionItemCreateModalHeader" style="
@@ -972,7 +973,7 @@
                   border-bottom: 2px solid #e5e7eb;
                 ">
               <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
-                거래 상세내역 입력
+                거래 상세내역 입력(수정버튼시)
               </h2>
               <button id="transactionItemCreateModalCloseBtn" onclick="closeTransactionItemCreateModal()" style="
                     width: 36px;
@@ -1197,6 +1198,7 @@
         </div>
 
         <!-- ✅ 거래명세서 수정 - 품목 수정 모달 (Prefix 규칙: transactionItemEditModal) -->
+        <!-- 거래명세서 상세내역 수정  -->
         <div id="transactionItemEditModal" class="modal" style="display: none">
           <div class="modal-content" style="max-width: 500px">
             <div id="transactionItemEditModalHeader" style="
@@ -1367,7 +1369,7 @@
             </div>
 
             <div style="display: flex; gap: 12px">
-              <button onclick="closeTransactionDetailDeleteModal()" style="
+              <button onclick="closeTransactionItemDeleteModal()" style="
                     flex: 1;
                     padding: 12px 24px;
                     background: #f3f4f6;
@@ -1481,12 +1483,12 @@
           </div>
         </div>
 
-        <!-- ✅ 거래명세서 작성 모달 -->
-        <div id="transactionCreateModal" class="modal" style="display: none">
-          <div id="transactionCreateModalContent" class="modal-content large"
+        <!-- ✅ 거래명세서 작성 버튼에 해당하는 모달 -->
+        <div id="openTransactionCreateModal" class="modal" style="display: none">
+          <div id="openTransactionCreateModalContent" class="modal-content large"
             style="max-width: 1000px; max-height: 90vh; display: flex; flex-direction: column; position: relative; overflow: hidden;">
             <!-- ✅ 헤더 영역 (제목 + 닫기 버튼) - 고정 -->
-            <div id="transactionCreateModalHeader" style="
+            <div id="openTransactionCreateModalHeader" style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
@@ -1519,7 +1521,7 @@
             </div>
 
             <!-- ✅ 스크롤 가능한 본문 영역 -->
-            <div style="flex: 1; overflow-y: auto; padding: 24px 32px;">
+            <div id="openTransactionCreateModalBasicInfo" style="flex: 1; overflow-y: auto; padding: 24px 32px;">
               <form id="transactionCreateForm" onsubmit="submitTransactionCreate(event)">
                 <!-- 기본 정보 섹션 -->
                 <div style="
@@ -1593,6 +1595,7 @@
                         </button>
                       </div>
                       <!-- 선택된 매출처 정보 표시 -->
+                      <!-- 견적관리에서도 해당 매출처 검색 모달을 사용해야 합니다. -->
                       <div id="transactionSelectedCustomerDisplay" style="
                           display: none;
                           margin-top: 8px;
@@ -1645,8 +1648,8 @@
                   </div>
                 </div>
 
-                <!-- 상세내역 섹션 -->
-                <div style="margin-bottom: 24px">
+                <!-- 거래명세서 상세내역 섹션 -->
+                <div id="openTransactionCreateModalDetailInfo" style="margin-bottom: 24px">
                   <div style="
                       display: flex;
                       justify-content: space-between;
@@ -1654,7 +1657,7 @@
                       margin-bottom: 16px;
                     ">
                     <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #374151">
-                      거래 품목 내역
+                      거래명세서 상세내역
                     </h3>
                     <button type="button" onclick="openNewTransactionDetailAddModal()" style="
                         padding: 8px 16px;
@@ -1853,7 +1856,7 @@
                   cursor: move;
                 ">
               <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937">
-                거래 상세내역 추가
+                거래 상세내역 추가(newTransactionDetailAddModal)
               </h2>
               <button onclick="closeNewTransactionDetailAddModal()" style="
                     width: 36px;
@@ -2736,7 +2739,7 @@
         </div>
 
         <!-- ✅ 거래명세서 삭제 확인 모달 -->
-        <div id="transactionDeleteModal" class="modal" style="display: none">
+        <!-- <div id="transactionDeleteModal" class="modal" style="display: none">
           <div class="modal-content" style="max-width: 400px">
             <h3 style="margin-bottom: 16px">거래명세서 삭제</h3>
             <p id="transactionDeleteTransactionInfo" style="margin-bottom: 20px"></p>
@@ -2747,7 +2750,7 @@
               <button onclick="confirmTransactionDelete()" class="btn btn-danger">삭제</button>
             </div>
           </div>
-        </div>
+        </div> -->
 
         <!-- ✅ 메인 스크립트 (페이지 라우팅 및 이벤트 핸들러) -->
         <script>
@@ -2774,7 +2777,7 @@
               },
             },
             transaction: {
-              element: 'transactionPage',
+              element: 'transactionManagePage',
               title: '거래명세서관리',
               menu: 'sales',
               loadFunc: () => {

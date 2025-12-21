@@ -162,7 +162,7 @@ $(document).ready(function () {
   async function loadQuotations() {
     // ✅ 다른 페이지의 체크박스 이벤트 핸들러 제거
     $(document).off('change.orderPage');
-    $(document).off('change.transactionPage');
+    $(document).off('change.transactionManagePage');
     $(document).off('change.purchasePage');
 
     // 페이지가 표시될 때마다 날짜를 오늘 날짜(로그인 날짜)로 초기화
