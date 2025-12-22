@@ -3478,21 +3478,27 @@ app.get('/api/materials', async (req, res) => {
     if (searchCategory || searchCode || searchName || searchSpec) {
       const searchConditions = [];
 
-      if (searchCategory) {
-        request.input('searchCategory', sql.NVarChar, `%${searchCategory}%`);
-        searchConditions.push('m.분류코드 LIKE @searchCategory');
-      }
-      if (searchCode) {
-        request.input('searchCode', sql.NVarChar, `%${searchCode}%`);
-        searchConditions.push('(m.분류코드+m.세부코드) LIKE @searchCode');
-      }
-      if (searchName) {
-        request.input('searchName', sql.NVarChar, `%${searchName}%`);
-        searchConditions.push('m.자재명 LIKE @searchName');
-      }
-      if (searchSpec) {
-        request.input('searchSpec', sql.NVarChar, `%${searchSpec}%`);
-        searchConditions.push('m.규격 LIKE @searchSpec');
+      // searchCode와 searchName이 같은 값이면 OR로 연결 (코드 또는 자재명 검색)
+      if (searchCode && searchName && searchCode === searchName) {
+        request.input('searchKeyword', sql.NVarChar, `%${searchCode}%`);
+        searchConditions.push('((m.분류코드+m.세부코드) LIKE @searchKeyword OR m.세부코드 LIKE @searchKeyword OR m.자재명 LIKE @searchKeyword)');
+      } else {
+        if (searchCategory) {
+          request.input('searchCategory', sql.NVarChar, `%${searchCategory}%`);
+          searchConditions.push('m.분류코드 LIKE @searchCategory');
+        }
+        if (searchCode) {
+          request.input('searchCode', sql.NVarChar, `%${searchCode}%`);
+          searchConditions.push('(m.분류코드+m.세부코드) LIKE @searchCode');
+        }
+        if (searchName) {
+          request.input('searchName', sql.NVarChar, `%${searchName}%`);
+          searchConditions.push('m.자재명 LIKE @searchName');
+        }
+        if (searchSpec) {
+          request.input('searchSpec', sql.NVarChar, `%${searchSpec}%`);
+          searchConditions.push('m.규격 LIKE @searchSpec');
+        }
       }
 
       query += ` AND (${searchConditions.join(' AND ')})`;
@@ -4939,11 +4945,12 @@ app.get('/api/transactions', async (req, res) => {
         (SUM(ISNULL(t.출고수량,0) * ISNULL(t.출고단가,0)) + SUM(ISNULL(t.출고부가,0))) AS 합계금액,
         (ISNULL(t.거래일자,'') + '-' + CAST(t.거래번호 AS VARCHAR(10))) AS 명세서번호,
         MAX(t.적요) AS 적요,
-        MAX(u.사용자명) AS 작성자
+        MAX(u.사용자명) AS 작성자,
+        MAX(t.사용구분) AS 사용구분
       FROM 자재입출내역 t
       LEFT JOIN 매출처 c ON t.매출처코드 = c.매출처코드
       LEFT JOIN 사용자 u ON t.사용자코드 = u.사용자코드
-      WHERE t.사용구분 = 0
+      WHERE t.사용구분 IN (0, 9)
         AND t.입출고구분 = 2
     `;
 

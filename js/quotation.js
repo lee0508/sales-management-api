@@ -278,9 +278,9 @@ $(document).ready(function () {
         {
           data: null,
           render: function (data, type, row) {
-            // 사용구분이 9이면 "삭제" 표시
+            // 사용구분이 9이면 "삭제됨" 표시 (이탤릭 + 취소선)
             if (row.사용구분 === 9) {
-              return `<span class="status-badge" style="background: #dc2626; color: white;">삭제</span>`;
+              return `<span style="font-style: italic; text-decoration: line-through; color: #dc2626;">삭제됨</span>`;
             }
 
             // 상태코드에 따른 표시
@@ -1088,7 +1088,7 @@ async function showPriceHistory() {
     await loadActualPriceHistory();
 
     // 모달 표시
-    document.getElementById('priceHistoryModal').style.display = 'block';
+    document.getElementById('quotationManagePriceHistoryModal').style.display = 'block';
   } catch (err) {
     console.error('❌ 단가 이력 조회 오류:', err);
     alert('단가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
@@ -2765,7 +2765,7 @@ async function showPriceHistoryForNewQuotation(material) {
     await loadActualPriceHistoryForNewQuotation(material.자재코드, 매출처코드);
 
     // 모달 표시
-    document.getElementById('priceHistoryModal').style.display = 'block';
+    document.getElementById('quotationManagePriceHistoryModal').style.display = 'block';
   } catch (err) {
     console.error('❌ 단가 이력 조회 오류:', err);
     alert('단가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
@@ -3337,7 +3337,7 @@ $(document).ready(function () {
 // 신규 견적서 단가 이력 조회
 // ========================================
 
-// ✅ 신규 견적서 단가 이력 모달 열기 (기존 priceHistoryModal 재사용)
+// ✅ 신규 견적서 단가 이력 모달 열기 (기존 quotationManagePriceHistoryModal 재사용)
 async function showNewPriceHistory() {
   try {
     // 자재가 선택되었는지 확인
@@ -3357,9 +3357,9 @@ async function showNewPriceHistory() {
     isNewQuotationMode = true;
 
     // 단가 이력 모달의 z-index를 더 높게 설정 (신규 견적서 모달 위에 표시)
-    const priceHistoryModal = document.getElementById('priceHistoryModal');
-    if (priceHistoryModal) {
-      priceHistoryModal.style.zIndex = '10000';
+    const quotationManagePriceHistoryModal = document.getElementById('quotationManagePriceHistoryModal');
+    if (quotationManagePriceHistoryModal) {
+      quotationManagePriceHistoryModal.style.zIndex = '10000';
     }
 
     // 기존 showPriceHistory 함수 호출 (공통 모달 사용)

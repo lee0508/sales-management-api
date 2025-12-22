@@ -1763,6 +1763,11 @@ input[type='checkbox'] {
   z-index: 10000 !important;
 }
 
+/* 거래명세서 작성/수정 시 사용되는 자재 추가 모달 (높은 z-index) */
+#transactionItemCreateModal {
+  z-index: 9999 !important;
+}
+
 .modal-content {
   background: #fff;
   margin: 5% auto;
