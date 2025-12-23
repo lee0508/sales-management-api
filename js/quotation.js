@@ -1354,8 +1354,12 @@ async function loadQuotationPriceHistory() {
 
 // ✅ 자재 추가 모달 열기
 function openQuotationManageDetailAddModal() {
+  console.log('===== 견적 상세내역 입력 모달 열기 =====');
+  console.log('모달 ID: quotationManageDetailAddModal');
+
   // 모달 초기화
   selectedMaterialForAdd = null;
+  console.log('✅ 선택된 자재 초기화');
 
   // 자재 검색 필드 초기화
   const categoryInput = document.getElementById('addDetailMaterialSearchCategory');
@@ -1364,6 +1368,7 @@ function openQuotationManageDetailAddModal() {
   if (categoryInput) categoryInput.value = '';
   if (codeInput) codeInput.value = '';
   if (nameInput) nameInput.value = '';
+  console.log('✅ 자재 검색 필드 초기화 완료');
 
   // 수량/단가/금액 필드 초기화
   const quantityInput = document.getElementById('addDetailQuantity');
@@ -1372,21 +1377,26 @@ function openQuotationManageDetailAddModal() {
   if (quantityInput) quantityInput.value = '1';
   if (priceInput) priceInput.value = '0';
   if (amountInput) amountInput.value = '0';
+  console.log('✅ 수량/단가/금액 필드 초기화 완료');
 
   // 검색 결과 및 선택 정보 숨기기
   const searchResults = document.getElementById('addDetailMaterialSearchResults');
   const selectedInfo = document.getElementById('addDetailSelectedMaterialInfo');
   if (searchResults) searchResults.style.display = 'none';
   if (selectedInfo) selectedInfo.style.display = 'none';
+  console.log('✅ 검색 결과 및 선택 정보 숨김');
 
   // 검색 결과 테이블 초기화
   const tbody = document.getElementById('addDetailMaterialSearchTableBody');
   if (tbody) tbody.innerHTML = '';
+  console.log('✅ 검색 결과 테이블 초기화 완료');
 
   // 모달 표시
   const modal = document.getElementById('quotationManageDetailAddModal');
   if (modal) {
     modal.style.display = 'block';
+    console.log('✅ 모달 표시 완료');
+    console.log('모달 display:', modal.style.display);
 
     // 드래그로 인한 transform 초기화 (overflow-x 방지)
     const modalContent = modal.querySelector('.modal-content');
@@ -2294,11 +2304,16 @@ let newQuotationDetails = [];
 
 // ✅ 견적서 작성 모달 열기
 function openQuotationManageCreateModal() {
+  console.log('===== 견적서 작성 모달 열기 =====');
+  console.log('모달 ID: quotationManageCreateModal');
+
   // 모달 제목 설정
   document.getElementById('quotationManageCreateModalTitle').textContent = '견적서 작성';
+  console.log('✅ 모달 제목 설정 완료');
 
   // 폼 초기화
   document.getElementById('quotationManageCreateForm').reset();
+  console.log('✅ 폼 초기화 완료');
 
   // 매출처 정보 초기화
   document.getElementById('quotationManageCreateCustomerCode').value = '';
@@ -2307,19 +2322,25 @@ function openQuotationManageCreateModal() {
   if (infoDiv) {
     infoDiv.style.display = 'none';
   }
+  console.log('✅ 매출처 정보 초기화 완료');
 
   // 견적일자를 오늘 날짜로 설정
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('quotationManageCreateDate').value = today;
+  console.log('✅ 견적일자 설정:', today);
 
   // 상세내역 초기화
   newQuotationDetails = [];
   renderNewQuotationDetailTable();
+  console.log('✅ 상세내역 초기화 완료');
 
   // 모달 표시
   const modal = document.getElementById('quotationManageCreateModal');
   modal.style.display = 'block';
   modal.style.position = 'fixed';
+  console.log('✅ 모달 표시 완료');
+  console.log('모달 display:', modal.style.display);
+  console.log('모달 position:', modal.style.position);
 
   // ✅ 드래그 기능 활성화 (최초 1회만 실행)
   const modalContent = document.getElementById('quotationModalContent');
@@ -2345,10 +2366,17 @@ function openQuotationManageCreateModal() {
 
 // ✅ 견적서 작성 모달 닫기
 function closeQuotationManageCreateModal() {
+  console.log('===== 견적서 작성 모달 닫기 =====');
+  console.log('모달 ID: quotationManageCreateModal');
+
   document.getElementById('quotationManageCreateModal').style.display = 'none';
+  console.log('✅ 모달 숨김 완료');
+
   // 견적 체크박스만 초기화
   $('#quotationManageSelectAll').prop('checked', false);
   $('.quotationRowCheck').prop('checked', false);
+  console.log('✅ 체크박스 초기화 완료');
+
   // 버튼 상태도 초기화
   $('.quotationRowCheck').each(function () {
     const quotationDate = $(this).data('date');
@@ -2360,27 +2388,39 @@ function closeQuotationManageCreateModal() {
     actionDiv.find('.quotationBtnDelete').hide();
     actionDiv.find('.quotationBtnApprove').hide(); // ✅ 승인 버튼도 숨김
   });
+  console.log('✅ 버튼 상태 초기화 완료');
+
   newQuotationDetails = [];
+  console.log('✅ 상세내역 배열 초기화 완료');
 }
 
 // ✅ 견적서 작성용 매출처 검색 모달 열기 (공통 모달 1개 사용)
 function openQuotationManageCreateCustomerSearchModal() {
+  console.log('===== 견적서 작성용 매출처 검색 모달 열기 =====');
+
   // 견적 입력값을 공통 검색창에 전달
   const searchValue = document.getElementById('quotationManageCreateCustomerName').value.trim();
+  console.log('검색어:', searchValue);
 
   // [핵심] customer.js의 공통 모달 열기 사용
   // callerContext = 'quotation' (선택 결과를 견적에 주입하기 위한 컨텍스트)
   // initialSearchValue = searchValue (매출처명 입력란의 값을 검색어로 전달)
   if (typeof window.openCustomerSearchModal === 'function') {
+    console.log('✅ 공통 매출처 검색 모달 호출 (callerContext: quotation)');
     window.openCustomerSearchModal('quotation', searchValue);
+  } else {
+    console.error('❌ window.openCustomerSearchModal 함수를 찾을 수 없습니다');
   }
 
   // 값이 있으면 자동검색 (모달이 열린 후 실행되도록 setTimeout 사용)
   if (searchValue) {
+    console.log('✅ 자동 검색 예약 (100ms 후)');
     setTimeout(() => {
       if (typeof window.searchCustomersForModal === 'function') {
+        console.log('✅ 공통 검색 함수 호출: searchCustomersForModal()');
         window.searchCustomersForModal();
       } else {
+        console.log('✅ 대체 검색 함수 호출: searchQuotationCustomers()');
         searchQuotationCustomers();
       }
     }, 100);
@@ -3090,6 +3130,7 @@ function removeNewQuotationDetail(index) {
 
 // ✅ 견적서 저장
 async function submitQuotationManageCreate(event) {
+  console.log('===== 견적서 등록 폼 제출 =====');
   event.preventDefault();
 
   try {
@@ -3100,16 +3141,23 @@ async function submitQuotationManageCreate(event) {
     const 제목 = document.getElementById('quotationManageCreateTitle').value;
     const 적요 = document.getElementById('quotationManageCreateRemark').value;
 
+    console.log('입력값:', { 견적일자, 출고희망일자, 매출처코드, 제목, 적요 });
+
     // 유효성 검사
     if (!매출처코드) {
+      console.error('❌ 유효성 검사 실패: 매출처 미선택');
       alert('매출처를 선택해주세요.');
       return;
     }
 
     if (newQuotationDetails.length === 0) {
+      console.error('❌ 유효성 검사 실패: 상세내역 없음');
       alert('견적 상세내역을 최소 1개 이상 추가해주세요.');
       return;
     }
+
+    console.log('✅ 유효성 검사 통과');
+    console.log('상세내역 개수:', newQuotationDetails.length);
 
     // API 호출 데이터 구성
     const quotationData = {
@@ -3128,7 +3176,10 @@ async function submitQuotationManageCreate(event) {
       })),
     };
 
+    console.log('API 요청 데이터:', JSON.stringify(quotationData, null, 2));
+
     // API 호출
+    console.log('✅ API 호출 시작: POST /api/quotations_add');
     const response = await fetch('/api/quotations_add', {
       method: 'POST',
       headers: {
@@ -3138,7 +3189,9 @@ async function submitQuotationManageCreate(event) {
       body: JSON.stringify(quotationData),
     });
 
+    console.log('API 응답 상태:', response.status);
     const result = await response.json();
+    console.log('API 응답 결과:', result);
 
     if (!result.success) {
       throw new Error(result.message || '견적서 저장 실패');

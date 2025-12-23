@@ -563,17 +563,27 @@ app.get('/api/customer_new', async (req, res) => {
   try {
     console.log('===== 신규 매출처코드 생성 요청 =====');
 
+    // 세션에서 사업장코드 가져오기 (없으면 기본값 '01')
+    const 사업장코드 = req.session.user?.사업장코드 || '01';
+
     // 1. 현재 가장 큰 매출처코드 조회 (영문 접두사별로, 숫자 부분 기준 정렬)
+    // ✅ 수정: 길이 제약 제거, 사업장코드 필터 추가, 모든 길이의 매출처코드 조회
+    // ✅ TRY_CAST 대신 CASE 문 사용 (SQL Server 2008 이하 호환)
     const query = `
       SELECT TOP 1 매출처코드
       FROM 매출처
-      WHERE LEN(매출처코드) = 8
+      WHERE 사업장코드 = @사업장코드
+        AND PATINDEX('[A-Z]%', 매출처코드) = 1
+        AND LEN(매출처코드) > 1
+        AND ISNUMERIC(SUBSTRING(매출처코드, 2, LEN(매출처코드) - 1)) = 1
       ORDER BY
         SUBSTRING(매출처코드, 1, 1) DESC,
-        CAST(SUBSTRING(매출처코드, 2, 7) AS INT) DESC
+        CAST(SUBSTRING(매출처코드, 2, LEN(매출처코드) - 1) AS INT) DESC
     `;
 
-    const result = await pool.request().query(query);
+    const result = await pool.request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .query(query);
 
     let newCode;
 
@@ -581,7 +591,7 @@ app.get('/api/customer_new', async (req, res) => {
       const lastCode = result.recordset[0].매출처코드;
       console.log('마지막 매출처코드:', lastCode);
 
-      // 2. 영문 1자리 + 숫자 7자리 = 총 8자리 형식
+      // 2. 영문 접두사 추출
       const prefix = lastCode.charAt(0); // 첫 글자 (영문)
       const numPart = lastCode.substring(1); // 나머지 숫자 부분
 
@@ -622,21 +632,28 @@ app.get('/api/customers', async (req, res) => {
     const offset = (page - 1) * pageSize;
     const limit = Number(pageSize);
 
+    // 세션에서 사업장코드 가져오기 (없으면 기본값 '01')
+    const 사업장코드 = req.session.user?.사업장코드 || '01';
+
     const request = pool.request();
 
     let query = `
-      SELECT 매출처코드, 매출처명, 대표자명, 사업자번호, 전화번호, 사용구분, 수정일자
+      SELECT LTRIM(RTRIM(매출처코드)) AS 매출처코드, 매출처명, 대표자명, 사업자번호, 전화번호, 사용구분, 수정일자
       FROM (
-        SELECT ROW_NUMBER() OVER (ORDER BY 매출처코드) AS RowNum,
+        SELECT ROW_NUMBER() OVER (ORDER BY LTRIM(RTRIM(매출처코드))) AS RowNum,
               매출처코드, 매출처명, 대표자명, 사업자번호, 전화번호, 사용구분, 수정일자
         FROM 매출처
-        WHERE 1=1
+        WHERE 사업장코드=@사업장코드
     `;
 
+    // 사업장코드 파라미터 추가
+    request.input('사업장코드', sql.VarChar(2), 사업장코드);
+
     // 검색어가 있으면 매출처명 또는 매출처코드로 검색 (Parameterized Query 사용)
+    // ✅ LTRIM(RTRIM()) 적용: VB 시스템이 저장한 8자리 공백 포함 매출처코드 처리 (SQL Server 2016 이하 호환)
     if (search) {
       request.input('search', sql.NVarChar, `%${search}%`);
-      query += ` AND (매출처명 LIKE @search OR 매출처코드 LIKE @search)`;
+      query += ` AND (매출처명 LIKE @search OR LTRIM(RTRIM(매출처코드)) LIKE @search)`;
     }
 
     query += `
@@ -664,10 +681,11 @@ app.get('/api/customers/:code', async (req, res) => {
   try {
     const { code } = req.params;
 
+    // ✅ LTRIM(RTRIM()) 적용: VB 시스템이 저장한 8자리 공백 포함 매출처코드 처리
     const result = await pool
       .request()
       .input('매출처코드', sql.VarChar(8), code)
-      .query('SELECT * FROM 매출처 WHERE 매출처코드 = @매출처코드');
+      .query('SELECT * FROM 매출처 WHERE LTRIM(RTRIM(매출처코드)) = @매출처코드');
 
     if (result.recordset.length > 0) {
       res.json({
@@ -692,6 +710,7 @@ app.get('/api/customers/:code/transaction-history', async (req, res) => {
     const { code } = req.params;
     const 사업장코드 = req.session?.user?.사업장코드 || '01';
 
+    // ✅ TRIM() 적용: VB 시스템이 저장한 8자리 공백 포함 매출처코드 처리
     const result = await pool
       .request()
       .input('사업장코드', sql.VarChar(2), 사업장코드)
@@ -719,7 +738,7 @@ app.get('/api/customers/:code/transaction-history', async (req, res) => {
           ON k.매입처코드 = m.매입처코드
           AND k.사업장코드 = m.사업장코드
         WHERE k.사업장코드 = @사업장코드
-          AND k.매출처코드 = @매출처코드
+          AND LTRIM(RTRIM(k.매출처코드)) = @매출처코드
         ORDER BY k.입출고일자 DESC, k.거래번호 DESC
       `);
 
@@ -791,11 +810,12 @@ app.post('/api/customers', requireAuth, async (req, res) => {
 
     // 중복 체크 (클라이언트에서 검증했지만 서버에서도 확인)
     // ✅ 삭제된 매출처(사용구분=9)는 제외하고 체크
+    // ✅ LTRIM(RTRIM()) 적용: VB 시스템이 저장한 8자리 공백 포함 매출처코드 처리
     const checkQuery = `
       SELECT COUNT(*) as cnt
       FROM 매출처
       WHERE 사업장코드 = @사업장코드
-        AND 매출처코드 = @매출처코드
+        AND LTRIM(RTRIM(매출처코드)) = @매출처코드
         AND 사용구분 <> 9
     `;
 
@@ -952,7 +972,7 @@ app.put('/api/customers/:code', requireAuth, async (req, res) => {
           수정일자 = @수정일자,
           사용자코드 = @사용자코드,
           비고란 = @비고란
-        WHERE 매출처코드 = @매출처코드
+        WHERE LTRIM(RTRIM(매출처코드)) = @매출처코드
       `);
 
     res.json({
@@ -981,6 +1001,7 @@ app.delete('/api/customers/:code', requireAuth, async (req, res) => {
 
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
+    // ✅ TRIM() 적용: VB 시스템이 저장한 8자리 공백 포함 매출처코드 처리
     await pool
       .request()
       .input('매출처코드', sql.VarChar(8), code)
@@ -990,7 +1011,7 @@ app.delete('/api/customers/:code', requireAuth, async (req, res) => {
           사용구분 = 9,
           사용자코드 = @사용자코드,
           수정일자 = @수정일자
-        WHERE 매출처코드 = @매출처코드
+        WHERE LTRIM(RTRIM(매출처코드)) = @매출처코드
       `);
 
     res.json({
