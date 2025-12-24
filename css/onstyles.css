@@ -2322,3 +2322,13 @@ input[type='checkbox'] {
 #quotationManagePriceHistoryModal {
   z-index: 1300 !important;
 }
+
+/* 거래명세서 수정 모달 자재 추가 모달 z-index */
+#transactionItemCreateModal {
+  z-index: 1200 !important;
+}
+
+/* 거래명세서 수정 모달 이전 단가 이력 모달 z-index */
+#transactionEditPriceHistoryModal {
+  z-index: 1300 !important;
+}

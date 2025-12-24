@@ -574,39 +574,46 @@ window.closeTransactionCreateModal = function closeTransactionCreateModal() {
 };
 
 // ✅ 매출처 검색 모달 열기 (거래명세서용)
-function openTransactionCustomerSearchModal() {
+window.openTransactionCustomerSearchModal = function openTransactionCustomerSearchModal() {
   console.log('===== 거래명세서용 매출처 검색 모달 열기 =====');
-  console.log('모달 ID: transactionCustomerSearchModal');
 
   // 검색 입력 필드의 값을 가져와서 모달 검색창에 자동 입력
   const searchInput = document.getElementById('transactionCreateCustomerSearch');
-  const searchText = searchInput ? searchInput.value.trim() : '';
-  console.log('검색어:', searchText);
+  const searchValue = searchInput ? searchInput.value.trim() : '';
+  console.log('검색어:', searchValue);
 
-  document.getElementById('transactionCustomerSearchModal').style.display = 'block';
-  document.getElementById('transactionCustomerSearchInput').value = searchText;
-  console.log('✅ 모달 표시 및 검색어 설정 완료');
-
-  // 드래그 기능 활성화 (최초 1회만 실행)
-  if (typeof makeModalDraggable === 'function' && !window.transactionCustomerSearchModalDraggable) {
-    makeModalDraggable('transactionCustomerSearchModal', 'transactionCustomerSearchModalHeader');
-    window.transactionCustomerSearchModalDraggable = true;
-    console.log('✅ 드래그 기능 활성화 완료');
+  // [핵심] customer.js의 공통 모달 열기 사용
+  // callerContext = 'transaction' (선택 결과를 거래명세서에 주입하기 위한 컨텍스트)
+  // initialSearchValue = searchValue (매출처명 입력란의 값을 검색어로 전달)
+  if (typeof window.openCustomerSearchModal === 'function') {
+    console.log('✅ 공통 매출처 검색 모달 호출 (callerContext: transaction)');
+    window.openCustomerSearchModal('transaction', searchValue);
+  } else {
+    console.error('❌ window.openCustomerSearchModal 함수를 찾을 수 없습니다');
   }
 
-  // 검색어가 있으면 자동으로 검색 실행
-  if (searchText) {
-    console.log('✅ 자동 검색 실행 예약');
-    searchTransactionCustomers();
+  // 값이 있으면 자동검색 (모달이 열린 후 실행되도록 setTimeout 사용)
+  if (searchValue) {
+    console.log('✅ 자동 검색 예약 (100ms 후)');
+    setTimeout(() => {
+      if (typeof window.searchCustomersForModal === 'function') {
+        window.searchCustomersForModal();
+      }
+    }, 100);
   }
-}
+};
 
 // ✅ 매출처 검색 모달 닫기
+// @deprecated - 공통 모달(customerSearchModal) 사용으로 더 이상 필요 없음
 function closeTransactionCustomerSearchModal() {
-  document.getElementById('transactionCustomerSearchModal').style.display = 'none';
+  // 하위 호환성을 위해 유지 (실제로는 공통 모달 사용)
+  if (typeof window.closeCustomerSearchModal === 'function') {
+    window.closeCustomerSearchModal();
+  }
 }
 
 // ✅ 매출처 검색
+// @deprecated - customer.js의 공통 모달 검색 사용 (searchCustomersForModal)
 async function searchTransactionCustomers() {
   try {
     const searchText = document.getElementById('transactionCustomerSearchInput').value.trim();
@@ -665,24 +672,42 @@ async function searchTransactionCustomers() {
 }
 
 // ✅ 매출처 선택
-window.selectTransactionCustomer = function selectTransactionCustomer(customer) {
+window.selectTransactionCustomer = function selectTransactionCustomer(customerOrCode, name) {
+  // ✅ 두 가지 호출 방식 지원:
+  // 1. selectTransactionCustomer(customer) - 객체 전달
+  // 2. selectTransactionCustomer(code, name) - 개별 파라미터 (공통 모달에서 호출)
+  let code, customerName;
+
+  if (typeof customerOrCode === 'object' && customerOrCode !== null) {
+    // 객체로 전달된 경우
+    code = customerOrCode.매출처코드;
+    customerName = customerOrCode.매출처명;
+  } else {
+    // 개별 파라미터로 전달된 경우
+    code = customerOrCode;
+    customerName = name;
+  }
+
   // 숨김 필드에 값 설정
-  document.getElementById('transactionCreateCustomerCode').value = customer.매출처코드;
-  document.getElementById('transactionCreateCustomerName').value = customer.매출처명;
+  document.getElementById('transactionCreateCustomerCode').value = code;
+  document.getElementById('transactionCreateCustomerName').value = customerName;
 
   // 검색 입력 필드에 선택된 정보 표시
   const searchInput = document.getElementById('transactionCreateCustomerSearch');
-  searchInput.value = `${customer.매출처명} (${customer.매출처코드})`;
+  searchInput.value = `${customerName} (${code})`;
 
   // 선택된 매출처 표시 영역 업데이트
   const displayDiv = document.getElementById('transactionSelectedCustomerDisplay');
   const infoSpan = document.getElementById('transactionSelectedCustomerInfo');
-  infoSpan.textContent = `✓ ${customer.매출처명} (${customer.매출처코드})`;
+  infoSpan.textContent = `✓ ${customerName} (${code})`;
   displayDiv.style.display = 'block';
 
-  closeTransactionCustomerSearchModal();
+  // 공통 모달 닫기
+  if (typeof window.closeCustomerSearchModal === 'function') {
+    window.closeCustomerSearchModal();
+  }
 
-  console.log('✅ 매출처 선택됨:', { 매출처코드: customer.매출처코드, 매출처명: customer.매출처명 });
+  console.log('✅ 매출처 선택됨:', { 매출처코드: code, 매출처명: customerName });
 };
 
 // ✅ 매출처 선택 취소
