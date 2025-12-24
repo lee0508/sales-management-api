@@ -1483,6 +1483,8 @@ window.searchTransactionMaterials = async function searchTransactionMaterials() 
     const tbody = document.getElementById('transactionMaterialSearchTableBody');
     const resultsDiv = document.getElementById('transactionMaterialSearchResults');
 
+    tbody.innerHTML = '';
+
     if (materials.length === 0) {
       tbody.innerHTML =
         '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #9ca3af;">검색 결과가 없습니다</td></tr>';
@@ -1490,36 +1492,29 @@ window.searchTransactionMaterials = async function searchTransactionMaterials() 
       return;
     }
 
-    tbody.innerHTML = materials
-      .map(
-        (material) => `
-      <tr style="border-bottom: 1px solid #e5e7eb;">
-        <td style="padding: 12px;">${material.자재코드 || '-'}</td>
-        <td style="padding: 12px;">${material.자재명 || '-'}</td>
-        <td style="padding: 12px;">${material.규격 || '-'}</td>
-        <td style="padding: 12px; text-align: right;">${(
-          material.출고단가1 || 0
-        ).toLocaleString()}</td>
-        <td style="padding: 12px; text-align: center;">
-          <button onclick='selectTransactionMaterial(${JSON.stringify(material).replace(
-            /'/g,
-            '&apos;',
-          )})' style="
-            padding: 6px 16px;
-            background: #2563eb;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-          " onmouseover="this.style.background='#1d4ed8';"
-             onmouseout="this.style.background='#2563eb';">선택</button>
-        </td>
-      </tr>
-    `,
-      )
-      .join('');
+    // 견적관리와 동일한 방식: 행 클릭으로 자재 선택
+    materials.forEach((material) => {
+      const row = document.createElement('tr');
+      row.style.cursor = 'pointer';
+      row.style.transition = 'background 0.2s';
+      row.style.borderBottom = '1px solid #e5e7eb';
+      row.onmouseover = function () {
+        this.style.background = '#f9fafb';
+      };
+      row.onmouseout = function () {
+        this.style.background = 'white';
+      };
+      row.onclick = function () {
+        selectTransactionMaterial(material);
+      };
+
+      row.innerHTML = `
+        <td style="padding: 8px; font-size: 13px;">${material.자재코드 || '-'}</td>
+        <td style="padding: 8px; font-size: 13px;">${material.자재명 || '-'}</td>
+        <td style="padding: 8px; font-size: 13px;">${material.규격 || '-'}</td>
+      `;
+      tbody.appendChild(row);
+    });
 
     resultsDiv.style.display = 'block';
   } catch (err) {

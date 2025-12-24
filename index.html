@@ -29,7 +29,7 @@
   <script src="js/postoffice.js?v=1031M" defer></script>
   <!-- print.js를 transaction.js, quotation.js보다 먼저 로드하여 각 모듈의 인쇄 함수를 덮어쓸 수 있도록 함 -->
   <script src="js/print.js?v=1114.js" defer></script>
-  <script src="js/transaction.js?v=251224_enter_key" defer></script>
+  <script src="js/transaction.js?v=251224_row_click" defer></script>
   <script src="js/cash-history.js" defer></script>
   <script src="js/trial-balance.js" defer></script>
   <script src="js/balance-sheet.js" defer></script>
@@ -3634,7 +3634,7 @@
         </button>
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: 16px">
+      <div id="transactionItemCreateModalBody" style="display: flex; flex-direction: column; gap: 16px">
         <!-- ✅ 자재 검색 영역 -->
         <div id="transactionEditModalAddMaterial">
           <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151">자재 검색</label>
