@@ -1586,6 +1586,7 @@ window.confirmTransactionDetailAdd = function confirmTransactionDetailAdd() {
       세부코드: 세부코드,
       자재명: material.자재명,
       규격: material.규격 || '-',
+      단위: material.단위 || '-',
       수량: 수량,
       단가: 단가,
     });
@@ -1602,6 +1603,7 @@ window.confirmTransactionDetailAdd = function confirmTransactionDetailAdd() {
       자재코드: material.자재코드,
       자재명: material.자재명,
       규격: material.규격 || '-',
+      단위: material.단위 || '-',
       수량: 수량,
       단가: 단가,
       공급가액: 공급가액,
