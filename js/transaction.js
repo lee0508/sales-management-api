@@ -408,12 +408,14 @@ window.openTransactionViewModal = async function openTransactionViewModal(transa
           {
             data: null,
             render: (data, type, row, meta) => meta.row + 1,
+            orderable: false,
             className: 'dt-center',
             width: '70px',
           },
           {
             data: '자재코드',
             defaultContent: '-',
+            orderable: false,
             width: '100px',
             render: (d) => {
               if (!d) return '-';
@@ -424,33 +426,39 @@ window.openTransactionViewModal = async function openTransactionViewModal(transa
           {
             data: '자재명',
             defaultContent: '-',
+            orderable: false,
             width: '200px',
           },
           {
             data: '규격',
             defaultContent: '-',
+            orderable: false,
             width: '150px',
           },
           {
             data: '단위',
             defaultContent: '-',
+            orderable: false,
             width: '70px',
           },
           {
             data: '수량',
             render: (d) => (d ? d.toLocaleString() : '0'),
+            orderable: false,
             className: 'dt-right',
             width: '100px',
           },
           {
             data: '단가',
             render: (d) => (d ? d.toLocaleString() : '0'),
+            orderable: false,
             className: 'dt-right',
             width: '120px',
           },
           {
             data: '합계금액',
             render: (d) => (d ? d.toLocaleString() : '0'),
+            orderable: false,
             className: 'dt-right',
             width: '130px',
           },
@@ -825,7 +833,7 @@ function renderNewTransactionDetailTable() {
   if (newTransactionDetails.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" style="padding: 40px; text-align: center; color: #6b7280;">
+        <td colspan="11" style="padding: 40px; text-align: center; color: #6b7280;">
           자재 추가 버튼을 클릭하여 거래 상세내역을 입력하세요
         </td>
       </tr>
@@ -857,6 +865,7 @@ function renderNewTransactionDetailTable() {
       <td style="padding: 12px;">${detail.세부코드}</td>
       <td style="padding: 12px;">${detail.자재명 || '-'}</td>
       <td style="padding: 12px;">${detail.규격 || '-'}</td>
+      <td style="padding: 12px; text-align: center;">${detail.단위 || '-'}</td>
       <td style="padding: 12px; text-align: right;">${detail.수량.toLocaleString()}</td>
       <td style="padding: 12px; text-align: right;">${detail.단가.toLocaleString()}</td>
       <td style="padding: 12px; text-align: right;">${공급가.toLocaleString()}</td>
@@ -1172,6 +1181,7 @@ window.editTransaction = async function editTransaction(transactionDate, transac
         {
           data: '자재코드',
           defaultContent: '-',
+          orderable: false,
           className: 'dt-center',
           render: (d) => {
             if (!d) return '-';
@@ -1181,40 +1191,53 @@ window.editTransaction = async function editTransaction(transactionDate, transac
         {
           data: '자재명',
           defaultContent: '-',
+          orderable: false,
           className: 'dt-left',
         },
         {
           data: '규격',
           defaultContent: '-',
+          orderable: false,
           className: 'dt-left',
+        },
+        {
+          data: '단위',
+          defaultContent: '-',
+          orderable: false,
+          className: 'dt-center',
         },
         {
           data: '수량',
           defaultContent: '0',
+          orderable: false,
           className: 'dt-right',
           render: (d) => (d ? d.toLocaleString() : '0'),
         },
         {
           data: '단가',
           defaultContent: '0',
+          orderable: false,
           className: 'dt-right',
           render: (d) => (d ? d.toLocaleString() : '0'),
         },
         {
           data: '공급가액',
           defaultContent: '0',
+          orderable: false,
           className: 'dt-right',
           render: (d) => (d ? d.toLocaleString() : '0'),
         },
         {
           data: '부가세',
           defaultContent: '0',
+          orderable: false,
           className: 'dt-right',
           render: (d) => (d ? d.toLocaleString() : '0'),
         },
         {
           data: '합계금액',
           defaultContent: '0',
+          orderable: false,
           className: 'dt-right',
           render: (d) => (d ? d.toLocaleString() : '0'),
         },

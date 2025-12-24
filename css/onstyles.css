@@ -2269,3 +2269,56 @@ input[type='checkbox'] {
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
 }
+
+/* ================================
+   견적서 관리 DataTable 스타일
+   ================================ */
+
+/* 견적서 수정 모달 내부 DataTable 레이아웃 행 패딩 */
+#quotationManageEditDetailTableWrapper .dt-layout-row {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* 견적서 작성 모달 내부 DataTable 레이아웃 행 패딩 */
+#quotationManageCreateDetailTableWrapper .dt-layout-row {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* 견적서 상세보기 모달 내부 DataTable 레이아웃 행 패딩 */
+#quotationManageViewDetailTableWrapper .dt-layout-row {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* 견적서 관리 모달 DataTable 셀 수직 정렬 */
+#quotationManageEditDetailTable tbody td,
+#quotationManageCreateDetailTable tbody td {
+  vertical-align: middle !important;
+}
+
+/* 견적서 관리 모달 DataTable 관리 칼럼 버튼 컨테이너 */
+#quotationManageEditDetailTable tbody td.dt-center,
+#quotationManageCreateDetailTable tbody td.dt-center {
+  white-space: nowrap;
+}
+
+/* 견적서 관리 메인 페이지 DataTable 관리 칼럼 가운데 정렬 */
+#quotationManageTable tbody td {
+  vertical-align: middle !important;
+}
+
+#quotationManageTable tbody td:last-child {
+  text-align: center;
+}
+
+/* 견적서 관리 자재 추가 모달 z-index */
+#quotationManageDetailAddModal {
+  z-index: 1200 !important;
+}
+
+/* 견적서 관리 이전단가 이력 모달 z-index */
+#quotationManagePriceHistoryModal {
+  z-index: 1300 !important;
+}
