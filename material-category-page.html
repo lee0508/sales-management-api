@@ -10,17 +10,30 @@
       </span>
     </div>
 
-    <button class="btn btn-success" onclick="openNewCategoryModal()" style="
-      padding: 10px 20px;
-      background: #28a745;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;">
-      <span style="font-size: 18px; margin-right: 4px;">+</span> 자재분류 등록
-    </button>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-warning" onclick="openDuplicateMaterialModal()" style="
+        padding: 10px 20px;
+        background: #ffc107;
+        color: #000;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;">
+        <span style="font-size: 18px; margin-right: 4px;">🔍</span> 자재 중복 분석
+      </button>
+      <button class="btn btn-success" onclick="openNewCategoryModal()" style="
+        padding: 10px 20px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;">
+        <span style="font-size: 18px; margin-right: 4px;">+</span> 자재분류 등록
+      </button>
+    </div>
   </div>
 
   <!-- 자재분류 목록 DataTable -->
@@ -103,13 +116,13 @@
         <textarea
           id="category적요"
           class="form-control"
-          placeholder="비고 입력 (선택사항)"
+          placeholder="적요 입력 (선택사항)"
           rows="3"
           style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; resize: vertical;"
         ></textarea>
       </div>
 
-      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
         <button
           type="button"
           onclick="closeCategoryModal()"
@@ -127,5 +140,150 @@
         </button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- 자재 중복 분석 모달 -->
+<div id="duplicateMaterialModal" class="modal hidden" style="z-index: 10000;">
+  <div class="modal-content" style="max-width: 1200px; max-height: 90vh; overflow: auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1f2937;">
+        🔍 자재 중복 분석
+      </h2>
+      <button onclick="closeDuplicateMaterialModal()" style="
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #f3f4f6;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #6b7280;
+        transition: all 0.2s;"
+        onmouseover="this.style.background='#e5e7eb';"
+        onmouseout="this.style.background='#f3f4f6';">
+        &times;
+      </button>
+    </div>
+
+    <!-- 요약 정보 -->
+    <div style="margin-bottom: 20px; padding: 16px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 8px;">
+      <div style="display: flex; gap: 24px; font-size: 14px;">
+        <span>
+          총 중복 그룹:
+          <strong id="duplicateGroupCount" style="color: #dc3545; font-size: 18px;">0</strong>
+          개
+        </span>
+        <span>
+          중복된 자재:
+          <strong id="duplicateMaterialCount" style="color: #dc3545; font-size: 18px;">0</strong>
+          개
+        </span>
+      </div>
+      <p style="margin: 8px 0 0 0; font-size: 13px; color: #856404;">
+        💡 자재명 + 규격이 동일한데 자재코드가 다른 경우를 중복으로 판단합니다.
+      </p>
+    </div>
+
+    <!-- 중복 자재 목록 테이블 -->
+    <div style="overflow-x: auto;">
+      <table id="duplicateMaterialTable" class="display" style="width: 100%;">
+        <thead>
+          <tr>
+            <th>순번</th>
+            <th>자재명</th>
+            <th>규격</th>
+            <th>중복개수</th>
+            <th>자재코드 목록</th>
+            <th>상세보기</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- 닫기 버튼 -->
+    <div style="margin-top: 24px; text-align: right;">
+      <button
+        type="button"
+        onclick="closeDuplicateMaterialModal()"
+        style="padding: 10px 24px; background: #6c757d; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;"
+        onmouseover="this.style.background='#5a6268';"
+        onmouseout="this.style.background='#6c757d';">
+        닫기
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 중복 자재 상세 정보 모달 -->
+<div id="duplicateDetailModal" class="modal hidden" style="z-index: 10001;">
+  <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow: auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #1f2937;">
+        상세 거래 통계
+      </h2>
+      <button onclick="closeDuplicateDetailModal()" style="
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #f3f4f6;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #6b7280;
+        transition: all 0.2s;"
+        onmouseover="this.style.background='#e5e7eb';"
+        onmouseout="this.style.background='#f3f4f6';">
+        &times;
+      </button>
+    </div>
+
+    <!-- 자재 정보 -->
+    <div style="margin-bottom: 20px; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+      <div style="font-size: 14px;">
+        <strong>자재명:</strong> <span id="detailMaterialName"></span>
+      </div>
+      <div style="font-size: 14px; margin-top: 4px;">
+        <strong>규격:</strong> <span id="detailMaterialSpec"></span>
+      </div>
+    </div>
+
+    <!-- 상세 통계 테이블 -->
+    <div style="overflow-x: auto;">
+      <table id="duplicateDetailTable" class="display" style="width: 100%;">
+        <thead>
+          <tr>
+            <th>자재코드</th>
+            <th>단위</th>
+            <th>매입건수</th>
+            <th>매출건수</th>
+            <th>전체건수</th>
+            <th>최초거래일</th>
+            <th>최근거래일</th>
+            <th>추천</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- 닫기 버튼 -->
+    <div style="margin-top: 24px; text-align: right;">
+      <button
+        type="button"
+        onclick="closeDuplicateDetailModal()"
+        style="padding: 10px 24px; background: #6c757d; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;"
+        onmouseover="this.style.background='#5a6268';"
+        onmouseout="this.style.background='#6c757d';">
+        닫기
+      </button>
+    </div>
   </div>
 </div>

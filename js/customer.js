@@ -30,9 +30,6 @@ $(document).ready(function () {
       const result = await response.json();
       const tableData = result.data || [];
 
-      console.log('✅ API 응답:', result);
-      console.log('✅ 조회된 데이터 수:', tableData.length);
-      console.log('✅ 첫 번째 데이터:', tableData[0]);
 
       // ✅ DataTable 재사용 패턴: 없으면 생성, 있으면 데이터만 업데이트
       if (!window.salesCustomerManageTable || typeof window.salesCustomerManageTable.clear !== 'function') {
@@ -188,9 +185,7 @@ $(document).ready(function () {
       }
 
       // ✅ DataTable에 데이터 업데이트 (재사용 패턴)
-      console.log('✅ DataTable에 데이터 추가 시작...');
       window.salesCustomerManageTable.clear().rows.add(tableData).draw();
-      console.log('✅ DataTable 업데이트 완료. 현재 행 수:', window.salesCustomerManageTable.data().count());
 
     } catch (err) {
       console.error('❌ 매출처 조회 오류:', err);
@@ -254,8 +249,8 @@ $(document).ready(function () {
 
   // ✅ 표준 검색 함수 (salesCustomerManage prefix)
   window.searchSalesCustomerManage = function () {
+    console.log('===== salesCustomerManage > 검색 버튼 클릭 =====');
     const keyword = $('#salesCustomerManageSearchInput').val().trim();
-    console.log('🔍 매출처 검색:', keyword);
     currentSalesCustomerSearchKeyword = keyword;
     loadSalesCustomers(keyword);
   };
@@ -266,7 +261,7 @@ $(document).ready(function () {
 
   // ✅ 표준 검색 초기화 함수 (salesCustomerManage prefix)
   window.resetSalesCustomerManageSearch = function () {
-    console.log('🔄 매출처 검색 초기화');
+    console.log('===== salesCustomerManage > 검색 초기화 버튼 클릭 =====');
     $('#salesCustomerManageSearchInput').val('');
     currentSalesCustomerSearchKeyword = '';
     loadSalesCustomers('');
@@ -278,8 +273,8 @@ $(document).ready(function () {
 
   // ✅ 표준 엑셀 내보내기 함수 (salesCustomerManage prefix)
   window.exportSalesCustomerManageToGoogleSheets = function() {
+    console.log('===== salesCustomerManage > 엑셀 내보내기 버튼 클릭 =====');
     try {
-      console.log('===== Google Sheets로 내보내기 시작 =====');
 
       // 1. DataTable에서 현재 표시된 데이터 가져오기
       if (!window.salesCustomerManageTable) {
@@ -293,8 +288,6 @@ $(document).ready(function () {
         alert('내보낼 데이터가 없습니다.');
         return;
       }
-
-      console.log(`✅ 내보낼 데이터 수: ${dataToExport.length}건`);
 
       // 2. CSV 형식으로 변환
       const headers = [
@@ -336,7 +329,6 @@ $(document).ready(function () {
       link.click();
       document.body.removeChild(link);
 
-      console.log('✅ CSV 파일 다운로드 완료');
       alert(`매출처 ${dataToExport.length}건을 CSV 파일로 내보냈습니다.`);
     } catch (error) {
       console.error('❌ CSV 내보내기 오류:', error);
@@ -352,8 +344,8 @@ $(document).ready(function () {
 
   // 매출처 상세보기
   window.viewCustomerDetail = async function (customerCode) {
+    console.log('===== salesCustomerManage > 상세보기 버튼 클릭 =====');
     try {
-      console.log('🔍 [모달 열기] ID: salesCustomerManageViewModal');
       const result = await apiCall(`/customers/${customerCode}`);
 
       if (!result.success) {
@@ -445,7 +437,6 @@ $(document).ready(function () {
 
   // ✅ 표준 상세보기 모달 닫기 함수 (salesCustomerManage prefix)
   window.closeSalesCustomerManageViewModal = function () {
-    console.log('❌ [모달 닫기] ID: salesCustomerManageViewModal');
     const modal = document.getElementById('salesCustomerManageViewModal');
     if (modal) {
       modal.style.display = 'none';
@@ -465,8 +456,8 @@ $(document).ready(function () {
 
   // 매출처 수정
   window.editCustomer = async function (customerCode) {
+    console.log('===== salesCustomerManage > 수정 버튼 클릭 =====');
     try {
-      console.log('✏️ [모달 열기] ID: salesCustomerManageEditModal (수정 모드)');
       // 1. 매출처 상세 정보 조회
       const result = await apiCall(`/customers/${customerCode}`);
 
@@ -598,7 +589,6 @@ $(document).ready(function () {
 
   // ✅ 표준 모달 닫기 함수 (salesCustomerManage prefix)
   window.closeSalesCustomerManageEditModal = function () {
-    console.log('❌ [모달 닫기] ID: salesCustomerManageEditModal');
     const modal = document.getElementById('salesCustomerManageEditModal');
     if (modal) {
       modal.style.display = 'none';
@@ -637,14 +627,11 @@ $(document).ready(function () {
    * @description 신규등록/수정 모달의 검색 버튼 클릭 시 호출
    */
   window.openCustomerSearchFromEditForm = function() {
-    console.log('🔍 [모달 열기] ID: customerSearchModal (편집 폼에서 호출)');
-    console.log('===== 매출처 편집 폼에서 검색 모달 열기 =====');
+    console.log('===== salesCustomerManage > 편집폼 검색 버튼 클릭 =====');
 
     // 1. 매출처명 입력 필드에서 검색어 가져오기
     const customerNameInput = document.getElementById('customerName');
     const searchKeyword = customerNameInput ? customerNameInput.value.trim() : '';
-
-    console.log('🔍 검색어:', searchKeyword);
 
     // 2. 검색 모달 열기
     window.openCustomerSearchModal('editForm');
@@ -654,16 +641,12 @@ $(document).ready(function () {
       const modalInput = document.getElementById('customerSearchModalInput');
       if (modalInput) {
         modalInput.value = searchKeyword;
-        console.log('✅ 검색어 설정 완료:', searchKeyword);
 
         // 자동으로 검색 실행
         if (typeof window.searchCustomersForModal === 'function') {
           window.searchCustomersForModal();
-          console.log('✅ 자동 검색 실행 완료');
         }
       }
-    } else {
-      console.log('ℹ️ 검색어 없음 - 빈 상태로 모달 표시');
     }
   };
 
@@ -674,10 +657,6 @@ $(document).ready(function () {
    */
   window.selectCustomerForEditForm = async function(code, name) {
     try {
-      console.log('===== 매출처 편집 폼에 정보 채우기 =====');
-      console.log('매출처코드:', code);
-      console.log('매출처명:', name);
-
       // 1. API로 전체 매출처 정보 가져오기
       const result = await apiCall(`/customers/${code}`, 'GET');
 
@@ -686,7 +665,6 @@ $(document).ready(function () {
       }
 
       const customer = result.data;
-      console.log('✅ 매출처 정보 로드 성공:', customer);
 
       // 2. 폼 필드에 정보 채우기
       document.getElementById('customerCode').value = customer.매출처코드 || '';
@@ -709,8 +687,6 @@ $(document).ready(function () {
       // 비고
       document.getElementById('remarks').value = customer.비고 || '';
 
-      console.log('✅ 매출처 정보 폼 채우기 완료');
-
       // 3. 검색 모달 닫기
       window.closeCustomerSearchModal();
 
@@ -725,11 +701,8 @@ $(document).ready(function () {
 
   // ✅ 표준 매출처 삭제 모달 열기 함수 (salesCustomerManage prefix)
   window.deleteSalesCustomerManage = async function (customerCode) {
+    console.log('===== salesCustomerManage > 삭제 버튼 클릭 =====');
     try {
-      console.log('🗑️ [모달 열기] ID: salesCustomerManageDeleteModal');
-      console.log('===== 매출처 삭제 모달 열기 =====');
-      console.log('매출처코드:', customerCode);
-
       // 1. API 호출로 매출처 정보 가져오기
       const result = await apiCall(`/customers/${customerCode}`, 'GET');
 
@@ -738,7 +711,6 @@ $(document).ready(function () {
       }
 
       const customer = result.data;
-      console.log('✅ 매출처 정보 로드 성공:', customer);
 
       // 2. 삭제할 매출처 정보를 모달에 표시
       const deleteContent = document.getElementById('salesCustomerManageDeleteContent');
@@ -775,7 +747,6 @@ $(document).ready(function () {
 
       // 4. 모달 표시
       document.getElementById('salesCustomerManageDeleteModal').style.display = 'flex';
-      console.log('✅ 삭제 모달 표시 완료');
     } catch (error) {
       console.error('❌ 매출처 삭제 모달 열기 오류:', error);
       alert('매출처 정보를 불러오는 중 오류가 발생했습니다: ' + error.message);
@@ -787,11 +758,9 @@ $(document).ready(function () {
 
   // ✅ 표준 매출처 삭제 모달 닫기 함수 (salesCustomerManage prefix)
   window.closeSalesCustomerManageDeleteModal = function () {
-    console.log('❌ [모달 닫기] ID: salesCustomerManageDeleteModal');
     document.getElementById('salesCustomerManageDeleteModal').style.display = 'none';
     document.getElementById('salesCustomerManageDeleteContent').innerHTML = '';
     document.getElementById('salesCustomerManageDeleteModal').removeAttribute('data-customer-code');
-    console.log('✅ 삭제 모달 닫기 완료');
   };
 
   // ✅ 하위 호환성: 기존 함수명 유지
@@ -799,8 +768,8 @@ $(document).ready(function () {
 
   // ✅ 표준 매출처 삭제 확인 함수 (salesCustomerManage prefix)
   window.confirmSalesCustomerManageDelete = async function () {
+    console.log('===== salesCustomerManage > 삭제 확인 버튼 클릭 =====');
     try {
-      console.log('✅ [삭제 확인] ID: salesCustomerManageDeleteModal');
       const customerCode = document
         .getElementById('salesCustomerManageDeleteModal')
         .getAttribute('data-customer-code');
@@ -809,17 +778,12 @@ $(document).ready(function () {
         throw new Error('삭제할 매출처 코드가 없습니다.');
       }
 
-      console.log('===== 매출처 삭제 실행 =====');
-      console.log('매출처코드:', customerCode);
-
       // 1. API 호출로 매출처 삭제
       const result = await apiCall(`/customers/${customerCode}`, 'DELETE');
 
       if (!result.success) {
         throw new Error(result.message || '매출처 삭제에 실패했습니다.');
       }
-
-      console.log('✅ 매출처 삭제 성공:', result);
 
       // 2. 성공 메시지 표시
       alert('매출처가 성공적으로 삭제되었습니다.');
@@ -830,7 +794,6 @@ $(document).ready(function () {
       // 4. 목록 새로고침
       try {
         window.loadSalesCustomers();
-        console.log('✅ 매출처 목록 새로고침 완료');
       } catch (e) {
         console.warn('⚠️ 목록 새로고침 실패 (수동 새로고침 필요):', e);
       }
@@ -845,10 +808,8 @@ $(document).ready(function () {
 
   // ✅ 표준 신규 등록 모달 열기 함수 (salesCustomerManage prefix)
   window.openSalesCustomerManageCreateModal = async function () {
+    console.log('===== salesCustomerManage > 신규등록 버튼 클릭 =====');
     try {
-      console.log('➕ [모달 열기] ID: salesCustomerManageEditModal (신규 등록 모드)');
-      console.log('===== 신규 매출처 등록 모달 열기 =====');
-
       // 1. 서버에서 새로운 매출처코드 생성 요청
       const result = await apiCall('/customer_new', 'GET');
 
@@ -857,7 +818,6 @@ $(document).ready(function () {
       }
 
       const newCustomerCode = result.data.매출처코드;
-      console.log('✅ 생성된 매출처코드:', newCustomerCode);
 
       // 2. 모달 열기
       const modal = document.getElementById('salesCustomerManageEditModal');
@@ -886,8 +846,6 @@ $(document).ready(function () {
 
       // 7. 모달 드래그 기능 적용
       makeModalDraggable('salesCustomerManageEditModal', 'salesCustomerManageEditModalHeader');
-
-      console.log('✅ 신규 등록 모달 열기 완료');
     } catch (error) {
       console.error('❌ 신규 등록 모달 열기 오류:', error);
       alert('신규 등록 모달을 열 수 없습니다: ' + error.message);
@@ -906,13 +864,11 @@ $(document).ready(function () {
    * - 검색어가 있으면: 해당 키워드로 검색된 모달 열기
    */
   window.openCustomerSearchFromEditModal = function() {
-    console.log('🔍 [신규 등록] 매출처 검색 모달 열기');
+    console.log('===== salesCustomerManage > 신규등록 모달 검색 버튼 클릭 =====');
 
     // 1. 신규등록 모달의 매출처명 입력란에서 검색어 가져오기
     const customerNameInput = document.getElementById('customerName');
     const searchKeyword = customerNameInput ? customerNameInput.value.trim() : '';
-
-    console.log('🔍 검색어:', searchKeyword || '(전체)');
 
     // 2. 매출처 검색 모달 열기
     // - callerContext: 'salesCustomerEdit' (신규 등록 모달에서 호출)
@@ -925,16 +881,9 @@ $(document).ready(function () {
    * ⚠️ 선택한 매출처 정보를 그대로 폼에 입력 (사용자가 직접 매출처코드 수정)
    */
   window.selectCustomerForEdit = async function(customer) {
-    console.log('✅ 매출처 선택:', customer);
-
     try {
       // 매출처코드와 매출처명 설정
       const selectedCode = customer.매출처코드 || customer.customer_code || '';
-      const customerName = customer.매출처명 || customer.customer_name || '';
-
-      console.log('===== 매출처 정보 폼에 채우기 (신규 등록 모달) =====');
-      console.log('선택된 매출처코드:', selectedCode);
-      console.log('선택된 매출처명:', customerName);
 
       // 1. API로 전체 매출처 정보 가져오기
       const result = await apiCall(`/customers/${selectedCode}`, 'GET');
@@ -944,7 +893,6 @@ $(document).ready(function () {
       }
 
       const fullCustomer = result.data;
-      console.log('✅ 매출처 전체 정보 로드 성공:', fullCustomer);
 
       // 2. 폼 필드에 정보 채우기 (선택한 매출처코드 그대로 사용)
       document.getElementById('customerCode').value = selectedCode;
@@ -967,15 +915,10 @@ $(document).ready(function () {
       // 비고
       document.getElementById('remarks').value = fullCustomer.비고 || '';
 
-      console.log('✅ 매출처 정보 폼 채우기 완료');
-      console.log('📌 매출처코드:', selectedCode);
-
       // 3. 매출처 검색 모달 닫기
       if (typeof window.closeCustomerSearchModal === 'function') {
         window.closeCustomerSearchModal();
       }
-
-      console.log('✅ 매출처 정보 자동 입력 완료 (사용자가 매출처코드 수정 가능)');
     } catch (error) {
       console.error('❌ 매출처 정보 입력 오류:', error);
       alert('매출처 정보를 입력하는 중 오류가 발생했습니다: ' + error.message);
@@ -1140,10 +1083,9 @@ $(document).ready(function () {
  * @description customerSearchModal에서 사용하는 공용 검색 함수
  */
 window.searchCustomersForModal = async function() {
+  console.log('===== customerSearchModal > 검색 버튼 클릭 =====');
   try {
-    console.log('🔍 [검색 실행] 모달 ID: customerSearchModal');
     const keyword = document.getElementById('customerSearchModalInput').value.trim();
-    console.log('🔍 검색 키워드:', keyword);
 
     // API 호출
     let apiUrl = API_BASE_URL + '/customers?pageSize=1000';
@@ -1238,13 +1180,6 @@ window.searchCustomersForModal = async function() {
 
     // DataTable에 데이터 업데이트 및 매출처코드 순 정렬
     window.customerSearchTable.clear().rows.add(customers).order([[0, 'asc']]).draw();
-
-    console.log('✅ 검색 완료:', customers.length, '건');
-    console.log('✅ 정렬 기준: 매출처코드 오름차순 (컬럼 0)');
-    if (customers.length > 0) {
-      console.log('첫 번째 데이터:', customers[0]);
-    }
-
   } catch (error) {
     console.error('매출처 검색 오류:', error);
     alert('매출처 검색 중 오류가 발생했습니다.');
@@ -1313,8 +1248,7 @@ window.selectCustomerFromModal = function(customerOrCode, name) {
  * @param {string} initialSearchValue - 초기 검색어 (선택적)
  */
 window.openCustomerSearchModal = function(callerContext, initialSearchValue) {
-  console.log('🔍 [모달 열기] ID: customerSearchModal (공용)');
-  console.log('📞 호출자:', callerContext || 'unknown');
+  console.log('===== customerSearchModal > 모달 열기 =====');
   window.currentCustomerSearchCaller = callerContext || 'unknown';
   // 표준 ID 우선, 없으면 기존 quotation ID 사용 (하위 호환)
   const modal = document.getElementById('customerSearchModal') ||
@@ -1368,7 +1302,6 @@ window.openCustomerSearchModal = function(callerContext, initialSearchValue) {
  * 매출처 검색 모달 닫기 (공용)
  */
 window.closeCustomerSearchModal = function() {
-  console.log('❌ [모달 닫기] ID: customerSearchModal (공용)');
   // 표준 ID 우선, 없으면 기존 quotation ID 사용 (하위 호환)
   const modal = document.getElementById('customerSearchModal') ||
                 document.getElementById('quotationCustomerSearchModal');
@@ -1418,6 +1351,3 @@ window.searchQuotationCustomers = window.searchCustomersForModal;
  * @deprecated closeCustomerSearchModal() 사용 권장
  */
 window.closeQuotationCustomerSearchModal = window.closeCustomerSearchModal;
-
-console.log('✅ customer.js (salesCustomer) 로드 완료 - 하위 호환성 레이어 활성화');
-console.log('✅ 공용 매출처 검색 모달 함수 로드 완료 (customerSearchModal)');
