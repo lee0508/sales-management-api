@@ -2678,6 +2678,65 @@ app.get('/api/materials/:materialCode/purchase-price-history/:supplierCode', asy
 });
 
 //------------------------------------------------------------
+// ✅ 모든 매입처 입고 이력 조회 API (자재입출내역 테이블 기반 - 매입처 제한 없음)
+// GET /api/materials/:materialCode/all-purchase-history
+//------------------------------------------------------------
+app.get('/api/materials/:materialCode/all-purchase-history', async (req, res) => {
+  try {
+    const { materialCode } = req.params;
+
+    // 자재코드 분리 (분류코드 2자리 + 세부코드)
+    const 분류코드 = materialCode.substring(0, 2);
+    const 세부코드 = materialCode.substring(2);
+
+    // 5년 전 날짜 계산 (YYYYMMDD 형식)
+    const fiveYearsAgo = new Date();
+    fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+    const 기준일자 = fiveYearsAgo.toISOString().slice(0, 10).replace(/-/g, '');
+
+    console.log(`🔍 전체 매입처 입고 이력 조회 - 자재코드: ${materialCode}, 기준일자: ${기준일자} 이후 (최근 5년)`);
+
+    // 자재입출내역 테이블에서 모든 매입처의 입고 이력 조회 (5년 이내 데이터)
+    const result = await pool
+      .request()
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(18), 세부코드)
+      .input('기준일자', sql.VarChar(8), 기준일자).query(`
+        SELECT
+          t.입출고일자,
+          t.입출고시간,
+          t.입고수량,
+          t.입고단가,
+          t.입고부가,
+          (t.입고수량 * t.입고단가) AS 금액,
+          t.적요,
+          t.매입처코드,
+          p.매입처명
+        FROM 자재입출내역 t
+        LEFT JOIN 매입처 p ON t.매입처코드 = p.매입처코드 AND t.사업장코드 = p.사업장코드
+        WHERE t.분류코드 = @분류코드
+          AND t.세부코드 = @세부코드
+          AND t.입출고구분 = 1
+          AND t.입고수량 > 0
+          AND t.사용구분 = 0
+          AND t.입출고일자 >= @기준일자
+        ORDER BY t.입출고일자 DESC, t.입출고시간 DESC
+      `);
+
+    console.log(`✅ 전체 매입처 입고 이력 ${result.recordset.length}건 조회 완료`);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('전체 매입처 입고 이력 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+//------------------------------------------------------------
 // ✅ 발주 제안가 이력 조회 API (발주내역 테이블 기반 - 매입처 기준)
 // GET /api/materials/:materialCode/order-history/:supplierCode
 //------------------------------------------------------------
@@ -3468,14 +3527,58 @@ app.delete('/api/orders/:date/:no', requireAuth, async (req, res) => {
 // 자재 리스트
 app.get('/api/materials', async (req, res) => {
   try {
-    const { search, 분류코드, includeDeleted, searchByCode, searchByName, searchBySpec, searchCategory, searchCode, searchName, searchSpec } =
+    const { search, 분류코드, includeDeleted, searchByCode, searchByName, searchBySpec, searchCategory, searchCode, searchName, searchSpec, removeDuplicates } =
       req.query;
     const 사업장코드 = req.session?.user?.사업장코드 || '01';
 
     // includeDeleted=true면 사용구분 0과 9 모두 조회, 아니면 0만 조회
     const 사용구분조건 = includeDeleted === 'true' ? 'IN (0, 9)' : '= 0';
 
-    let query = `
+    // removeDuplicates=true면 자재명+규격+단위 중복 제거 (거래 빈도 높은 것만 선택)
+    let query = '';
+
+    if (removeDuplicates === 'true') {
+      console.log('🔄 중복 제거 모드: 자재명+규격+단위 기준으로 거래 빈도 높은 자재만 반환');
+      query = `
+            SELECT
+                (m.분류코드+m.세부코드) as 자재코드,
+                m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
+                m.바코드, m.과세구분, m.적요, m.사용구분,
+                c.분류명,
+                ml.입고단가1, ml.출고단가1, ml.출고단가2, ml.출고단가3
+            FROM (
+                SELECT
+                    분류코드, 세부코드, 자재명, 규격, 단위,
+                    바코드, 과세구분, 적요, 사용구분,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY 자재명, 규격, 단위
+                        ORDER BY
+                            -- 거래 건수가 많은 자재 우선
+                            (SELECT COUNT(*)
+                             FROM 자재입출내역 t
+                             WHERE t.분류코드 = 자재.분류코드
+                               AND t.세부코드 = 자재.세부코드
+                               AND t.사업장코드 = @사업장코드
+                               AND t.사용구분 = 0) DESC,
+                            -- 거래 건수가 같으면 최근 거래일 최신 순
+                            (SELECT MAX(t.입출고일자)
+                             FROM 자재입출내역 t
+                             WHERE t.분류코드 = 자재.분류코드
+                               AND t.세부코드 = 자재.세부코드
+                               AND t.사업장코드 = @사업장코드
+                               AND t.사용구분 = 0) DESC,
+                            -- 그래도 같으면 세부코드가 작은 것 우선
+                            세부코드 ASC
+                    ) AS 순위
+                FROM 자재
+                WHERE 사용구분 ${사용구분조건}
+            ) m
+            LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
+            LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = @사업장코드
+            WHERE m.순위 = 1
+        `;
+    } else {
+      query = `
             SELECT
                 (m.분류코드+m.세부코드) as 자재코드,
                 m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
@@ -3487,6 +3590,7 @@ app.get('/api/materials', async (req, res) => {
             LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = @사업장코드
             WHERE m.사용구분 ${사용구분조건}
         `;
+    }
 
     const request = pool.request().input('사업장코드', sql.VarChar(2), 사업장코드);
 
@@ -3495,15 +3599,25 @@ app.get('/api/materials', async (req, res) => {
       query += ` AND m.분류코드 = @분류코드`;
     }
 
-    // 새로운 방식: 개별 필드 검색 (searchCategory, searchCode, searchName)
+    // 새로운 방식: 개별 필드 검색 (searchCategory, searchCode, searchName, searchSpec)
     if (searchCategory || searchCode || searchName || searchSpec) {
       const searchConditions = [];
 
-      // searchCode와 searchName이 같은 값이면 OR로 연결 (코드 또는 자재명 검색)
-      if (searchCode && searchName && searchCode === searchName) {
+      // searchCode, searchName, searchSpec가 모두 같은 값이면 OR로 연결 (통합 검색)
+      if (searchCode && searchName && searchSpec &&
+          searchCode === searchName && searchName === searchSpec) {
+        request.input('searchKeyword', sql.NVarChar, `%${searchCode}%`);
+        searchConditions.push('((m.분류코드+m.세부코드) LIKE @searchKeyword OR m.세부코드 LIKE @searchKeyword OR m.자재명 LIKE @searchKeyword OR m.규격 LIKE @searchKeyword)');
+        console.log(`🔍 자재 통합 검색 (코드 OR 자재명 OR 규격):`, searchCode);
+      }
+      // searchCode와 searchName만 같은 값이면 OR로 연결 (코드 또는 자재명 검색)
+      else if (searchCode && searchName && searchCode === searchName && !searchSpec) {
         request.input('searchKeyword', sql.NVarChar, `%${searchCode}%`);
         searchConditions.push('((m.분류코드+m.세부코드) LIKE @searchKeyword OR m.세부코드 LIKE @searchKeyword OR m.자재명 LIKE @searchKeyword)');
-      } else {
+        console.log(`🔍 자재 통합 검색 (코드 OR 자재명):`, searchCode);
+      }
+      // 개별 필드 검색 (AND 조건)
+      else {
         if (searchCategory) {
           request.input('searchCategory', sql.NVarChar, `%${searchCategory}%`);
           searchConditions.push('m.분류코드 LIKE @searchCategory');
@@ -3520,15 +3634,17 @@ app.get('/api/materials', async (req, res) => {
           request.input('searchSpec', sql.NVarChar, `%${searchSpec}%`);
           searchConditions.push('m.규격 LIKE @searchSpec');
         }
+        console.log(`🔍 자재 개별 필드 검색 (AND 조건):`, {
+          분류코드: searchCategory || '',
+          자재코드: searchCode || '',
+          자재명: searchName || '',
+          규격: searchSpec || '',
+        });
       }
 
-      query += ` AND (${searchConditions.join(' AND ')})`;
-      console.log(`🔍 자재 개별 필드 검색:`, {
-        분류코드: searchCategory || '',
-        자재코드: searchCode || '',
-        자재명: searchName || '',
-        규격: searchSpec || '',
-      });
+      if (searchConditions.length > 0) {
+        query += ` AND (${searchConditions.join(' AND ')})`;
+      }
     }
     // 기존 방식: 단일 검색어 + 체크박스 (하위 호환성)
     else if (search) {
@@ -3558,8 +3674,9 @@ app.get('/api/materials', async (req, res) => {
           });
         }
       } else {
-        // 기본 검색 (하위 호환성 - 자재명과 규격만)
-        query += ` AND (m.자재명 LIKE @search OR m.규격 LIKE @search)`;
+        // 기본 검색 (분류코드, 세부코드, 자재명, 규격 모두 검색)
+        query += ` AND (m.분류코드 LIKE @search OR m.세부코드 LIKE @search OR (m.분류코드+m.세부코드) LIKE @search OR m.자재명 LIKE @search OR m.규격 LIKE @search)`;
+        console.log(`🔍 자재 통합 검색:`, search);
       }
     }
 
@@ -4284,6 +4401,220 @@ app.get('/api/materials/:code/consistency-check', async (req, res) => {
   }
 });
 
+// 특정 자재의 중복 검사 API
+app.get('/api/materials/:code/duplicate-check', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const 분류코드 = code.substring(0, 2);
+    const 세부코드 = code.substring(2);
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    // 1. 현재 자재 정보 조회
+    const currentMaterialResult = await pool
+      .request()
+      .input('분류코드', sql.VarChar(2), 분류코드)
+      .input('세부코드', sql.VarChar(16), 세부코드)
+      .input('사업장코드', sql.VarChar(2), 사업장코드).query(`
+        SELECT
+          m.분류코드,
+          m.세부코드,
+          m.자재명,
+          m.규격,
+          m.단위,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 1 THEN 1 ELSE 0 END), 0) AS 매입건수,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 2 THEN 1 ELSE 0 END), 0) AS 매출건수,
+          ISNULL(COUNT(t.입출고일자), 0) AS 전체거래건수,
+          MAX(t.입출고일자) AS 최근거래일
+        FROM 자재 m
+        LEFT JOIN 자재입출내역 t
+          ON m.분류코드 = t.분류코드
+          AND m.세부코드 = t.세부코드
+          AND t.사업장코드 = @사업장코드
+          AND t.사용구분 = 0
+        WHERE m.분류코드 = @분류코드
+          AND m.세부코드 = @세부코드
+          AND m.사용구분 = 0
+        GROUP BY m.분류코드, m.세부코드, m.자재명, m.규격, m.단위
+      `);
+
+    if (currentMaterialResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '자재를 찾을 수 없습니다.' });
+    }
+
+    const currentMaterial = currentMaterialResult.recordset[0];
+    const { 자재명, 규격 } = currentMaterial;
+
+    // 2. 동일한 자재명 + 규격을 가진 다른 자재 검색 (단위는 사용자 입력이므로 제외)
+    const duplicatesResult = await pool
+      .request()
+      .input('자재명', sql.NVarChar(30), 자재명)
+      .input('규격', sql.NVarChar(30), 규격 || '')
+      .input('현재분류코드', sql.VarChar(2), 분류코드)
+      .input('현재세부코드', sql.VarChar(16), 세부코드)
+      .input('사업장코드', sql.VarChar(2), 사업장코드).query(`
+        SELECT
+          m.분류코드,
+          m.세부코드,
+          m.자재명,
+          m.규격,
+          m.단위,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 1 THEN 1 ELSE 0 END), 0) AS 매입건수,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 2 THEN 1 ELSE 0 END), 0) AS 매출건수,
+          ISNULL(COUNT(t.입출고일자), 0) AS 전체거래건수,
+          MAX(t.입출고일자) AS 최근거래일,
+          MIN(t.입출고일자) AS 최초거래일,
+          -- 주 자재 여부 (거래 건수가 가장 많은 자재 = 1)
+          CASE
+            WHEN ISNULL(COUNT(t.입출고일자), 0) = (
+              SELECT MAX(cnt)
+              FROM (
+                SELECT COUNT(t2.입출고일자) AS cnt
+                FROM 자재 m2
+                LEFT JOIN 자재입출내역 t2
+                  ON m2.분류코드 = t2.분류코드
+                  AND m2.세부코드 = t2.세부코드
+                  AND t2.사업장코드 = @사업장코드
+                  AND t2.사용구분 = 0
+                WHERE m2.자재명 = @자재명
+                  AND m2.규격 = @규격
+                  AND m2.사용구분 = 0
+                GROUP BY m2.분류코드, m2.세부코드
+              ) AS subq
+            ) THEN 1
+            ELSE 0
+          END AS is_primary
+        FROM 자재 m
+        LEFT JOIN 자재입출내역 t
+          ON m.분류코드 = t.분류코드
+          AND m.세부코드 = t.세부코드
+          AND t.사업장코드 = @사업장코드
+          AND t.사용구분 = 0
+        WHERE m.자재명 = @자재명
+          AND m.규격 = @규격
+          AND m.사용구분 = 0
+          AND NOT (m.분류코드 = @현재분류코드 AND m.세부코드 = @현재세부코드)
+        GROUP BY m.분류코드, m.세부코드, m.자재명, m.규격, m.단위
+        ORDER BY 전체거래건수 DESC, 최근거래일 DESC
+      `);
+
+    res.json({
+      success: true,
+      data: {
+        current: currentMaterial,
+        duplicates: duplicatesResult.recordset,
+      },
+    });
+  } catch (err) {
+    console.error('중복 체크 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// 4. 중복 자재 분석 API (자재명 + 규격 중복)
+app.get('/api/materials/duplicate-analysis', async (req, res) => {
+  try {
+    console.log('🔍 중복 자재 분석 API 호출');
+
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    // 중복 자재 목록 조회 (자재명 + 규격 기준)
+    const result = await pool.request().input('사업장코드', sql.VarChar(2), 사업장코드).query(`
+      SELECT
+          자재명,
+          규격,
+          COUNT(*) AS 중복개수,
+          STUFF((
+              SELECT ', ' + 분류코드 + 세부코드
+              FROM 자재 AS m2
+              WHERE m2.자재명 = m.자재명
+                AND m2.규격 = m.규격
+                AND m2.사용구분 = 0
+              FOR XML PATH(''), TYPE
+          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS 자재코드목록
+      FROM 자재 AS m
+      WHERE 사용구분 = 0
+      GROUP BY 자재명, 규격
+      HAVING COUNT(*) > 1
+      ORDER BY 중복개수 DESC, 자재명
+    `);
+
+    console.log(`✅ 중복 자재 그룹 ${result.recordset.length}개 조회 완료`);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      summary: {
+        duplicateGroups: result.recordset.length,
+        totalDuplicates: result.recordset.reduce((sum, row) => sum + row.중복개수, 0),
+      },
+    });
+  } catch (err) {
+    console.error('❌ 중복 자재 분석 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
+// 5. 중복 자재 상세 정보 API (특정 자재명+규격의 모든 버전 조회)
+app.get('/api/materials/duplicate-detail', async (req, res) => {
+  try {
+    const { 자재명, 규격 } = req.query;
+
+    if (!자재명 || !규격) {
+      return res.status(400).json({ success: false, message: '자재명과 규격은 필수입니다.' });
+    }
+
+    console.log(`🔍 중복 자재 상세 조회: ${자재명} / ${규격}`);
+
+    const 사업장코드 = req.session?.user?.사업장코드 || '01';
+
+    const result = await pool
+      .request()
+      .input('사업장코드', sql.VarChar(2), 사업장코드)
+      .input('자재명', sql.NVarChar, 자재명)
+      .input('규격', sql.NVarChar, 규격).query(`
+      SELECT
+          m.분류코드,
+          m.세부코드,
+          (m.분류코드 + m.세부코드) AS 자재코드,
+          m.자재명,
+          m.규격,
+          m.단위,
+          -- 매입 통계
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 1 THEN 1 ELSE 0 END), 0) AS 매입건수,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 1 THEN t.입고수량 ELSE 0 END), 0) AS 총매입수량,
+          -- 매출 통계
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 2 THEN 1 ELSE 0 END), 0) AS 매출건수,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 2 THEN t.출고수량 ELSE 0 END), 0) AS 총매출수량,
+          -- 전체 통계
+          ISNULL(COUNT(t.입출고일자), 0) AS 전체거래건수,
+          -- 날짜
+          MIN(t.입출고일자) AS 최초거래일,
+          MAX(t.입출고일자) AS 최근거래일
+      FROM 자재 m
+      LEFT JOIN 자재입출내역 t
+          ON m.분류코드 = t.분류코드
+          AND m.세부코드 = t.세부코드
+          AND t.사업장코드 = @사업장코드
+          AND t.사용구분 = 0
+      WHERE m.사용구분 = 0
+        AND m.자재명 = @자재명
+        AND m.규격 = @규격
+      GROUP BY m.분류코드, m.세부코드, m.자재명, m.규격, m.단위
+      ORDER BY 전체거래건수 DESC, 최근거래일 DESC
+    `);
+
+    console.log(`✅ ${자재명} / ${규격} - ${result.recordset.length}개 버전 조회 완료`);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error('❌ 중복 자재 상세 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류: ' + err.message });
+  }
+});
+
 // 자재 분류 목록 조회
 // 자재분류 목록 조회
 app.get('/api/material-categories', async (req, res) => {
@@ -4866,25 +5197,48 @@ app.delete(
 app.get('/api/inventory/:workplace', async (req, res) => {
   try {
     const { workplace } = req.params;
+    const { search } = req.query;
 
-    const result = await pool.request().input('사업장코드', sql.VarChar(2), workplace).query(`
-                SELECT 
-                    (i.분류코드 + i.세부코드) as 자재코드,
-                    m.자재명, m.규격, m.단위,
-                    SUM(CASE WHEN i.입출고구분 = 1 THEN i.입고수량 ELSE 0 END) as 총입고,
-                    SUM(CASE WHEN i.입출고구분 = 2 THEN i.출고수량 ELSE 0 END) as 총출고,
-                    SUM(CASE WHEN i.입출고구분 = 1 THEN i.입고수량 ELSE -i.출고수량 END) as 현재고,
-                    l.적정재고, l.최저재고,
-                    l.최종입고일자, l.최종출고일자
-                FROM 자재입출내역 i
-                LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
-                LEFT JOIN 자재원장 l ON i.사업장코드 = l.사업장코드 
-                    AND i.분류코드 = l.분류코드 AND i.세부코드 = l.세부코드
-                WHERE i.사업장코드 = @사업장코드 AND i.사용구분 = 0
-                GROUP BY i.분류코드, i.세부코드, m.자재명, m.규격, m.단위,
-                    l.적정재고, l.최저재고, l.최종입고일자, l.최종출고일자
-                ORDER BY i.분류코드, i.세부코드
-            `);
+    let query = `
+      SELECT
+          i.분류코드,
+          i.세부코드,
+          (i.분류코드 + i.세부코드) as 자재코드,
+          m.자재명, m.규격, m.단위,
+          SUM(CASE WHEN i.입출고구분 = 1 THEN i.입고수량 ELSE 0 END) as 총입고,
+          SUM(CASE WHEN i.입출고구분 = 2 THEN i.출고수량 ELSE 0 END) as 총출고,
+          SUM(CASE WHEN i.입출고구분 = 1 THEN i.입고수량 ELSE -i.출고수량 END) as 현재고,
+          l.적정재고, l.최저재고,
+          l.최종입고일자, l.최종출고일자
+      FROM 자재입출내역 i
+      LEFT JOIN 자재 m ON i.분류코드 = m.분류코드 AND i.세부코드 = m.세부코드
+      LEFT JOIN 자재원장 l ON i.사업장코드 = l.사업장코드
+          AND i.분류코드 = l.분류코드 AND i.세부코드 = l.세부코드
+      WHERE i.사업장코드 = @사업장코드 AND i.사용구분 = 0
+    `;
+
+    const request = pool.request().input('사업장코드', sql.VarChar(2), workplace);
+
+    // 검색어가 있으면 검색 조건 추가 (자재코드, 자재명, 규격)
+    if (search) {
+      query += ` AND (
+        (i.분류코드 + i.세부코드) LIKE @search
+        OR i.분류코드 LIKE @search
+        OR i.세부코드 LIKE @search
+        OR m.자재명 LIKE @search
+        OR m.규격 LIKE @search
+      )`;
+      request.input('search', sql.NVarChar(100), `%${search}%`);
+      console.log('🔍 재고 검색:', search);
+    }
+
+    query += `
+      GROUP BY i.분류코드, i.세부코드, m.자재명, m.규격, m.단위,
+          l.적정재고, l.최저재고, l.최종입고일자, l.최종출고일자
+      ORDER BY i.분류코드, i.세부코드
+    `;
+
+    const result = await request.query(query);
 
     res.json({
       success: true,
@@ -4893,6 +5247,122 @@ app.get('/api/inventory/:workplace', async (req, res) => {
     });
   } catch (err) {
     console.error('재고 현황 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// --------------------------
+// 자재코드관리 (Material Code Management) API
+// --------------------------
+
+// 자재명별 코드 분석 목록 조회
+app.get('/api/material-codes/analysis', async (req, res) => {
+  try {
+    const { search } = req.query;
+
+    console.log('📥 자재명별 코드 분석 목록 조회 시작:', { search });
+
+    // SQL Server 2008R2 호환 쿼리
+    let query = `
+      SELECT
+          m.자재명,
+          m.규격,
+          m.단위,
+          COUNT(DISTINCT (m.분류코드 + m.세부코드)) AS 코드개수,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 1 THEN 1 ELSE 0 END), 0) AS 매입건수,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 2 THEN 1 ELSE 0 END), 0) AS 매출건수,
+          ISNULL(COUNT(t.입출고일자), 0) AS 전체건수,
+          MAX(t.입출고일자) AS 최근거래일
+      FROM 자재 m
+      LEFT JOIN 자재입출내역 t
+          ON m.분류코드 = t.분류코드
+          AND m.세부코드 = t.세부코드
+          AND t.사용구분 = 0
+      WHERE m.사용구분 = 0
+    `;
+
+    const request = pool.request();
+
+    // 검색어가 있으면 검색 조건 추가 (세부코드, 자재명, 규격)
+    if (search) {
+      query += ` AND (m.세부코드 LIKE @search OR m.자재명 LIKE @search OR m.규격 LIKE @search)`;
+      request.input('search', sql.NVarChar(100), `%${search}%`);
+    }
+
+    query += `
+      GROUP BY m.자재명, m.규격, m.단위
+      ORDER BY 전체건수 DESC, m.자재명
+    `;
+
+    const result = await request.query(query);
+
+    console.log(`✅ 자재명 ${result.recordset.length}건 조회 완료`);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('❌ 자재명별 코드 분석 조회 에러:', err);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+// 자재명별 코드 상세 조회
+app.get('/api/material-codes/detail', async (req, res) => {
+  try {
+    const { 자재명, 규격 } = req.query;
+
+    if (!자재명) {
+      return res.status(400).json({ success: false, message: '자재명은 필수입니다.' });
+    }
+
+    console.log('📥 자재코드 상세 조회:', { 자재명, 규격 });
+
+    // 자재명과 규격이 일치하는 모든 자재코드의 거래 통계 조회
+    const query = `
+      SELECT
+          m.분류코드,
+          m.세부코드,
+          (m.분류코드 + m.세부코드) AS 자재코드,
+          c.분류명,
+          m.단위,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 1 THEN 1 ELSE 0 END), 0) AS 매입건수,
+          ISNULL(SUM(CASE WHEN t.입출고구분 = 2 THEN 1 ELSE 0 END), 0) AS 매출건수,
+          ISNULL(COUNT(t.입출고일자), 0) AS 전체건수,
+          MIN(t.입출고일자) AS 최초거래일,
+          MAX(t.입출고일자) AS 최근거래일
+      FROM 자재 m
+      LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
+      LEFT JOIN 자재입출내역 t
+          ON m.분류코드 = t.분류코드
+          AND m.세부코드 = t.세부코드
+          AND t.사용구분 = 0
+      WHERE m.사용구분 = 0
+        AND m.자재명 = @자재명
+        AND ${규격 ? 'm.규격 = @규격' : '(m.규격 IS NULL OR m.규격 = \'\')'}
+      GROUP BY m.분류코드, m.세부코드, c.분류명, m.단위
+      ORDER BY 전체건수 DESC, 최근거래일 DESC
+    `;
+
+    const request = pool.request().input('자재명', sql.NVarChar(50), 자재명);
+
+    if (규격) {
+      request.input('규격', sql.NVarChar(50), 규격);
+    }
+
+    const result = await request.query(query);
+
+    console.log(`✅ 자재코드 ${result.recordset.length}건 조회 완료`);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+      total: result.recordset.length,
+    });
+  } catch (err) {
+    console.error('❌ 자재코드 상세 조회 에러:', err);
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
