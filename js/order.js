@@ -863,13 +863,7 @@ async function editOrderManage(orderDate, orderNo) {
       const totalAmount = details.reduce((sum, item) => sum + (item.공급가액 || 0), 0);
       $('#orderManageEditDetailTotal').text(totalAmount.toLocaleString());
 
-      // ✅ 전체 선택 체크박스 이벤트
-      $('#selectAllEditDetails')
-        .off('change')
-        .on('change', function () {
-          const isChecked = $(this).prop('checked');
-          $('.editDetailCheckbox').prop('checked', isChecked);
-        });
+      // ✅ [미사용 코드 삭제] 전체 선택 체크박스 (#selectAllEditDetails) - HTML에 존재하지 않음
 
       // 드래그 기능 활성화 (최초 1회만 실행)
       if (typeof makeModalDraggable === 'function' && !window.orderManageEditModalDraggable) {
