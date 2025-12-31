@@ -10,8 +10,6 @@ let selectedMaterials = [];
  * 자재 목록 DataTable 초기화
  */
 function initMaterialHistoryTable() {
-  console.log('📋 [initMaterialHistoryTable] 호출 - 관련 ID: #materialHistoryPage, #materialHistoryTable, #materialHistoryList');
-
   if (materialHistoryTableInstance) {
     materialHistoryTableInstance.destroy();
   }
@@ -179,16 +177,12 @@ function initMaterialHistoryTable() {
   $('#materialHistoryTable tbody').on('change', '.material-checkbox', function () {
     updateMaterialHistoryButtonStates();
   });
-
-  console.log('✅ 자재 목록 DataTable 초기화 완료');
 }
 
 /**
  * 체크박스 상태에 따라 버튼 표시/숨김 처리
  */
 function updateMaterialHistoryButtonStates() {
-  console.log('🔘 [updateMaterialHistoryButtonStates] 호출 - 관련 ID: .historyActions-{code}');
-
   const checkboxes = document.querySelectorAll('.material-checkbox');
   const checkedCount = Array.from(checkboxes).filter((cb) => cb.checked).length;
 
@@ -224,10 +218,7 @@ function updateMaterialHistoryButtonStates() {
  * 자재 목록 조회
  */
 async function loadMaterialList(searchKeyword = '') {
-  console.log('📥 [loadMaterialList] 호출 - 관련 ID: #materialHistoryTable, #selectAllMaterials');
-
   try {
-    console.log('🔍 자재 목록 조회 시작:', searchKeyword);
 
     // 자재내역관리에서는 삭제된 자재(사용구분=9)도 포함하여 조회
     // removeDuplicates=true: 자재명+규격+단위 기준으로 중복 제거 (거래 빈도 높은 자재만 표시)
@@ -246,8 +237,6 @@ async function loadMaterialList(searchKeyword = '') {
     const result = await response.json();
 
     if (result.success && result.data) {
-      console.log(`✅ 자재 ${result.data.length}건 조회 성공 (중복 제거됨)`);
-
       // DataTable 데이터 갱신
       materialHistoryTableInstance.clear();
       materialHistoryTableInstance.rows.add(result.data);
@@ -256,7 +245,7 @@ async function loadMaterialList(searchKeyword = '') {
       alert('자재 목록 조회에 실패했습니다.');
     }
   } catch (error) {
-    console.error('❌ 자재 목록 조회 에러:', error);
+    console.error('자재 목록 조회 에러:', error);
     alert('자재 목록 조회 중 오류가 발생했습니다.');
   }
 }
@@ -265,7 +254,7 @@ async function loadMaterialList(searchKeyword = '') {
  * 검색 기능
  */
 window.searchMaterialHistory = function searchMaterialHistory() {
-  console.log('🔍 [searchMaterialHistory] 호출 - 관련 ID: #historyListSearchInput, #historySearchBtn');
+  console.log('===== materialHistoryList > 검색 버튼 클릭 =====');
 
   const keyword = document.getElementById('historyListSearchInput').value.trim();
   loadMaterialList(keyword);
@@ -275,18 +264,17 @@ window.searchMaterialHistory = function searchMaterialHistory() {
  * 검색 초기화
  */
 window.resetHistorySearch = function resetHistorySearch() {
-  console.log('🔄 [resetHistorySearch] 호출 - 관련 ID: #historyListSearchInput, #historyResetBtn');
+  console.log('===== materialHistoryList > 초기화 버튼 클릭 =====');
 
   document.getElementById('historyListSearchInput').value = '';
   materialHistoryTableInstance.clear().draw();
-  console.log('🔄 검색 초기화 완료');
 };
 
 /**
  * 신규 자재 등록 모달 열기
  */
 window.openNewHistoryModal = function openNewHistoryModal() {
-  console.log('➕ [openNewHistoryModal] 호출 - 관련 ID: #materialHistoryModal, #materialHistoryForm, #materialHistoryModalTitle, #saveMaterialHistoryBtn, #historyNewBtn');
+  console.log('===== materialHistoryList > 신규 등록 버튼 클릭 =====');
 
   // 모달 제목 설정
   const titleElement = document.getElementById('materialHistoryModalTitle');
@@ -311,7 +299,7 @@ window.openNewHistoryModal = function openNewHistoryModal() {
  * 자재 저장 (신규 등록)
  */
 async function saveMaterial() {
-  console.log('💾 [saveMaterial] 호출 - 관련 ID: #materialHistoryForm, #materialHistory분류코드, #materialHistory세부코드, #materialHistory자재명');
+  console.log('===== materialHistoryModal > 저장 버튼 클릭 =====');
 
   try {
     const 분류코드 = document.getElementById('materialHistory분류코드').value.trim();
@@ -342,8 +330,6 @@ async function saveMaterial() {
       적요,
     };
 
-    console.log('📤 자재 등록 요청:', requestBody);
-
     const response = await fetch('/api/materials', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -361,7 +347,7 @@ async function saveMaterial() {
       alert(result.message || '자재 등록에 실패했습니다.');
     }
   } catch (error) {
-    console.error('❌ 자재 등록 에러:', error);
+    console.error('자재 등록 에러:', error);
     alert('자재 등록 중 오류가 발생했습니다.');
   }
 }
@@ -370,10 +356,9 @@ async function saveMaterial() {
  * 자재 수정 모달 열기
  */
 window.editMaterial = async function editMaterial(자재코드) {
-  console.log('✏️ [editMaterial] 호출 - 관련 ID: #materialHistoryModal, #materialHistoryForm, #materialHistoryModalTitle, #materialHistory분류코드, #materialHistory세부코드');
+  console.log('===== materialHistoryTable > 수정 버튼 클릭 =====');
 
   try {
-    console.log('✏️ 자재 수정 모달 열기:', 자재코드);
 
     // 자재 상세 정보 조회
     const response = await fetch(`/api/materials/${자재코드}/detail`, {
@@ -456,8 +441,6 @@ async function updateMaterial(자재코드) {
       적요,
     };
 
-    console.log('📤 자재 수정 요청:', 자재코드, requestBody);
-
     const response = await fetch(`/api/materials/${자재코드}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -475,7 +458,7 @@ async function updateMaterial(자재코드) {
       alert(result.message || '자재 수정에 실패했습니다.');
     }
   } catch (error) {
-    console.error('❌ 자재 수정 에러:', error);
+    console.error('자재 수정 에러:', error);
     alert('자재 수정 중 오류가 발생했습니다.');
   }
 }
@@ -484,7 +467,7 @@ async function updateMaterial(자재코드) {
  * 자재 삭제
  */
 window.deleteMaterial = async function deleteMaterial(자재코드) {
-  console.log('🗑️ [deleteMaterial] 호출 - 관련 ID: #materialHistoryDeleteModal, #materialHistoryDeleteInfo');
+  console.log('===== materialHistoryTable > 삭제 버튼 클릭 =====');
 
   // 삭제할 자재 정보 표시
   const deleteInfo = document.getElementById('materialHistoryDeleteInfo');
@@ -508,7 +491,7 @@ window.deleteMaterial = async function deleteMaterial(자재코드) {
  * 삭제 모달 닫기
  */
 window.closeMaterialHistoryDeleteModal = function closeMaterialHistoryDeleteModal() {
-  console.log('❌ [closeMaterialHistoryDeleteModal] 호출 - 관련 ID: #materialHistoryDeleteModal');
+  console.log('===== materialHistoryDeleteModal > 닫기 버튼 클릭 =====');
 
   document.getElementById('materialHistoryDeleteModal').style.display = 'none';
   window.materialToDelete = null;
@@ -518,14 +501,13 @@ window.closeMaterialHistoryDeleteModal = function closeMaterialHistoryDeleteModa
  * 삭제 확인 처리
  */
 window.confirmDeleteMaterialHistory = async function confirmDeleteMaterialHistory() {
-  console.log('✅ [confirmDeleteMaterialHistory] 호출 - 관련 ID: #confirmMaterialHistoryDeleteBtn');
+  console.log('===== materialHistoryDeleteModal > 삭제하기 버튼 클릭 =====');
 
   if (!window.materialToDelete) {
     return;
   }
 
   try {
-    console.log('🗑️ 자재 삭제 요청:', window.materialToDelete);
 
     const response = await fetch(`/api/materials/${window.materialToDelete}`, {
       method: 'DELETE',
@@ -542,7 +524,7 @@ window.confirmDeleteMaterialHistory = async function confirmDeleteMaterialHistor
       alert(result.message || '자재 삭제에 실패했습니다.');
     }
   } catch (error) {
-    console.error('❌ 자재 삭제 에러:', error);
+    console.error('자재 삭제 에러:', error);
     alert('자재 삭제 중 오류가 발생했습니다.');
   }
 };
@@ -551,10 +533,9 @@ window.confirmDeleteMaterialHistory = async function confirmDeleteMaterialHistor
  * 자재 상세보기 모달 열기
  */
 window.viewMaterialDetail = async function viewMaterialDetail(자재코드) {
-  console.log('👁️ [viewMaterialDetail] 호출 - 관련 ID: #materialHistoryDetailModal, #materialHistoryDetailContent');
+  console.log('===== materialHistoryTable > 상세 버튼 클릭 =====');
 
-  try {
-    console.log('🔍 자재 상세보기:', 자재코드);
+  try{
 
     const response = await fetch(`/api/materials/${자재코드}/detail`, {
       credentials: 'include',
@@ -567,13 +548,12 @@ window.viewMaterialDetail = async function viewMaterialDetail(자재코드) {
     const result = await response.json();
 
     if (result.success && result.data) {
-      console.log('✅ 자재 상세 정보 조회 성공:', result.data);
       displayMaterialDetailModal(result.data);
     } else {
       alert('자재 상세 정보를 불러올 수 없습니다.');
     }
   } catch (error) {
-    console.error('❌ 자재 상세보기 에러:', error);
+    console.error('자재 상세보기 에러:', error);
     alert('자재 상세 정보 조회 중 오류가 발생했습니다.');
   }
 };
@@ -811,7 +791,7 @@ function displayMaterialDetailModal(data) {
  * 상세보기 모달 닫기
  */
 window.closeMaterialHistoryDetailModal = function closeMaterialHistoryDetailModal() {
-  console.log('❌ [closeMaterialHistoryDetailModal] 호출 - 관련 ID: #materialHistoryDetailModal');
+  console.log('===== materialHistoryDetailModal > 닫기 버튼 클릭 =====');
 
   document.getElementById('materialHistoryDetailModal').style.display = 'none';
 };
@@ -820,7 +800,7 @@ window.closeMaterialHistoryDetailModal = function closeMaterialHistoryDetailModa
  * 등록/수정 모달 닫기
  */
 window.closeMaterialHistoryModal = function closeMaterialHistoryModal() {
-  console.log('❌ [closeMaterialHistoryModal] 호출 - 관련 ID: #materialHistoryModal, #materialHistoryForm');
+  console.log('===== materialHistoryModal > 닫기 버튼 클릭 =====');
 
   document.getElementById('materialHistoryModal').style.display = 'none';
   document.getElementById('materialHistoryForm').reset();
@@ -834,10 +814,9 @@ window.closeMaterialHistoryModal = function closeMaterialHistoryModal() {
  * Google Sheets 내보내기
  */
 window.exportHistoryToGoogleSheets = function exportHistoryToGoogleSheets() {
-  console.log('📊 [exportHistoryToGoogleSheets] 호출 - 관련 ID: #materialHistoryTable, #historyExportBtn');
+  console.log('===== materialHistoryList > Google Sheets 내보내기 버튼 클릭 =====');
 
   try {
-    console.log('===== Google Sheets로 내보내기 시작 =====');
 
     const table = $('#materialHistoryTable').DataTable();
     const dataToExport = table.rows({ search: 'applied' }).data().toArray();
@@ -891,10 +870,9 @@ window.exportHistoryToGoogleSheets = function exportHistoryToGoogleSheets() {
     link.click();
     document.body.removeChild(link);
 
-    console.log('✅ CSV 파일 다운로드 완료');
     alert('CSV 파일이 다운로드되었습니다. Google Sheets에서 열어보세요.');
   } catch (error) {
-    console.error('❌ CSV 내보내기 에러:', error);
+    console.error('CSV 내보내기 에러:', error);
     alert('CSV 내보내기 중 오류가 발생했습니다.');
   }
 };
@@ -1428,6 +1406,5 @@ function formatDateString(dateStr) {
 $(document).ready(function () {
   if ($('#materialHistoryTable').length > 0) {
     initMaterialHistoryTable();
-    console.log('✅ 자재내역관리 페이지 로드 완료');
   }
 });

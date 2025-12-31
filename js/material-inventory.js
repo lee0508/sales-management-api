@@ -106,18 +106,15 @@ function initMaterialInventoryTable() {
     autoWidth: false,
     pageLength: 25,
   });
-
-  console.log('✅ 자재재고관리 DataTable 초기화 완료');
 }
 
 /**
  * 재고 검색 (검색어 포함)
  */
 async function searchInventory() {
-  console.log('🔍 [searchInventory] 호출 - 관련 ID: #inventorySearchArea, #inventorySearchBtn, #inventorySearchInput, #inventoryWorkplaceFilter');
+  console.log('===== inventorySearchArea > 검색 버튼 클릭 =====');
 
   const searchKeyword = document.getElementById('inventorySearchInput').value.trim();
-  console.log('🔍 검색어:', searchKeyword || '(전체 조회)');
 
   await loadMaterialInventory(searchKeyword);
 }
@@ -126,8 +123,6 @@ async function searchInventory() {
  * 재고 현황 조회
  */
 async function loadMaterialInventory(searchKeyword = '') {
-  console.log('📥 [loadMaterialInventory] 호출 - 관련 ID: #inventorySearchArea, #inventoryWorkplaceFilter, #materialInventoryTable, #totalMaterialCount, #lowStockCount, #warningStockCount');
-
   const 사업장코드 = document.getElementById('inventoryWorkplaceFilter').value;
 
   if (!사업장코드) {
@@ -136,7 +131,6 @@ async function loadMaterialInventory(searchKeyword = '') {
   }
 
   try {
-    console.log('🔍 재고 현황 조회 시작:', { 사업장코드, searchKeyword });
 
     // 검색어가 있으면 쿼리 파라미터에 추가
     let url = `/api/inventory/${사업장코드}`;
@@ -178,10 +172,8 @@ async function loadMaterialInventory(searchKeyword = '') {
     document.getElementById('totalMaterialCount').textContent = 총자재수;
     document.getElementById('lowStockCount').textContent = 부족자재수;
     document.getElementById('warningStockCount').textContent = 주의자재수;
-
-    console.log(`✅ 재고 현황 ${총자재수}건 조회 완료 (부족: ${부족자재수}건, 주의: ${주의자재수}건)`);
   } catch (err) {
-    console.error('❌ 재고 현황 조회 에러:', err);
+    console.error('재고 현황 조회 에러:', err);
     alert('재고 현황 조회 중 오류가 발생했습니다: ' + err.message);
   }
 }
@@ -190,8 +182,6 @@ async function loadMaterialInventory(searchKeyword = '') {
  * 사업장 목록 로드
  */
 async function loadWorkplacesForInventory() {
-  console.log('🏢 [loadWorkplacesForInventory] 호출 - 관련 ID: #inventorySearchArea, #inventoryWorkplaceFilter');
-
   try {
     const response = await fetch('/api/workplaces', {
       credentials: 'include',
@@ -215,13 +205,10 @@ async function loadWorkplacesForInventory() {
     // 첫 번째 사업장 자동 선택 (있는 경우)
     if (workplaces.length > 0) {
       select.value = workplaces[0].사업장코드;
-      console.log(`✅ 사업장 ${workplaces.length}개 로드 완료, 첫 번째 사업장 자동 선택: ${workplaces[0].사업장코드}`);
       loadMaterialInventory();
-    } else {
-      console.log('⚠️ 사업장 데이터 없음');
     }
   } catch (err) {
-    console.error('❌ 사업장 로드 에러:', err);
+    console.error('사업장 로드 에러:', err);
   }
 }
 
@@ -229,7 +216,7 @@ async function loadWorkplacesForInventory() {
  * 검색 초기화
  */
 function resetInventorySearch() {
-  console.log('🔄 [resetInventorySearch] 호출 - 관련 ID: #inventorySearchArea, #inventoryResetBtn, #inventoryWorkplaceFilter, #inventorySearchInput, #materialInventoryTable, #totalMaterialCount, #lowStockCount, #warningStockCount');
+  console.log('===== inventorySearchArea > 초기화 버튼 클릭 =====');
 
   document.getElementById('inventoryWorkplaceFilter').value = '';
   document.getElementById('inventorySearchInput').value = '';
@@ -241,19 +228,15 @@ function resetInventorySearch() {
   document.getElementById('totalMaterialCount').textContent = '0';
   document.getElementById('lowStockCount').textContent = '0';
   document.getElementById('warningStockCount').textContent = '0';
-
-  console.log('✅ 재고 검색 초기화 완료');
 }
 
 /**
  * Google Sheets로 재고 현황 내보내기
  */
 window.exportInventoryToGoogleSheets = function exportInventoryToGoogleSheets() {
-  console.log('📊 [exportInventoryToGoogleSheets] 호출 - 관련 ID: #inventoryActionArea, #inventoryExportBtn, #materialInventoryTable');
+  console.log('===== inventoryActionArea > Google Sheets 내보내기 버튼 클릭 =====');
 
   try {
-    console.log('===== Google Sheets로 내보내기 시작 =====');
-
     const table = $('#materialInventoryTable').DataTable();
     const dataToExport = table.rows({ search: 'applied' }).data().toArray();
 
@@ -333,10 +316,9 @@ window.exportInventoryToGoogleSheets = function exportInventoryToGoogleSheets() 
     link.click();
     document.body.removeChild(link);
 
-    console.log('✅ CSV 파일 다운로드 완료');
     alert('CSV 파일이 다운로드되었습니다. Google Sheets에서 열어보세요.');
   } catch (error) {
-    console.error('❌ CSV 내보내기 에러:', error);
+    console.error('CSV 내보내기 에러:', error);
     alert('CSV 내보내기 중 오류가 발생했습니다.');
   }
 };
@@ -345,12 +327,10 @@ window.exportInventoryToGoogleSheets = function exportInventoryToGoogleSheets() 
 $(document).ready(function () {
   if ($('#materialInventoryTable').length > 0) {
     initMaterialInventoryTable();
-    console.log('✅ 자재재고관리 페이지 로드 완료');
   }
 
   // loadWorkplacesForInventory()는 페이지가 실제로 표시될 때만 호출되도록 전역 함수로 노출
   window.loadMaterialInventoryPage = function() {
-    console.log('📄 [loadMaterialInventoryPage] 호출 - 관련 ID: #materialInventoryPage, #inventoryToolbar, #inventorySearchArea, #inventoryActionArea');
     loadWorkplacesForInventory();
   };
 });

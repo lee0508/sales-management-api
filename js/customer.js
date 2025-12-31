@@ -11,18 +11,23 @@
 $(document).ready(function () {
   // ✅ Prefix 규칙: window.salesCustomerManageTable (페이지 전용)
   window.salesCustomerManageTable = null;
-  let currentSalesCustomerSearchKeyword = ''; // 현재 검색 키워드 저장
+  let currentSalesCustomerSearchParams = { 매출처코드: '', 매출처명: '' }; // 현재 검색 조건 저장
   let currentSalesCustomerCode = ''; // 현재 선택된 매출처코드
   let currentSalesCustomerName = ''; // 현재 선택된 매출처명
   // ✅ Prefix 규칙: window.salesCustomerManageViewTransactionTable (페이지 전용)
   window.salesCustomerManageViewTransactionTable = null;
 
-  async function loadSalesCustomers(searchKeyword = '') {
+  async function loadSalesCustomers(매출처코드 = '', 매출처명 = '') {
     try {
       // API URL에 검색 파라미터 추가 (pageSize=10000으로 전체 데이터 조회)
       let apiUrl = API_BASE_URL + '/customers?pageSize=10000';
-      if (searchKeyword) {
-        apiUrl += `&search=${encodeURIComponent(searchKeyword)}`;
+
+      const params = [];
+      if (매출처코드) params.push(`매출처코드=${encodeURIComponent(매출처코드)}`);
+      if (매출처명) params.push(`매출처명=${encodeURIComponent(매출처명)}`);
+
+      if (params.length > 0) {
+        apiUrl += `&${params.join('&')}`;
       }
 
       // 데이터 조회
@@ -238,7 +243,7 @@ $(document).ready(function () {
     });
 
   // Enter 키 이벤트 처리 (이벤트 네임스페이스 적용)
-  $('#salesCustomerManageSearchInput')
+  $('#salesCustomerCodeSearchInput, #salesCustomerNameSearchInput')
     .off('keypress.customerPage')
     .on('keypress.customerPage', function (e) {
       if (e.which === 13) { // Enter key
@@ -250,9 +255,12 @@ $(document).ready(function () {
   // ✅ 표준 검색 함수 (salesCustomerManage prefix)
   window.searchSalesCustomerManage = function () {
     console.log('===== salesCustomerManage > 검색 버튼 클릭 =====');
-    const keyword = $('#salesCustomerManageSearchInput').val().trim();
-    currentSalesCustomerSearchKeyword = keyword;
-    loadSalesCustomers(keyword);
+
+    const 매출처코드 = $('#salesCustomerCodeSearchInput').val().trim();
+    const 매출처명 = $('#salesCustomerNameSearchInput').val().trim();
+
+    currentSalesCustomerSearchParams = { 매출처코드, 매출처명 };
+    loadSalesCustomers(매출처코드, 매출처명);
   };
 
   // ✅ 하위 호환성: 기존 함수명 유지
@@ -262,9 +270,11 @@ $(document).ready(function () {
   // ✅ 표준 검색 초기화 함수 (salesCustomerManage prefix)
   window.resetSalesCustomerManageSearch = function () {
     console.log('===== salesCustomerManage > 검색 초기화 버튼 클릭 =====');
-    $('#salesCustomerManageSearchInput').val('');
-    currentSalesCustomerSearchKeyword = '';
-    loadSalesCustomers('');
+
+    $('#salesCustomerCodeSearchInput').val('');
+    $('#salesCustomerNameSearchInput').val('');
+    currentSalesCustomerSearchParams = { 매출처코드: '', 매출처명: '' };
+    loadSalesCustomers('', '');
   };
 
   // ✅ 하위 호환성: 기존 함수명 유지

@@ -10,15 +10,13 @@ let codeDetailTableInstance = null;
  * 자재코드관리 DataTable 초기화
  */
 function initMaterialCodeTable() {
-  console.log('🔧 [initMaterialCodeTable] 호출 - 관련 ID: #materialCodeTable');
-
   if (materialCodeTableInstance) {
     materialCodeTableInstance.destroy();
   }
 
   materialCodeTableInstance = $('#materialCodeTable').DataTable({
     data: [],
-    order: [[7, 'desc']], // 전체건수 기준 내림차순
+    order: [], // 서버 정렬 유지 (정렬 비활성화)
     columns: [
       {
         data: null,
@@ -96,52 +94,52 @@ function initMaterialCodeTable() {
       [10, 25, 50, 100, '전체'],
     ],
   });
-
-  console.log('✅ 자재코드관리 DataTable 초기화 완료');
 }
 
 /**
- * 자재코드 검색 (검색어 포함)
+ * 자재코드 검색 (세부코드, 자재명, 규격 개별 검색)
  */
 window.searchMaterialCode = async function searchMaterialCode() {
-  console.log('🔍 [searchMaterialCode] 호출 - 관련 ID: #materialCodeSearchArea, #materialCodeSearchBtn, #materialCodeSearchInput');
+  console.log('===== materialCodeSearchArea > 검색 버튼 클릭 =====');
 
-  const searchKeyword = document.getElementById('materialCodeSearchInput').value.trim();
-  console.log('🔍 검색어:', searchKeyword || '(전체 조회)');
+  const 세부코드 = document.getElementById('materialCodeSearchInput').value.trim();
+  const 자재명 = document.getElementById('materialNameSearchInput').value.trim();
+  const 규격 = document.getElementById('materialSpecSearchInput').value.trim();
 
-  await loadMaterialCodeList(searchKeyword);
+  await loadMaterialCodeList(세부코드, 자재명, 규격);
 };
 
 /**
  * 검색 초기화
  */
 window.resetCodeSearch = function resetCodeSearch() {
-  console.log('🔄 [resetCodeSearch] 호출 - 관련 ID: #materialCodeSearchArea, #materialCodeResetBtn, #materialCodeSearchInput, #materialCodeTable, #materialCodeTotalCount');
+  console.log('===== materialCodeSearchArea > 초기화 버튼 클릭 =====');
 
   document.getElementById('materialCodeSearchInput').value = '';
+  document.getElementById('materialNameSearchInput').value = '';
+  document.getElementById('materialSpecSearchInput').value = '';
 
   if (materialCodeTableInstance) {
     materialCodeTableInstance.clear().draw();
   }
 
   document.getElementById('materialCodeTotalCount').textContent = '0';
-
-  console.log('✅ 검색 초기화 완료');
 };
 
 /**
  * 자재코드 목록 조회 (자재명별 그룹핑)
  */
-async function loadMaterialCodeList(searchKeyword = '') {
-  console.log('📥 [loadMaterialCodeList] 호출 - 관련 ID: #materialCodeTable, #materialCodeTotalCount');
-
+async function loadMaterialCodeList(세부코드 = '', 자재명 = '', 규격 = '') {
   try {
-    console.log('🔍 자재코드 목록 조회 시작:', { searchKeyword });
+    // 검색 조건을 쿼리 파라미터로 추가
+    const params = new URLSearchParams();
+    if (세부코드) params.append('세부코드', 세부코드);
+    if (자재명) params.append('자재명', 자재명);
+    if (규격) params.append('규격', 규격);
 
-    // 검색어가 있으면 쿼리 파라미터에 추가
     let url = '/api/material-codes/analysis';
-    if (searchKeyword) {
-      url += `?search=${encodeURIComponent(searchKeyword)}`;
+    if (params.toString()) {
+      url += `?${params.toString()}`;
     }
 
     const response = await fetch(url, {
@@ -155,8 +153,6 @@ async function loadMaterialCodeList(searchKeyword = '') {
     const result = await response.json();
 
     if (result.success && result.data) {
-      console.log(`✅ 자재명 ${result.data.length}건 조회 성공`);
-
       // DataTable 데이터 갱신
       materialCodeTableInstance.clear();
       materialCodeTableInstance.rows.add(result.data);
@@ -168,7 +164,7 @@ async function loadMaterialCodeList(searchKeyword = '') {
       alert('자재코드 목록 조회에 실패했습니다.');
     }
   } catch (error) {
-    console.error('❌ 자재코드 목록 조회 에러:', error);
+    console.error('자재코드 목록 조회 에러:', error);
     alert('자재코드 목록 조회 중 오류가 발생했습니다.');
   }
 }
@@ -177,13 +173,11 @@ async function loadMaterialCodeList(searchKeyword = '') {
  * 자재코드 상세 정보 조회
  */
 window.viewCodeDetail = async function viewCodeDetail(자재명, 규격) {
-  console.log('👁️ [viewCodeDetail] 호출 - 관련 ID: #materialCodeDetailModal, #materialCodeDetailTable');
+  console.log('===== materialCodeTable > 상세 버튼 클릭 =====');
 
   try {
     const decodedName = decodeURIComponent(자재명);
     const decodedSpec = decodeURIComponent(규격);
-
-    console.log('🔍 자재코드 상세 조회:', { 자재명: decodedName, 규격: decodedSpec });
 
     // API 요청 (자재명과 규격을 쿼리 파라미터로 전달)
     const params = new URLSearchParams({
@@ -202,13 +196,12 @@ window.viewCodeDetail = async function viewCodeDetail(자재명, 규격) {
     const result = await response.json();
 
     if (result.success && result.data) {
-      console.log('✅ 자재코드 상세 정보 조회 성공:', result.data);
       displayCodeDetailModal(result.data, decodedName, decodedSpec);
     } else {
       alert('자재코드 상세 정보를 불러올 수 없습니다.');
     }
   } catch (error) {
-    console.error('❌ 자재코드 상세보기 에러:', error);
+    console.error('자재코드 상세보기 에러:', error);
     alert('자재코드 상세 정보 조회 중 오류가 발생했습니다.');
   }
 };
@@ -217,8 +210,6 @@ window.viewCodeDetail = async function viewCodeDetail(자재명, 규격) {
  * 자재코드 상세 정보 모달 표시
  */
 function displayCodeDetailModal(data, 자재명, 규격) {
-  console.log('📋 [displayCodeDetailModal] 호출 - 관련 ID: #materialCodeDetailModal, #materialCodeDetailName, #materialCodeDetailSpec, #materialCodeDetailTable');
-
   // 자재 정보 표시
   document.getElementById('materialCodeDetailName').textContent = 자재명;
   document.getElementById('materialCodeDetailSpec').textContent = 규격 || '-';
@@ -303,7 +294,7 @@ function displayCodeDetailModal(data, 자재명, 규격) {
  * 자재코드 상세 모달 닫기
  */
 window.closeCodeDetailModal = function closeCodeDetailModal() {
-  console.log('❌ [closeCodeDetailModal] 호출 - 관련 ID: #materialCodeDetailModal');
+  console.log('===== materialCodeDetailModal > 닫기 버튼 클릭 =====');
 
   document.getElementById('materialCodeDetailModal').style.display = 'none';
 
@@ -317,7 +308,7 @@ window.closeCodeDetailModal = function closeCodeDetailModal() {
  * 자재명별 코드 분석 모달 열기 (향후 구현)
  */
 window.openCodeDuplicateModal = function openCodeDuplicateModal() {
-  console.log('🔍 [openCodeDuplicateModal] 호출 - 관련 ID: #codeDuplicateBtn');
+  console.log('===== materialCodeToolbar > 코드분석 버튼 클릭 =====');
 
   alert('자재명별 코드 분석 기능은 향후 추가될 예정입니다.');
 };
@@ -326,12 +317,10 @@ window.openCodeDuplicateModal = function openCodeDuplicateModal() {
 $(document).ready(function () {
   if ($('#materialCodeTable').length > 0) {
     initMaterialCodeTable();
-    console.log('✅ 자재코드관리 페이지 로드 완료');
   }
 
   // loadMaterialCodeList()는 페이지가 실제로 표시될 때만 호출되도록 전역 함수로 노출
   window.loadMaterialCodePage = function () {
-    console.log('📄 [loadMaterialCodePage] 호출 - 관련 ID: #materialCodePage, #materialCodeToolbar, #materialCodeTable');
     loadMaterialCodeList();
   };
 });

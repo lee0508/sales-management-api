@@ -658,6 +658,12 @@ body {
   color: #92400e;
 }
 
+.status-deleted {
+  background: #f3f4f6;
+  color: #6b7280;
+  text-decoration: line-through;
+}
+
 .status-completed {
   background: #dbeafe;
   color: #1e40af;

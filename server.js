@@ -628,9 +628,12 @@ app.get('/api/customer_new', async (req, res) => {
 //---------------------------------------------
 app.get('/api/customers', async (req, res) => {
   try {
-    const { page = 1, pageSize = 500, search = '' } = req.query;
+    const { page = 1, pageSize = 500, search = '', 매출처코드, 매출처명 } = req.query;
     const offset = (page - 1) * pageSize;
     const limit = Number(pageSize);
+
+    console.log('===== 매출처 목록 조회 =====');
+    console.log('검색 조건:', { 매출처코드, 매출처명 });
 
     // 세션에서 사업장코드 가져오기 (없으면 기본값 '01')
     const 사업장코드 = req.session.user?.사업장코드 || '01';
@@ -649,11 +652,27 @@ app.get('/api/customers', async (req, res) => {
     // 사업장코드 파라미터 추가
     request.input('사업장코드', sql.VarChar(2), 사업장코드);
 
-    // 검색어가 있으면 매출처명 또는 매출처코드로 검색 (Parameterized Query 사용)
-    // ✅ LTRIM(RTRIM()) 적용: VB 시스템이 저장한 8자리 공백 포함 매출처코드 처리 (SQL Server 2016 이하 호환)
-    if (search) {
+    // 개별 검색 조건 (매출처코드, 매출처명)
+    const conditions = [];
+
+    if (매출처코드) {
+      request.input('매출처코드', sql.NVarChar(100), `${매출처코드}%`); // 시작 검색
+      conditions.push('LTRIM(RTRIM(매출처코드)) LIKE @매출처코드');
+    }
+
+    if (매출처명) {
+      request.input('매출처명', sql.NVarChar(100), `%${매출처명}%`); // 포함 검색
+      conditions.push('매출처명 LIKE @매출처명');
+    }
+
+    // 레거시 search 파라미터 지원 (하위 호환성)
+    if (search && !매출처코드 && !매출처명) {
       request.input('search', sql.NVarChar, `%${search}%`);
-      query += ` AND (매출처명 LIKE @search OR LTRIM(RTRIM(매출처코드)) LIKE @search)`;
+      conditions.push('(매출처명 LIKE @search OR LTRIM(RTRIM(매출처코드)) LIKE @search)');
+    }
+
+    if (conditions.length > 0) {
+      query += ` AND (${conditions.join(' AND ')})`;
     }
 
     query += `
@@ -999,6 +1018,26 @@ app.delete('/api/customers/:code', requireAuth, async (req, res) => {
       });
     }
 
+    // ✅ 거래 내역 확인 (견적서, 거래명세서, 세금계산서)
+    const checkResult = await pool
+      .request()
+      .input('매출처코드', sql.VarChar(8), code).query(`
+        SELECT
+          (SELECT COUNT(*) FROM 견적서 WHERE LTRIM(RTRIM(매출처코드)) = @매출처코드) AS 견적서건수,
+          (SELECT COUNT(*) FROM 거래명세서 WHERE LTRIM(RTRIM(매출처코드)) = @매출처코드) AS 거래명세서건수,
+          (SELECT COUNT(*) FROM 세금계산서 WHERE LTRIM(RTRIM(매출처코드)) = @매출처코드) AS 세금계산서건수
+      `);
+
+    const { 견적서건수, 거래명세서건수, 세금계산서건수 } = checkResult.recordset[0];
+    const 총거래건수 = 견적서건수 + 거래명세서건수 + 세금계산서건수;
+
+    if (총거래건수 > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `거래 내역이 존재하는 매출처는 삭제할 수 없습니다.\n(견적서: ${견적서건수}건, 거래명세서: ${거래명세서건수}건, 세금계산서: ${세금계산서건수}건)`,
+      });
+    }
+
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     // ✅ TRIM() 적용: VB 시스템이 저장한 8자리 공백 포함 매출처코드 처리
@@ -1058,9 +1097,12 @@ app.get('/api/suppliers', async (req, res) => {
             total: result.recordset.length
         }); **/
     // ✅ page, pageSize 파라미터 추가 (SQL Injection 수정)
-    const { search = '', 사업장코드, page = 1, pageSize = 10 } = req.query;
+    const { search = '', 매입처코드, 매입처명, 사업장코드, page = 1, pageSize = 10 } = req.query;
     const offset = (page - 1) * pageSize;
     const limit = Number(pageSize);
+
+    console.log('===== 매입처 목록 조회 =====');
+    console.log('검색 조건:', { 매입처코드, 매입처명, 사업장코드 });
 
     // ✅ 총 레코드 수 계산 (Parameterized Query)
     const countRequest = pool.request();
@@ -1074,9 +1116,28 @@ app.get('/api/suppliers', async (req, res) => {
       countRequest.input('사업장코드', sql.VarChar(2), 사업장코드);
       countQuery += ` AND 사업장코드 = @사업장코드`;
     }
-    if (search) {
+
+    // 개별 검색 조건 (매입처코드, 매입처명)
+    const conditions = [];
+
+    if (매입처코드) {
+      countRequest.input('매입처코드', sql.NVarChar(100), `${매입처코드}%`); // 시작 검색
+      conditions.push('매입처코드 LIKE @매입처코드');
+    }
+
+    if (매입처명) {
+      countRequest.input('매입처명', sql.NVarChar(100), `%${매입처명}%`); // 포함 검색
+      conditions.push('매입처명 LIKE @매입처명');
+    }
+
+    // 레거시 search 파라미터 지원 (하위 호환성)
+    if (search && !매입처코드 && !매입처명) {
       countRequest.input('search', sql.NVarChar, `%${search}%`);
-      countQuery += ` AND (매입처코드 LIKE @search OR 매입처명 LIKE @search OR 사업자번호 LIKE @search)`;
+      conditions.push('(매입처코드 LIKE @search OR 매입처명 LIKE @search OR 사업자번호 LIKE @search)');
+    }
+
+    if (conditions.length > 0) {
+      countQuery += ` AND (${conditions.join(' AND ')})`;
     }
 
     const countResult = await countRequest.query(countQuery);
@@ -1099,9 +1160,28 @@ app.get('/api/suppliers', async (req, res) => {
       dataRequest.input('사업장코드', sql.VarChar(2), 사업장코드);
       query += ` AND 사업장코드 = @사업장코드`;
     }
-    if (search) {
+
+    // 개별 검색 조건 (매입처코드, 매입처명)
+    const dataConditions = [];
+
+    if (매입처코드) {
+      dataRequest.input('매입처코드', sql.NVarChar(100), `${매입처코드}%`); // 시작 검색
+      dataConditions.push('매입처코드 LIKE @매입처코드');
+    }
+
+    if (매입처명) {
+      dataRequest.input('매입처명', sql.NVarChar(100), `%${매입처명}%`); // 포함 검색
+      dataConditions.push('매입처명 LIKE @매입처명');
+    }
+
+    // 레거시 search 파라미터 지원 (하위 호환성)
+    if (search && !매입처코드 && !매입처명) {
       dataRequest.input('search', sql.NVarChar, `%${search}%`);
-      query += ` AND (매입처코드 LIKE @search OR 매입처명 LIKE @search OR 사업자번호 LIKE @search)`;
+      dataConditions.push('(매입처코드 LIKE @search OR 매입처명 LIKE @search OR 사업자번호 LIKE @search)');
+    }
+
+    if (dataConditions.length > 0) {
+      query += ` AND (${dataConditions.join(' AND ')})`;
     }
 
     query += `
@@ -1232,25 +1312,41 @@ app.post('/api/suppliers', requireAuth, async (req, res) => {
     const 최종사업장코드 = 사업장코드 || session사업장코드;
     console.log('사업장코드:', 최종사업장코드);
 
-    // 중복 체크 및 자동 증가 로직
+    // 매입처코드 처리 로직
     let 최종매입처코드 = 매입처코드;
 
-    // 1. 중복 확인
-    const checkQuery = `
-      SELECT COUNT(*) as cnt
-      FROM 매입처
-      WHERE 사업장코드 = @사업장코드 AND 매입처코드 = @매입처코드
-    `;
+    // 1. 사용자가 매입처코드를 입력한 경우
+    if (매입처코드 && 매입처코드.trim() !== '') {
+      console.log('사용자 입력 매입처코드:', 매입처코드);
 
-    const checkResult = await pool
-      .request()
-      .input('사업장코드', sql.VarChar(2), 최종사업장코드)
-      .input('매입처코드', sql.VarChar(8), 매입처코드)
-      .query(checkQuery);
+      // 중복 확인
+      const checkQuery = `
+        SELECT COUNT(*) as cnt
+        FROM 매입처
+        WHERE 사업장코드 = @사업장코드 AND 매입처코드 = @매입처코드
+      `;
 
-    // 2. 중복이면 다음 코드 자동 생성
-    if (checkResult.recordset[0].cnt > 0) {
-      console.log('⚠️ 매입처코드 중복 감지 - 자동 증가 처리');
+      const checkResult = await pool
+        .request()
+        .input('사업장코드', sql.VarChar(2), 최종사업장코드)
+        .input('매입처코드', sql.VarChar(8), 매입처코드)
+        .query(checkQuery);
+
+      // 중복이면 에러 반환
+      if (checkResult.recordset[0].cnt > 0) {
+        console.log('⚠️ 매입처코드 중복:', 매입처코드);
+        return res.status(400).json({
+          success: false,
+          message: `매입처코드 "${매입처코드}"는 이미 사용 중입니다. 다른 코드를 입력해주세요.`,
+        });
+      }
+
+      최종매입처코드 = 매입처코드;
+      console.log('✅ 사용자 입력 코드 사용:', 최종매입처코드);
+    }
+    // 2. 매입처코드가 비어있으면 자동 생성
+    else {
+      console.log('매입처코드 자동 생성 시작');
 
       const maxQuery = `
         SELECT TOP 1 매입처코드
@@ -1269,8 +1365,8 @@ app.post('/api/suppliers', requireAuth, async (req, res) => {
 
       if (maxResult.recordset.length > 0) {
         const lastCode = maxResult.recordset[0].매입처코드;
-        let prefix = lastCode.charAt(0); // 영문 부분 (예: "A")
-        const numPart = lastCode.substring(1); // 숫자 부분 (예: "999")
+        let prefix = lastCode.charAt(0); // 영문 부분 (예: "Y")
+        const numPart = lastCode.substring(1); // 숫자 부분 (예: "046")
         let nextNum = parseInt(numPart) + 1;
 
         // 숫자가 999를 초과하면 다음 영문자로 변경하고 숫자를 001로 리셋
@@ -1292,8 +1388,11 @@ app.post('/api/suppliers', requireAuth, async (req, res) => {
         }
 
         최종매입처코드 = prefix + String(nextNum).padStart(3, '0');
-
-        console.log(`  기존 코드: ${매입처코드} → 새 코드: ${최종매입처코드}`);
+        console.log(`  자동 생성된 코드: ${최종매입처코드}`);
+      } else {
+        // 첫 번째 매입처인 경우
+        최종매입처코드 = 'A001';
+        console.log('  첫 번째 매입처 - 코드: A001');
       }
     }
 
@@ -1345,10 +1444,7 @@ app.post('/api/suppliers', requireAuth, async (req, res) => {
 
     res.json({
       success: true,
-      message:
-        최종매입처코드 !== 매입처코드
-          ? `매입처가 등록되었습니다. (코드: ${최종매입처코드})`
-          : '매입처가 등록되었습니다.',
+      message: `매입처가 등록되었습니다. (코드: ${최종매입처코드})`,
       data: {
         매입처코드: 최종매입처코드,
       },
@@ -3534,153 +3630,150 @@ app.get('/api/materials', async (req, res) => {
     // includeDeleted=true면 사용구분 0과 9 모두 조회, 아니면 0만 조회
     const 사용구분조건 = includeDeleted === 'true' ? 'IN (0, 9)' : '= 0';
 
-    // removeDuplicates=true면 자재명+규격+단위 중복 제거 (거래 빈도 높은 것만 선택)
+    const request = pool.request().input('사업장코드', sql.VarChar(2), 사업장코드);
+
+    // 검색 조건 구성 (서브쿼리 내부용과 외부용)
+    const buildSearchConditions = (prefix = '') => {
+      const conditions = [];
+      const p = prefix; // 'm.' 또는 빈 문자열
+
+      // 새로운 방식: 개별 필드 검색
+      if (searchCategory || searchCode || searchName || searchSpec) {
+        // 통합 검색 (모든 필드가 같은 값)
+        if (searchCode && searchName && searchSpec && searchCode === searchName && searchName === searchSpec) {
+          if (!request.parameters.searchKeyword) {
+            request.input('searchKeyword', sql.NVarChar, `%${searchCode}%`);
+          }
+          conditions.push(`((${p}분류코드+${p}세부코드) LIKE @searchKeyword OR ${p}세부코드 LIKE @searchKeyword OR ${p}자재명 LIKE @searchKeyword OR ${p}규격 LIKE @searchKeyword)`);
+        }
+        // 코드 또는 자재명 검색
+        else if (searchCode && searchName && searchCode === searchName && !searchSpec) {
+          if (!request.parameters.searchKeyword) {
+            request.input('searchKeyword', sql.NVarChar, `%${searchCode}%`);
+          }
+          conditions.push(`((${p}분류코드+${p}세부코드) LIKE @searchKeyword OR ${p}세부코드 LIKE @searchKeyword OR ${p}자재명 LIKE @searchKeyword)`);
+        }
+        // 개별 필드 검색 (AND 조건)
+        else {
+          if (searchCategory) {
+            if (!request.parameters.searchCategory) {
+              request.input('searchCategory', sql.NVarChar, `%${searchCategory}%`);
+            }
+            conditions.push(`${p}분류코드 LIKE @searchCategory`);
+          }
+          if (searchCode) {
+            if (!request.parameters.searchCode) {
+              request.input('searchCode', sql.NVarChar, `%${searchCode}%`);
+            }
+            conditions.push(`(${p}분류코드+${p}세부코드) LIKE @searchCode`);
+          }
+          if (searchName) {
+            if (!request.parameters.searchName) {
+              request.input('searchName', sql.NVarChar, `%${searchName}%`);
+            }
+            conditions.push(`${p}자재명 LIKE @searchName`);
+          }
+          if (searchSpec) {
+            if (!request.parameters.searchSpec) {
+              request.input('searchSpec', sql.NVarChar, `%${searchSpec}%`);
+            }
+            conditions.push(`${p}규격 LIKE @searchSpec`);
+          }
+        }
+      }
+      // 기존 방식: 단일 검색어
+      else if (search) {
+        if (!request.parameters.search) {
+          request.input('search', sql.NVarChar, `%${search}%`);
+        }
+        // 체크박스 사용
+        if (searchByCode !== undefined || searchByName !== undefined || searchBySpec !== undefined) {
+          const orConditions = [];
+          if (searchByCode === 'true') {
+            orConditions.push(`(${p}분류코드+${p}세부코드) LIKE @search`);
+          }
+          if (searchByName === 'true') {
+            orConditions.push(`${p}자재명 LIKE @search`);
+          }
+          if (searchBySpec === 'true') {
+            orConditions.push(`${p}규격 LIKE @search`);
+          }
+          if (orConditions.length > 0) {
+            conditions.push(`(${orConditions.join(' OR ')})`);
+          }
+        } else {
+          // 기본 검색 (모든 필드)
+          conditions.push(`(${p}분류코드 LIKE @search OR ${p}세부코드 LIKE @search OR (${p}분류코드+${p}세부코드) LIKE @search OR ${p}자재명 LIKE @search OR ${p}규격 LIKE @search)`);
+        }
+      }
+
+      return conditions;
+    };
+
     let query = '';
 
     if (removeDuplicates === 'true') {
-      console.log('🔄 중복 제거 모드: 자재명+규격+단위 기준으로 거래 빈도 높은 자재만 반환');
+      // 중복 제거 쿼리
+      const innerConditions = [`사용구분 ${사용구분조건}`];
+      if (분류코드) {
+        request.input('분류코드', sql.VarChar(2), 분류코드);
+        innerConditions.push('분류코드 = @분류코드');
+      }
+      innerConditions.push(...buildSearchConditions(''));
+
       query = `
-            SELECT
-                (m.분류코드+m.세부코드) as 자재코드,
-                m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
-                m.바코드, m.과세구분, m.적요, m.사용구분,
-                c.분류명,
-                ml.입고단가1, ml.출고단가1, ml.출고단가2, ml.출고단가3
-            FROM (
-                SELECT
-                    분류코드, 세부코드, 자재명, 규격, 단위,
-                    바코드, 과세구분, 적요, 사용구분,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY 자재명, 규격, 단위
-                        ORDER BY
-                            -- 거래 건수가 많은 자재 우선
-                            (SELECT COUNT(*)
-                             FROM 자재입출내역 t
-                             WHERE t.분류코드 = 자재.분류코드
-                               AND t.세부코드 = 자재.세부코드
-                               AND t.사업장코드 = @사업장코드
-                               AND t.사용구분 = 0) DESC,
-                            -- 거래 건수가 같으면 최근 거래일 최신 순
-                            (SELECT MAX(t.입출고일자)
-                             FROM 자재입출내역 t
-                             WHERE t.분류코드 = 자재.분류코드
-                               AND t.세부코드 = 자재.세부코드
-                               AND t.사업장코드 = @사업장코드
-                               AND t.사용구분 = 0) DESC,
-                            -- 그래도 같으면 세부코드가 작은 것 우선
-                            세부코드 ASC
-                    ) AS 순위
-                FROM 자재
-                WHERE 사용구분 ${사용구분조건}
-            ) m
-            LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
-            LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = @사업장코드
-            WHERE m.순위 = 1
-        `;
+        SELECT
+          (m.분류코드+m.세부코드) as 자재코드,
+          m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
+          m.바코드, m.과세구분, m.적요, m.사용구분,
+          c.분류명,
+          ml.입고단가1, ml.출고단가1, ml.출고단가2, ml.출고단가3
+        FROM (
+          SELECT
+            분류코드, 세부코드, 자재명, 규격, 단위,
+            바코드, 과세구분, 적요, 사용구분,
+            ROW_NUMBER() OVER (
+              PARTITION BY 자재명, 규격, 단위
+              ORDER BY
+                (SELECT COUNT(*) FROM 자재입출내역 t
+                 WHERE t.분류코드 = 자재.분류코드 AND t.세부코드 = 자재.세부코드
+                   AND t.사업장코드 = @사업장코드 AND t.사용구분 = 0) DESC,
+                (SELECT MAX(t.입출고일자) FROM 자재입출내역 t
+                 WHERE t.분류코드 = 자재.분류코드 AND t.세부코드 = 자재.세부코드
+                   AND t.사업장코드 = @사업장코드 AND t.사용구분 = 0) DESC,
+                세부코드 ASC
+            ) AS 순위
+          FROM 자재
+          WHERE ${innerConditions.join(' AND ')}
+        ) m
+        LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
+        LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = @사업장코드
+        WHERE m.순위 = 1
+        ORDER BY m.분류코드, m.세부코드
+      `;
     } else {
+      // 일반 쿼리
+      const whereConditions = [`m.사용구분 ${사용구분조건}`];
+      if (분류코드) {
+        request.input('분류코드', sql.VarChar(2), 분류코드);
+        whereConditions.push('m.분류코드 = @분류코드');
+      }
+      whereConditions.push(...buildSearchConditions('m.'));
+
       query = `
-            SELECT
-                (m.분류코드+m.세부코드) as 자재코드,
-                m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
-                m.바코드, m.과세구분, m.적요, m.사용구분,
-                c.분류명,
-                ml.입고단가1, ml.출고단가1, ml.출고단가2, ml.출고단가3
-            FROM 자재 m
-            LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
-            LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = @사업장코드
-            WHERE m.사용구분 ${사용구분조건}
-        `;
+        SELECT
+          (m.분류코드+m.세부코드) as 자재코드,
+          m.분류코드, m.세부코드, m.자재명, m.규격, m.단위,
+          m.바코드, m.과세구분, m.적요, m.사용구분,
+          c.분류명,
+          ml.입고단가1, ml.출고단가1, ml.출고단가2, ml.출고단가3
+        FROM 자재 m
+        LEFT JOIN 자재분류 c ON m.분류코드 = c.분류코드
+        LEFT JOIN 자재원장 ml ON m.분류코드 = ml.분류코드 AND m.세부코드 = ml.세부코드 AND ml.사업장코드 = @사업장코드
+        WHERE ${whereConditions.join(' AND ')}
+        ORDER BY m.분류코드, m.세부코드
+      `;
     }
-
-    const request = pool.request().input('사업장코드', sql.VarChar(2), 사업장코드);
-
-    if (분류코드) {
-      request.input('분류코드', sql.VarChar(2), 분류코드);
-      query += ` AND m.분류코드 = @분류코드`;
-    }
-
-    // 새로운 방식: 개별 필드 검색 (searchCategory, searchCode, searchName, searchSpec)
-    if (searchCategory || searchCode || searchName || searchSpec) {
-      const searchConditions = [];
-
-      // searchCode, searchName, searchSpec가 모두 같은 값이면 OR로 연결 (통합 검색)
-      if (searchCode && searchName && searchSpec &&
-          searchCode === searchName && searchName === searchSpec) {
-        request.input('searchKeyword', sql.NVarChar, `%${searchCode}%`);
-        searchConditions.push('((m.분류코드+m.세부코드) LIKE @searchKeyword OR m.세부코드 LIKE @searchKeyword OR m.자재명 LIKE @searchKeyword OR m.규격 LIKE @searchKeyword)');
-        console.log(`🔍 자재 통합 검색 (코드 OR 자재명 OR 규격):`, searchCode);
-      }
-      // searchCode와 searchName만 같은 값이면 OR로 연결 (코드 또는 자재명 검색)
-      else if (searchCode && searchName && searchCode === searchName && !searchSpec) {
-        request.input('searchKeyword', sql.NVarChar, `%${searchCode}%`);
-        searchConditions.push('((m.분류코드+m.세부코드) LIKE @searchKeyword OR m.세부코드 LIKE @searchKeyword OR m.자재명 LIKE @searchKeyword)');
-        console.log(`🔍 자재 통합 검색 (코드 OR 자재명):`, searchCode);
-      }
-      // 개별 필드 검색 (AND 조건)
-      else {
-        if (searchCategory) {
-          request.input('searchCategory', sql.NVarChar, `%${searchCategory}%`);
-          searchConditions.push('m.분류코드 LIKE @searchCategory');
-        }
-        if (searchCode) {
-          request.input('searchCode', sql.NVarChar, `%${searchCode}%`);
-          searchConditions.push('(m.분류코드+m.세부코드) LIKE @searchCode');
-        }
-        if (searchName) {
-          request.input('searchName', sql.NVarChar, `%${searchName}%`);
-          searchConditions.push('m.자재명 LIKE @searchName');
-        }
-        if (searchSpec) {
-          request.input('searchSpec', sql.NVarChar, `%${searchSpec}%`);
-          searchConditions.push('m.규격 LIKE @searchSpec');
-        }
-        console.log(`🔍 자재 개별 필드 검색 (AND 조건):`, {
-          분류코드: searchCategory || '',
-          자재코드: searchCode || '',
-          자재명: searchName || '',
-          규격: searchSpec || '',
-        });
-      }
-
-      if (searchConditions.length > 0) {
-        query += ` AND (${searchConditions.join(' AND ')})`;
-      }
-    }
-    // 기존 방식: 단일 검색어 + 체크박스 (하위 호환성)
-    else if (search) {
-      request.input('search', sql.NVarChar, `%${search}%`);
-
-      // 검색 조건이 명시된 경우 (체크박스 사용)
-      if (searchByCode !== undefined || searchByName !== undefined || searchBySpec !== undefined) {
-        const searchConditions = [];
-
-        if (searchByCode === 'true') {
-          searchConditions.push('(m.분류코드+m.세부코드) LIKE @search');
-        }
-        if (searchByName === 'true') {
-          searchConditions.push('m.자재명 LIKE @search');
-        }
-        if (searchBySpec === 'true') {
-          searchConditions.push('m.규격 LIKE @search');
-        }
-
-        if (searchConditions.length > 0) {
-          query += ` AND (${searchConditions.join(' OR ')})`;
-          console.log(`🔍 자재 검색 조건:`, {
-            검색어: search,
-            자재코드: searchByCode === 'true',
-            자재명: searchByName === 'true',
-            규격: searchBySpec === 'true',
-          });
-        }
-      } else {
-        // 기본 검색 (분류코드, 세부코드, 자재명, 규격 모두 검색)
-        query += ` AND (m.분류코드 LIKE @search OR m.세부코드 LIKE @search OR (m.분류코드+m.세부코드) LIKE @search OR m.자재명 LIKE @search OR m.규격 LIKE @search)`;
-        console.log(`🔍 자재 통합 검색:`, search);
-      }
-    }
-
-    query += ` ORDER BY m.분류코드, m.세부코드`;
 
     const result = await request.query(query);
 
@@ -3697,14 +3790,10 @@ app.get('/api/materials', async (req, res) => {
 
 // 자재 상세 조회 (재고 정보 포함)
 app.get('/api/materials/transaction-history', async (req, res) => {
-  console.log('🔍 [자재내역조회 API] 호출됨');
-  console.log('📥 Query params:', req.query);
-
   try {
     const { materialCode, startDate, endDate, 입출고구분, supplierCode, customerCode } = req.query;
 
     if (!materialCode) {
-      console.log('❌ 자재코드 누락');
       return res.status(400).json({ success: false, message: '자재코드는 필수입니다.' });
     }
 
@@ -3720,8 +3809,6 @@ app.get('/api/materials/transaction-history', async (req, res) => {
     const 분류코드 = materialCode.substring(0, 2);
     const 세부코드 = materialCode.substring(2);
     const 사업장코드 = req.session?.user?.사업장코드 || '01';
-
-    console.log('📊 파싱된 코드:', { 사업장코드, 분류코드, 세부코드 });
 
     let query = `
       SELECT
@@ -3804,10 +3891,7 @@ app.get('/api/materials/transaction-history', async (req, res) => {
 
     query += ` ORDER BY t.거래일자 DESC, t.거래번호 DESC`;
 
-    console.log('🔄 SQL 쿼리 실행 중...');
     const result = await request.query(query);
-
-    console.log('✅ 조회 성공! 결과:', result.recordset.length, '건');
 
     res.json({
       success: true,
@@ -4513,8 +4597,6 @@ app.get('/api/materials/:code/duplicate-check', async (req, res) => {
 // 4. 중복 자재 분석 API (자재명 + 규격 중복)
 app.get('/api/materials/duplicate-analysis', async (req, res) => {
   try {
-    console.log('🔍 중복 자재 분석 API 호출');
-
     const 사업장코드 = req.session?.user?.사업장코드 || '01';
 
     // 중복 자재 목록 조회 (자재명 + 규격 기준)
@@ -4624,7 +4706,7 @@ app.get('/api/material-categories', async (req, res) => {
     let query = `
       SELECT 분류코드, 분류명, 적요, 사용구분, 수정일자, 사용자코드
       FROM 자재분류
-      WHERE 사용구분 = 0
+      WHERE 1=1
     `;
 
     const request = pool.request();
@@ -4635,7 +4717,7 @@ app.get('/api/material-categories', async (req, res) => {
       request.input('search', sql.NVarChar(100), `%${search}%`);
     }
 
-    query += ` ORDER BY 분류코드`;
+    query += ` ORDER BY 사용구분, 분류코드`;
 
     const result = await request.query(query);
 
@@ -4691,18 +4773,48 @@ app.post('/api/material-categories', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, message: '분류코드는 2자리여야 합니다.' });
     }
 
-    // 중복 체크
+    // 중복 체크 (사용구분 포함)
     const checkResult = await pool
       .request()
       .input('분류코드', sql.VarChar(2), 분류코드)
-      .query('SELECT 분류코드 FROM 자재분류 WHERE 분류코드 = @분류코드');
-
-    if (checkResult.recordset.length > 0) {
-      return res.status(409).json({ success: false, message: '이미 존재하는 분류코드입니다.' });
-    }
+      .query('SELECT 분류코드, 사용구분 FROM 자재분류 WHERE 분류코드 = @분류코드');
 
     const 수정일자 = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
+    if (checkResult.recordset.length > 0) {
+      const existing = checkResult.recordset[0];
+
+      // 삭제된 레코드(사용구분=9)가 있으면 복구(UPDATE)
+      if (existing.사용구분 === 9) {
+        await pool
+          .request()
+          .input('분류코드', sql.VarChar(2), 분류코드)
+          .input('분류명', sql.VarChar(50), 분류명)
+          .input('적요', sql.VarChar(100), 적요 || '')
+          .input('사용구분', sql.TinyInt, 0)
+          .input('수정일자', sql.VarChar(8), 수정일자)
+          .input('사용자코드', sql.VarChar(4), 사용자코드).query(`
+            UPDATE 자재분류
+            SET 분류명 = @분류명,
+                적요 = @적요,
+                사용구분 = @사용구분,
+                수정일자 = @수정일자,
+                사용자코드 = @사용자코드
+            WHERE 분류코드 = @분류코드
+          `);
+
+        return res.json({
+          success: true,
+          message: '삭제된 자재분류가 복구되었습니다.',
+          data: { 분류코드, 분류명, 적요 },
+        });
+      } else {
+        // 사용 중인 분류코드는 등록 불가
+        return res.status(409).json({ success: false, message: '이미 존재하는 분류코드입니다.' });
+      }
+    }
+
+    // 새로운 분류 등록
     await pool
       .request()
       .input('분류코드', sql.VarChar(2), 분류코드)
@@ -5258,9 +5370,9 @@ app.get('/api/inventory/:workplace', async (req, res) => {
 // 자재명별 코드 분석 목록 조회
 app.get('/api/material-codes/analysis', async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, 세부코드, 자재명, 규격 } = req.query;
 
-    console.log('📥 자재명별 코드 분석 목록 조회 시작:', { search });
+    console.log('📥 자재명별 코드 분석 목록 조회 시작:', { search, 세부코드, 자재명, 규격 });
 
     // SQL Server 2008R2 호환 쿼리
     let query = `
@@ -5283,15 +5395,39 @@ app.get('/api/material-codes/analysis', async (req, res) => {
 
     const request = pool.request();
 
-    // 검색어가 있으면 검색 조건 추가 (세부코드, 자재명, 규격)
-    if (search) {
-      query += ` AND (m.세부코드 LIKE @search OR m.자재명 LIKE @search OR m.규격 LIKE @search)`;
-      request.input('search', sql.NVarChar(100), `%${search}%`);
+    // 개별 필드 검색 (우선순위)
+    if (세부코드 || 자재명 || 규격) {
+      const conditions = [];
+
+      if (세부코드) {
+        request.input('세부코드', sql.NVarChar(100), `${세부코드}%`);
+        conditions.push('m.세부코드 LIKE @세부코드');
+      }
+
+      if (자재명) {
+        request.input('자재명', sql.NVarChar(100), `${자재명}%`);
+        conditions.push('m.자재명 LIKE @자재명');
+      }
+
+      if (규격) {
+        request.input('규격', sql.NVarChar(100), `%${규격}%`);
+        conditions.push('m.규격 LIKE @규격');
+      }
+
+      if (conditions.length > 0) {
+        query += ` AND (${conditions.join(' AND ')})`;
+      }
+    }
+    // 통합 검색 (하위 호환성)
+    else if (search) {
+      query += ` AND (m.자재명 LIKE @searchStart OR m.세부코드 LIKE @searchContain OR m.규격 LIKE @searchContain)`;
+      request.input('searchStart', sql.NVarChar(100), `${search}%`);
+      request.input('searchContain', sql.NVarChar(100), `%${search}%`);
     }
 
     query += `
       GROUP BY m.자재명, m.규격, m.단위
-      ORDER BY 전체건수 DESC, m.자재명
+      ORDER BY m.자재명 ASC
     `;
 
     const result = await request.query(query);

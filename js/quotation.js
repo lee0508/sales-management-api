@@ -925,18 +925,33 @@ let isNewQuotationMode = false;
 async function searchMaterials() {
   console.log('===== quotationManageDetailAddModal > 자재 검색 버튼 클릭 =====');
   try {
-    const keyword = document.getElementById('materialSearchInput').value.trim();
+    let keyword = document.getElementById('materialSearchInput').value.trim();
+    let searchSpec = ''; // 규격 검색어
 
     if (!keyword) {
       alert('검색어를 입력해주세요.');
       return;
     }
 
+    // 검색어에서 쉼표로 분리하여 자재명과 규격 검색어 추출
+    // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
+    if (keyword.includes(',')) {
+      const parts = keyword.split(',').map(s => s.trim());
+      keyword = parts[0] || ''; // 첫 번째 부분: 자재명
+      searchSpec = parts[1] || ''; // 두 번째 부분: 규격
+
+      console.log(`  검색어 분리: "${keyword}", 규격: "${searchSpec}"`);
+    }
+
     // 서버는 /api/materials 에서 searchName을 처리
     const params = new URLSearchParams();
     params.append('searchCode', keyword);
     params.append('searchName', keyword);
-    params.append('searchSpec', keyword); // 규격 검색 추가
+    if (searchSpec) {
+      params.append('searchSpec', searchSpec); // 규격 검색어 추가 (쉼표로 분리된 경우)
+    } else {
+      params.append('searchSpec', keyword); // 단일 검색어인 경우 모든 필드에서 검색
+    }
     params.append('removeDuplicates', 'true'); // 중복 제거 활성화
 
     const response = await fetch(`/api/materials?${params.toString()}`);
@@ -1411,7 +1426,18 @@ async function searchAddDetailMaterials() {
   try {
     const searchCategory = document.getElementById('addDetailMaterialSearchCategory').value.trim();
     const searchCode = document.getElementById('addDetailMaterialSearchCode').value.trim();
-    const searchName = document.getElementById('addDetailMaterialSearchName').value.trim();
+    let searchName = document.getElementById('addDetailMaterialSearchName').value.trim();
+    let searchSpec = ''; // 규격 검색어
+
+    // 자재명에서 쉼표로 분리하여 자재명과 규격 검색어 추출
+    // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
+    if (searchName && searchName.includes(',')) {
+      const parts = searchName.split(',').map(s => s.trim());
+      searchName = parts[0] || ''; // 첫 번째 부분: 자재명
+      searchSpec = parts[1] || ''; // 두 번째 부분: 규격
+
+      console.log(`  자재명 검색: "${searchName}", 규격 검색: "${searchSpec}"`);
+    }
 
     if (!searchCategory && !searchCode && !searchName) {
       alert('최소 1개 이상의 검색 조건을 입력해주세요.');
@@ -1422,6 +1448,7 @@ async function searchAddDetailMaterials() {
     if (searchCategory) params.append('searchCategory', searchCategory);
     if (searchCode) params.append('searchCode', searchCode);
     if (searchName) params.append('searchName', searchName);
+    if (searchSpec) params.append('searchSpec', searchSpec); // 규격 검색어 추가
     params.append('removeDuplicates', 'true'); // 중복 제거 활성화
 
     const response = await fetch(`${API_BASE_URL}/materials?${params.toString()}`);
@@ -2817,9 +2844,29 @@ window.selectQuotationMaterialAdd = function (material) {
 };
 async function searchMaterialsForQuotation() {
   try {
-    const searchText = document.getElementById('materialSearchInput2').value.trim();
+    let searchText = document.getElementById('materialSearchInput2').value.trim();
+    let searchSpec = ''; // 규격 검색어
 
-    const response = await fetch(`/api/materials?search=${encodeURIComponent(searchText)}`);
+    // 검색어에서 쉼표로 분리하여 자재명과 규격 검색어 추출
+    // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
+    if (searchText && searchText.includes(',')) {
+      const parts = searchText.split(',').map(s => s.trim());
+      searchText = parts[0] || ''; // 첫 번째 부분: 자재명
+      searchSpec = parts[1] || ''; // 두 번째 부분: 규격
+
+      console.log(`  검색어 분리: "${searchText}", 규격: "${searchSpec}"`);
+    }
+
+    // API 호출
+    const params = new URLSearchParams();
+    if (searchText) {
+      params.append('search', searchText);
+    }
+    if (searchSpec) {
+      params.append('searchSpec', searchSpec); // 규격 검색어 추가
+    }
+
+    const response = await fetch(`/api/materials?${params.toString()}`);
     const result = await response.json();
 
     if (!result.success) {
@@ -3370,7 +3417,18 @@ async function searchNewMaterials() {
     // 각 필드의 검색어 가져오기
     const searchCategory = document.getElementById('newMaterialSearchCategory').value.trim();
     const searchCode = document.getElementById('newMaterialSearchCode').value.trim();
-    const searchName = document.getElementById('newMaterialSearchName').value.trim();
+    let searchName = document.getElementById('newMaterialSearchName').value.trim();
+    let searchSpec = ''; // 규격 검색어
+
+    // 자재명에서 쉼표로 분리하여 자재명과 규격 검색어 추출
+    // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
+    if (searchName && searchName.includes(',')) {
+      const parts = searchName.split(',').map(s => s.trim());
+      searchName = parts[0] || ''; // 첫 번째 부분: 자재명
+      searchSpec = parts[1] || ''; // 두 번째 부분: 규격
+
+      console.log(`  자재명 검색: "${searchName}", 규격 검색: "${searchSpec}"`);
+    }
 
     // 최소 1개 이상의 검색어 입력 확인
     if (!searchCategory && !searchCode && !searchName) {
@@ -3383,6 +3441,7 @@ async function searchNewMaterials() {
     if (searchCategory) params.append('searchCategory', searchCategory);
     if (searchCode) params.append('searchCode', searchCode);
     if (searchName) params.append('searchName', searchName);
+    if (searchSpec) params.append('searchSpec', searchSpec); // 규격 검색어 추가
     params.append('removeDuplicates', 'true'); // 중복 제거 활성화
 
     const result = await apiCall(`/materials?${params.toString()}`);
