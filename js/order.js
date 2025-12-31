@@ -190,10 +190,8 @@ $(document).ready(function () {
       orderManageTable = null;
     }
 
-    // ✅ 날짜 필드 설정 후 DataTable 초기화 (DOM 업데이트 대기)
-    setTimeout(() => {
-      // DataTable 초기화
-      orderManageTable = $('#orderManageTable').DataTable({
+    // DataTable 초기화
+    orderManageTable = $('#orderManageTable').DataTable({
       ajax: {
         url: '/api/orders',
         data: function (d) {
@@ -466,7 +464,6 @@ $(document).ready(function () {
           // actionDiv.find('.orderBtnApprove').hide();
         }
       });
-    }, 0); // ✅ setTimeout 닫기 - 날짜 필드 설정 후 DataTable 초기화
   }
 
   // 전역 변수로 저장
