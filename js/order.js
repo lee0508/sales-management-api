@@ -919,122 +919,14 @@ let selectedOrderMaterial = null;
 // ✅ 신규/수정 모드 플래그 (전역 변수)
 let isNewOrderMode = false;
 
-// ✅ 자재 검색 함수
-// ✅ [발주관리] 공통 자재 검색 (orderDetailAddModal)
-// HTML에 있는 materialSearchInput / materialSearchTableBody / materialSearchResults 기준으로 동작
-async function searchMaterialsForOrder() {
-  console.log('===== orderManageDetailAddModal > 자재 검색 버튼 클릭 =====');
-  try {
-    let keyword = document.getElementById('materialSearchInput').value.trim();
-    let searchSpec = ''; // 규격 검색어
-
-    if (!keyword) {
-      alert('검색어를 입력해주세요.');
-      return;
-    }
-
-    // 검색어에서 쉼표로 분리하여 자재명과 규격 검색어 추출
-    // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
-    if (keyword.includes(',')) {
-      const parts = keyword.split(',').map((s) => s.trim());
-      keyword = parts[0] || ''; // 첫 번째 부분: 자재명
-      searchSpec = parts[1] || ''; // 두 번째 부분: 규격
-
-      console.log(`  검색어 분리: "${keyword}", 규격: "${searchSpec}"`);
-    }
-
-    // 서버는 /api/materials 에서 searchName을 처리
-    const params = new URLSearchParams();
-    params.append('searchCode', keyword);
-    params.append('searchName', keyword);
-    if (searchSpec) {
-      params.append('searchSpec', searchSpec); // 규격 검색어 추가 (쉼표로 분리된 경우)
-    } else {
-      params.append('searchSpec', keyword); // 단일 검색어인 경우 모든 필드에서 검색
-    }
-    params.append('removeDuplicates', 'true'); // 중복 제거 활성화
-
-    const response = await fetch(`/api/materials?${params.toString()}`);
-    const result = await response.json();
-
-    if (!result.success) throw new Error(result.message || '자재 조회 실패');
-
-    const tbody = document.getElementById('materialSearchTableBody');
-    const resultsDiv = document.getElementById('materialSearchResults');
-
-    if (!result.data || result.data.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="6" style="padding:40px;text-align:center;color:#999;">
-            검색 결과가 없습니다
-          </td>
-        </tr>`;
-      resultsDiv.style.display = 'block';
-      return;
-    }
-
-    tbody.innerHTML = '';
-    result.data.forEach((material) => {
-      const 자재코드 = (material.분류코드 || '') + (material.세부코드 || '');
-
-      const tr = document.createElement('tr');
-      tr.style.cursor = 'pointer';
-      tr.onmouseover = () => (tr.style.background = '#f8f9fa');
-      tr.onmouseout = () => (tr.style.background = 'white');
-
-      tr.innerHTML = `
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${자재코드}</td>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${material.자재명 || '-'}</td>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${material.규격 || '-'}</td>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${(
-          material.출고단가1 || 0
-        ).toLocaleString()}</td>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center;">
-          <button type="button" class="btn btn-sm"
-            onclick='selectMaterialForOrder(${JSON.stringify(material).replace(/'/g, '&apos;')})'>
-            선택
-          </button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    resultsDiv.style.display = 'block';
-  } catch (err) {
-    console.error('❌ orderManageDetailAddModal > 자재 검색 오류:', err);
-    alert('자재 검색 중 오류가 발생했습니다.');
-  }
-}
-
-// ✅ 자재 선택 함수
-function selectMaterial(material) {
-  selectedOrderMaterial = material;
-
-  const 자재코드 = material.분류코드 + material.세부코드;
-
-  // 선택된 자재 정보 표시
-  document.getElementById('selectedMaterialName').textContent = material.자재명;
-  document.getElementById('selectedMaterialCode').textContent = `[${자재코드}] ${
-    material.규격 || ''
-  }`;
-  document.getElementById('selectedMaterialInfo').style.display = 'block';
-
-  // 검색 결과 숨기기
-  document.getElementById('materialSearchResults').style.display = 'none';
-}
-
-// ✅ 선택된 자재 취소
-function clearSelectedMaterial() {
-  selectedOrderMaterial = null;
-  if (typeof newSelectedOrderMaterial !== 'undefined') newSelectedOrderMaterial = null;
-
-  const selectedInfo = document.getElementById('selectedMaterialInfo');
-  if (selectedInfo) selectedInfo.style.display = 'none';
-
-  // 검색 결과 다시 표시
-  const resultsDiv = document.getElementById('materialSearchResults');
-  if (resultsDiv) resultsDiv.style.display = 'block';
-}
+// ✅ [미사용 함수 삭제됨 - quotation.js 복사 시 남은 레거시 코드]
+// - searchMaterialsForOrder(): HTML에 materialSearchInput 요소 없음
+// - selectMaterial(): 호출되지 않음
+// - clearSelectedMaterial(): 호출되지 않음
+// 실제 사용 중인 함수:
+//   - searchAddDetailMaterialsForOrder(): 발주 수정 시 자재 검색
+//   - selectAddDetailMaterialForOrder(): 자재 선택
+//   - clearAddDetailMaterialSearchForOrder(): 검색 초기화
 
 // ✅ 금액 자동 계산 (수량 * 단가)
 function calculateDetailAmount() {
@@ -3079,8 +2971,8 @@ function selectPriceFromHistoryForNewOrder(price) {
 function selectMaterialForOrder(material) {
   // 선택된 자재를 변수에 저장 (신규/수정 모두 호환)
   selectedOrderMaterial = material;
-  if (typeof newSelectedOrderMaterial !== 'undefined') {
-    newSelectedOrderMaterial = material;
+  if (typeof newSelectedMaterial !== 'undefined') {
+    newSelectedMaterial = material;
   }
 
   // 자재코드 생성
@@ -3395,7 +3287,7 @@ async function submitOrderManageCreate(event) {
 
 // ==================== 신규 발주서용 품목 추가 모달 ====================
 
-let newSelectedOrderMaterial = null;
+let newSelectedMaterialForOrder = null;
 
 // ❌ [중복 삭제됨] openMaterialSearchModal() - 위의 공통 함수(라인 1887) 사용
 // 이전에는 newOrderMaterialModal을 사용했으나, 이제 orderDetailAddModal 1개로 통합
@@ -3501,7 +3393,7 @@ function clearNewMaterialSearch() {
 
 // 자재 선택
 function selectNewMaterial(material) {
-  newSelectedOrderMaterial = material;
+  newSelectedMaterialForOrder = material;
 
   const 자재코드 = material.분류코드 + material.세부코드;
 
@@ -3516,7 +3408,7 @@ function selectNewMaterial(material) {
 
 // 선택된 자재 취소
 function clearNewSelectedMaterial() {
-  newSelectedOrderMaterial = null;
+  newSelectedMaterial = null;
   document.getElementById('newSelectedMaterialInfo').style.display = 'none';
   document.getElementById('newMaterialSearchCode').value = '';
   document.getElementById('newMaterialSearchName').value = '';
@@ -3526,12 +3418,12 @@ function clearNewSelectedMaterial() {
 // 자재 추가 확인
 function confirmNewOrderMaterialAdd() {
   try {
-    if (!newSelectedOrderMaterial) {
+    if (!newSelectedMaterial) {
       alert('자재를 검색하여 선택해주세요.');
       return;
     }
 
-    const 자재코드 = newSelectedOrderMaterial.분류코드 + newSelectedOrderMaterial.세부코드;
+    const 자재코드 = newSelectedMaterial.분류코드 + newSelectedMaterial.세부코드;
     const 수량 = parseFloat(document.getElementById('newDetailQuantity').value) || 0;
     const 출고단가 = parseFloat(document.getElementById('newDetailPrice').value) || 0;
 
@@ -3543,8 +3435,8 @@ function confirmNewOrderMaterialAdd() {
     // newOrderDetails 배열에 추가
     newOrderDetails.push({
       자재코드: 자재코드,
-      자재명: newSelectedOrderMaterial.자재명,
-      규격: newSelectedOrderMaterial.규격,
+      자재명: newSelectedMaterial.자재명,
+      규격: newSelectedMaterial.규격,
       수량: 수량,
       단가: 출고단가,
     });
@@ -3578,7 +3470,7 @@ $(document).ready(function () {
 async function showNewPriceHistory() {
   try {
     // 자재가 선택되었는지 확인
-    if (!newSelectedOrderMaterial) {
+    if (!newSelectedMaterial) {
       alert('먼저 자재를 검색하여 선택해주세요.');
       return;
     }
@@ -3590,7 +3482,7 @@ async function showNewPriceHistory() {
     }
 
     // 기존 단가 이력 모달 재사용 - selectedOrderMaterial 설정
-    selectedOrderMaterial = newSelectedOrderMaterial;
+    selectedOrderMaterial = newSelectedMaterial;
     isNewOrderMode = true;
 
     // 단가 이력 모달의 z-index를 더 높게 설정 (신규 발주서 모달 위에 표시)
@@ -3674,9 +3566,9 @@ async function switchNewPriceHistoryTab(tab) {
 // ✅ 신규 발주서 실제 출고 이력 로드
 async function loadNewActualPriceHistory() {
   try {
-    if (!newSelectedOrderMaterial) return;
+    if (!newSelectedMaterial) return;
 
-    const 자재코드 = newSelectedOrderMaterial.분류코드 + newSelectedOrderMaterial.세부코드;
+    const 자재코드 = newSelectedMaterial.분류코드 + newSelectedMaterial.세부코드;
     const 매입처코드 = document.getElementById('selectedSupplierCode').value;
 
     if (!매입처코드) return;
@@ -3750,9 +3642,9 @@ async function loadNewActualPriceHistory() {
 // ✅ 신규 발주서 발주 제안가 이력 로드
 async function loadNewOrderPriceHistory() {
   try {
-    if (!newSelectedOrderMaterial) return;
+    if (!newSelectedMaterial) return;
 
-    const 자재코드 = newSelectedOrderMaterial.분류코드 + newSelectedOrderMaterial.세부코드;
+    const 자재코드 = newSelectedMaterial.분류코드 + newSelectedMaterial.세부코드;
     const 매입처코드 = document.getElementById('selectedSupplierCode').value;
 
     if (!매입처코드) return;
