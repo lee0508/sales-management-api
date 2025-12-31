@@ -722,6 +722,10 @@ async function editOrderManage(orderDate, orderNo) {
     const remarkEl = document.getElementById('orderManageEditRemark');
     if (remarkEl) remarkEl.value = master.적요 || '';
 
+    // ✅ 매입처코드 hidden 필드에 저장 (이전단가 조회 시 사용)
+    const supplierCodeEl = document.getElementById('orderManageEditSupplierCode');
+    if (supplierCodeEl) supplierCodeEl.value = master.매입처코드 || '';
+
     // 모달에 발주일자, 번호 저장 (submit 시 사용)
     const modal = document.getElementById('orderManageEditModal');
     modal.dataset.orderDate = orderDate;
@@ -1462,9 +1466,10 @@ async function showOrderManageDetailPriceHistory() {
       selectedMaterialForAddForOrder.품목코드 ||
       selectedMaterialForAddForOrder.분류코드 + selectedMaterialForAddForOrder.세부코드;
 
-    // 매입처코드 가져오기 (발주서 작성 모달에서)
+    // 매입처코드 가져오기 (발주서 작성/수정 모달에서)
     const 매입처코드 =
       document.getElementById('orderManageCreateSupplierCode')?.value ||
+      document.getElementById('orderManageEditSupplierCode')?.value ||
       document.getElementById('selectedSupplierCode')?.value;
 
     if (!매입처코드) {
