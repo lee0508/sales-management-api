@@ -190,8 +190,10 @@ $(document).ready(function () {
       orderManageTable = null;
     }
 
-    // DataTable 초기화
-    orderManageTable = $('#orderManageTable').DataTable({
+    // ✅ 날짜 필드 설정 후 DataTable 초기화 (DOM 업데이트 대기)
+    setTimeout(() => {
+      // DataTable 초기화
+      orderManageTable = $('#orderManageTable').DataTable({
       ajax: {
         url: '/api/orders',
         data: function (d) {
@@ -464,6 +466,7 @@ $(document).ready(function () {
           // actionDiv.find('.orderBtnApprove').hide();
         }
       });
+    }, 0); // ✅ setTimeout 닫기 - 날짜 필드 설정 후 DataTable 초기화
   }
 
   // 전역 변수로 저장
@@ -655,13 +658,6 @@ function closeOrderManageViewModal() {
     $('#orderManageViewDetailTable tbody').empty();
   }
 }
-
-// 필터링 함수
-// function filterOrders() {
-//   if (window.orderManageTableInstance) {
-//     window.orderManageTableInstance.ajax.reload();
-//   }
-// }
 
 // ✅ 발주 상세보기 함수 (DataTable 버튼에서 호출)
 function viewOrderManageDetail(orderDate, orderNo) {
