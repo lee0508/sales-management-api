@@ -2886,7 +2886,7 @@ app.get('/api/materials/:materialCode/order-history/:supplierCode', async (req, 
 // 발주 리스트
 app.get('/api/orders', async (req, res) => {
   try {
-    const { search, 사업장코드, 상태코드, orderStartDate, orderEndDate } = req.query;
+    const { search, 사업장코드, 상태코드, startDate, endDate } = req.query;
 
     let query = `
             SELECT
@@ -2917,16 +2917,10 @@ app.get('/api/orders', async (req, res) => {
       query += ` AND o.상태코드 = @상태코드`;
     }
 
-    // 날짜 필터링 (빈 문자열이 아니고 8자리 숫자인 경우만)
-    // if (startDate && endDate && startDate.length === 8 && endDate.length === 8) {
-    //   request.input('startDate', sql.VarChar(8), startDate);
-    //   request.input('endDate', sql.VarChar(8), endDate);
-    //   query += ` AND o.발주일자 BETWEEN @startDate AND @endDate`;
-    // }
-
-    if (orderStartDate && orderEndDate) {
-      request.input('startDate', sql.VarChar(8), orderStartDate);
-      request.input('endDate', sql.VarChar(8), orderEndDate);
+    // 날짜 필터링 (견적서와 동일한 파라미터명 사용)
+    if (startDate && endDate && startDate.length === 8 && endDate.length === 8) {
+      request.input('startDate', sql.VarChar(8), startDate);
+      request.input('endDate', sql.VarChar(8), endDate);
       query += ` AND o.발주일자 BETWEEN @startDate AND @endDate`;
     }
 
