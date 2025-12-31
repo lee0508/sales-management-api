@@ -163,7 +163,7 @@ $(document).ready(function () {
   // 견적 데이터 로드 함수 (DataTable 초기화)
   async function loadQuotations() {
     // ✅ 다른 페이지의 체크박스 이벤트 핸들러 제거
-    $(document).off('change.orderPage');
+    $(document).off('change.orderManagePage');
     $(document).off('change.transactionManagePage');
     $(document).off('change.purchasePage');
 
@@ -936,7 +936,7 @@ async function searchMaterials() {
     // 검색어에서 쉼표로 분리하여 자재명과 규격 검색어 추출
     // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
     if (keyword.includes(',')) {
-      const parts = keyword.split(',').map(s => s.trim());
+      const parts = keyword.split(',').map((s) => s.trim());
       keyword = parts[0] || ''; // 첫 번째 부분: 자재명
       searchSpec = parts[1] || ''; // 두 번째 부분: 규격
 
@@ -1432,7 +1432,7 @@ async function searchAddDetailMaterials() {
     // 자재명에서 쉼표로 분리하여 자재명과 규격 검색어 추출
     // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
     if (searchName && searchName.includes(',')) {
-      const parts = searchName.split(',').map(s => s.trim());
+      const parts = searchName.split(',').map((s) => s.trim());
       searchName = parts[0] || ''; // 첫 번째 부분: 자재명
       searchSpec = parts[1] || ''; // 두 번째 부분: 규격
 
@@ -1577,9 +1577,10 @@ async function showQuotationManageDetailPriceHistory() {
       selectedMaterialForAdd.품목코드 ||
       selectedMaterialForAdd.분류코드 + selectedMaterialForAdd.세부코드;
 
-    // 매출처코드 가져오기 (견적서 작성 모달에서)
+    // 매출처코드 가져오기 (견적서 작성/수정 모달에서)
     const 매출처코드 =
       document.getElementById('quotationManageCreateCustomerCode')?.value ||
+      document.getElementById('quotationManageEditCustomerCode')?.value ||
       document.getElementById('selectedCustomerCode')?.value;
 
     if (!매출처코드) {
@@ -1919,7 +1920,11 @@ function confirmQuotationManageDetailEdit() {
     const modal = document.getElementById('quotationManageDetailEditModal');
 
     // 신규 견적서 작성 모드인지 확인 (editIndex가 있으면 신규 견적서)
-    if (modal.dataset.editIndex !== undefined && modal.dataset.editIndex !== null && modal.dataset.editIndex !== '') {
+    if (
+      modal.dataset.editIndex !== undefined &&
+      modal.dataset.editIndex !== null &&
+      modal.dataset.editIndex !== ''
+    ) {
       confirmNewQuotationDetailEdit();
       return;
     }
@@ -1994,7 +1999,9 @@ function deleteQuotationManageDetailRow(rowIndex) {
     }
 
     // 모달에 정보 표시
-    document.getElementById('deleteQuotationDetailInfo').textContent = `[${rowData.자재코드}] ${rowData.자재명}`;
+    document.getElementById(
+      'deleteQuotationDetailInfo',
+    ).textContent = `[${rowData.자재코드}] ${rowData.자재명}`;
 
     // 모달에 rowIndex 저장 (deleteIndex는 삭제하여 견적서 수정 모드로 설정)
     const modal = document.getElementById('quotationManageDetailDeleteConfirmModal');
@@ -2003,7 +2010,6 @@ function deleteQuotationManageDetailRow(rowIndex) {
 
     // 모달 표시
     modal.style.display = 'block';
-
   } catch (err) {
     console.error('❌ 품목 삭제 오류:', err);
     alert('품목 삭제 중 오류가 발생했습니다: ' + err.message);
@@ -2030,7 +2036,11 @@ function confirmQuotationManageDetailDelete() {
     const modal = document.getElementById('quotationManageDetailDeleteConfirmModal');
 
     // 신규 견적서 작성 모드인지 확인 (deleteIndex가 있으면 신규 견적서)
-    if (modal.dataset.deleteIndex !== undefined && modal.dataset.deleteIndex !== null && modal.dataset.deleteIndex !== '') {
+    if (
+      modal.dataset.deleteIndex !== undefined &&
+      modal.dataset.deleteIndex !== null &&
+      modal.dataset.deleteIndex !== ''
+    ) {
       const index = parseInt(modal.dataset.deleteIndex);
 
       // newQuotationDetails 배열에서 삭제
@@ -2850,7 +2860,7 @@ async function searchMaterialsForQuotation() {
     // 검색어에서 쉼표로 분리하여 자재명과 규격 검색어 추출
     // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
     if (searchText && searchText.includes(',')) {
-      const parts = searchText.split(',').map(s => s.trim());
+      const parts = searchText.split(',').map((s) => s.trim());
       searchText = parts[0] || ''; // 첫 번째 부분: 자재명
       searchSpec = parts[1] || ''; // 두 번째 부분: 규격
 
@@ -3297,7 +3307,9 @@ function confirmNewQuotationDetailEdit() {
 
 // ✅ 상세내역 삭제 - 모달 열기
 function removeNewQuotationDetail(index) {
-  console.log('===== quotationManageCreateModal > quotationManageCreateDetailTable > 삭제 버튼 클릭 =====');
+  console.log(
+    '===== quotationManageCreateModal > quotationManageCreateDetailTable > 삭제 버튼 클릭 =====',
+  );
 
   try {
     const detail = newQuotationDetails[index];
@@ -3307,7 +3319,9 @@ function removeNewQuotationDetail(index) {
     }
 
     // 모달에 정보 표시
-    document.getElementById('deleteQuotationDetailInfo').textContent = `[${detail.자재코드}] ${detail.자재명}`;
+    document.getElementById(
+      'deleteQuotationDetailInfo',
+    ).textContent = `[${detail.자재코드}] ${detail.자재명}`;
 
     // 모달에 index 저장 (rowIndex는 삭제하여 신규 견적서 모드로 설정)
     const modal = document.getElementById('quotationManageDetailDeleteConfirmModal');
@@ -3423,7 +3437,7 @@ async function searchNewMaterials() {
     // 자재명에서 쉼표로 분리하여 자재명과 규격 검색어 추출
     // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
     if (searchName && searchName.includes(',')) {
-      const parts = searchName.split(',').map(s => s.trim());
+      const parts = searchName.split(',').map((s) => s.trim());
       searchName = parts[0] || ''; // 첫 번째 부분: 자재명
       searchSpec = parts[1] || ''; // 두 번째 부분: 규격
 
