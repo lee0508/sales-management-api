@@ -1,770 +1,758 @@
 /**
- * 발주관리 페이지 - DataTable 구현
- * 견적관리(quotation.js)와 동일한 패턴 적용
+ * 발주관리 DataTable 초기화 및 관리
  */
 
-// 전역 변수로 DataTable 인스턴스 저장 (Prefix 규칙 준수)
-window.orderTable = null;
-let isSelectAllMode = false; // 전체선택 모드 플래그
+// 전역 변수로 DataTable 인스턴스 저장
+let orderManageTable = null;
 
 // ==================== 전역 함수 정의 (최상단) ====================
-// 발주서용 매입처 선택 함수 - 고유한 이름 사용 (다른 모듈과 충돌 방지)
-window.selectOrderSupplier = function selectOrderSupplier(supplier) {
+// 발주서용 매입처 선택 함수 - 고유한 이름 사용 (taxinvoice.js와 충돌 방지)
+window.selectOrderSupplier = function selectOrderSupplier(supplierOrCode, name) {
   try {
-    // 매입처 코드와 이름 설정 (Prefix 규칙 적용)
-    const codeInput = document.getElementById('selectedSupplierCode');
-    const nameInput = document.getElementById('selectedSupplierName');
+    // ✅ 두 가지 호출 방식 지원:
+    // 1. selectOrderSupplier(supplier) - 객체 전달 (발주 전용 검색에서 호출)
+    // 2. selectOrderSupplier(code, name) - 개별 파라미터 (공통 모달에서 호출)
+    let code, supplierName;
+
+    if (typeof supplierOrCode === 'object' && supplierOrCode !== null) {
+      // 객체로 전달된 경우
+      code = supplierOrCode.매입처코드;
+      supplierName = supplierOrCode.매입처명;
+    } else {
+      // 개별 파라미터로 전달된 경우
+      code = supplierOrCode;
+      supplierName = name;
+    }
+
+    // 매입처 코드와 이름 설정 (Prefix Rule 적용)
+    const codeInput = document.getElementById('orderManageCreateSupplierCode');
+    const nameInput = document.getElementById('orderManageCreateSupplierName');
 
     if (!codeInput || !nameInput) {
-      console.error('입력 필드를 찾을 수 없습니다!');
+      console.error('❌ orderManageCreateModal > 입력 필드를 찾을 수 없습니다');
       alert('입력 필드를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
       return;
     }
 
-    codeInput.value = supplier.매입처코드;
-    nameInput.value = supplier.매입처명;
+    codeInput.value = code;
+    nameInput.value = supplierName;
 
-    // 선택된 매입처 정보 표시 (Prefix 규칙 적용)
-    const infoDiv = document.getElementById('selectedSupplierInfo');
-    const displaySpan = document.getElementById('selectedSupplierDisplay');
+    // 선택된 매입처 정보 표시
+    const infoDiv = document.getElementById('orderManageCreateSupplierInfo');
+    const displaySpan = document.getElementById('orderManageCreateSupplierDisplay');
 
     if (infoDiv && displaySpan) {
-      displaySpan.textContent = `[${supplier.매입처코드}] ${supplier.매입처명}`;
+      displaySpan.textContent = `[${code}] ${supplierName}`;
       infoDiv.style.display = 'block';
     }
 
-    // 모달 닫기 (Prefix 규칙 준수)
+    // 모달 닫기
     window.closeOrderSupplierSearchModal();
   } catch (err) {
-    console.error(' selectOrderSupplier 에러:', err);
+    console.error('❌ orderManageCreateModal > 매입처 선택 에러:', err);
     alert('매입처 선택 중 오류가 발생했습니다: ' + err.message);
   }
 };
 
-// 매입처 검색 모달 닫기 함수 (Prefix 규칙: order prefix 추가)
+// ✅ 발주서 작성용 매입처 검색 모달 닫기 함수 (공통 모달 사용)
+// @deprecated - supplier.js의 closeSupplierSearchModal() 사용 권장
 window.closeOrderSupplierSearchModal = function closeOrderSupplierSearchModal() {
-  console.log('[매입처검색모달] 닫기 (onclick) → closeSupplierSearchModal()');
-
-  const modal = document.getElementById('supplierSearchModal');
-  if (modal) {
-    modal.style.display = 'none';
+  // supplier.js의 공통 모달 닫기 함수 호출
+  if (typeof window.closeSupplierSearchModal === 'function') {
+    window.closeSupplierSearchModal();
   }
 };
-
-// 하위 호환성 유지 (레거시 코드 지원)
-window.closeSupplierSearchModal = window.closeOrderSupplierSearchModal;
 // ==================================================================
 
-/**
- * 발주 목록 조회 및 DataTable에 로드
- */
-async function loadOrderList() {
-  console.log('[발주관리] loadOrderList() 시작');
-
-  // 다른 페이지의 이벤트 핸들러 제거 (네임스페이스 패턴)
-  $(document).off('change.quotationPage');
-  $(document).off('change.transactionManagePage');
-  $(document).off('change.purchasePage');
-
-  // 발주관리 페이지 이벤트 핸들러 초기화 (중복 등록 방지)
-  // 페이지 진입 시 기존 이벤트를 모두 제거하고 새로 등록
-  $(document).off('.orderPage');
-  $('#closeOrderDetailModal').off('.orderPage');
-  $('#closeOrderEditModalBtn').off('.orderPage');
-  $('#closeOrderModal').off('.orderPage');
-  $('#closeOrderDetailAddModal').off('.orderPage');
-  $('#closeOrderDetailEditModal').off('.orderPage');
-  $('#closeOrderPriceHistoryModal').off('.orderPage');
-  $('#addOrderDetailQuantity, #addOrderDetailInPrice').off('.orderPage');
-  $('#editOrderDetailQuantity, #editOrderDetailInPrice').off('.orderPage');
-
-  // 신규 발주서 자재 추가 모달 - 금액 자동 계산 (견적서 패턴과 동일)
-  $('#newOrderDetailQuantity, #newOrderDetailPrice')
-    .off('.orderPage')
-    .on('input.orderPage', function () {
-      calculateNewOrderDetailAmount();
-    });
-
-  console.log(' 발주관리 페이지 이벤트 핸들러 초기화 완료');
-
-  // 페이지가 표시될 때마다 날짜를 오늘 날짜로 초기화
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-  console.log('오늘 날짜:', todayStr);
-
-  const startDateInput = document.getElementById('orderStartDate');
-  const endDateInput = document.getElementById('orderEndDate');
-
-  // 항상 오늘 날짜로 설정
-  if (startDateInput) {
-    startDateInput.value = todayStr;
-    console.log(' 시작일자 설정:', startDateInput.value);
-  } else {
-    console.error(' orderStartDate 입력 필드를 찾을 수 없습니다!');
-  }
-  if (endDateInput) {
-    endDateInput.value = todayStr;
-    console.log(' 종료일자 설정:', endDateInput.value);
-  } else {
-    console.error(' orderEndDate 입력 필드를 찾을 수 없습니다!');
-  }
-
-  // DataTable 재사용 패턴: 이미 존재하면 파괴 (향후 재사용 패턴으로 변경 권장)
-  if (window.orderTable) {
-    console.log('기존 DataTable 파괴');
-    window.orderTable.destroy();
-    window.orderTable = null;
-  }
-
-  // DataTable 초기화 (window.orderTable 사용)
-  window.orderTable = $('#orderTable').DataTable({
-    ajax: {
-      url: '/api/orders',
-      data: function (d) {
-        // 필터링 파라미터 추가
-        const 사업장코드 = currentUser?.사업장코드 || '01';
-        const 상태코드 = $('#orderStatusFilter').val();
-        const startDate = $('#orderStartDate').val()?.replace(/-/g, '') || '';
-        const endDate = $('#orderEndDate').val()?.replace(/-/g, '') || '';
-
-        console.log('[발주관리] DataTable AJAX 요청 파라미터:');
-        console.log('  - 사업장코드:', 사업장코드);
-        console.log('  - 상태코드:', 상태코드);
-        console.log('  - 시작일자:', startDate);
-        console.log('  - 종료일자:', endDate);
-        console.log('  - 원본 시작일:', $('#orderStartDate').val());
-        console.log('  - 원본 종료일:', $('#orderEndDate').val());
-
-        return {
-          사업장코드: 사업장코드,
-          상태코드: 상태코드,
-          orderStartDate: startDate,
-          orderEndDate: endDate,
-        };
-      },
-      dataSrc: function (json) {
-        console.log('[발주관리] 서버 응답 수신:', json);
-        console.log('  - 데이터 건수:', json.data?.length || 0);
-        console.log('  - 전체 건수:', json.total);
-
-        // 발주 건수 업데이트
-        const countEl = document.getElementById('orderCount');
-        if (countEl && json.total !== undefined) {
-          countEl.innerText = `${json.total.toLocaleString()}`;
-        }
-
-        return json.data || [];
-      },
-      error: function (xhr, error, code) {
-        console.error(' [발주관리] AJAX 요청 실패:', {
-          status: xhr.status,
-          statusText: xhr.statusText,
-          error: error,
-          code: code,
-          responseText: xhr.responseText,
-        });
-      },
-    },
-    columns: [
-      // 1. 체크박스
-      {
-        data: null,
-        orderable: false,
-        render: function (data, type, row) {
-          return `<input type="checkbox" class="orderRowCheck" data-order-date="${row.발주일자}" data-order-no="${row.발주번호}" />`;
-        },
-      },
-      // 2. 순번
-      {
-        data: null,
-        className: 'dt-center',
-        render: (data, type, row, meta) => meta.row + 1,
-      },
-      // 3. 발주번호 (일자-번호)
-      {
-        data: null,
-        render: function (data, type, row) {
-          return `${row.발주일자}-${row.발주번호}`;
-        },
-      },
-      // 4. 매입처명
-      {
-        data: '매입처명',
-        defaultContent: '-',
-      },
-      // 5. 발주일자 (YYYY-MM-DD 포맷)
-      {
-        data: '발주일자',
-        render: function (data) {
-          if (!data || data.length !== 8) return '-';
-          return `${data.substring(0, 4)}-${data.substring(4, 6)}-${data.substring(6, 8)}`;
-        },
-      },
-      // 6. 제목
-      {
-        data: '제목',
-        defaultContent: '-',
-      },
-      // 7. 발주금액
-      {
-        data: '합계금액',
-        render: function (data) {
-          if (!data) return '0원';
-          return data.toLocaleString() + '원';
-        },
-      },
-      // 8. 담당자
-      {
-        data: '사용자명',
-        defaultContent: '-',
-      },
-      // 9. 상태 (배지)
-      {
-        data: '상태코드',
-        render: function (data) {
-          const statusMap = {
-            0: { text: '발주대기', class: 'status-pending' },
-            1: { text: '발주완료', class: 'status-active' },
-            2: { text: '입고완료', class: 'status-completed' },
-          };
-          const status = statusMap[data] || { text: '알수없음', class: '' };
-          return `<span class="status-badge ${status.class}">${status.text}</span>`;
-        },
-      },
-      // 10. 관리 버튼
-      {
-        data: null,
-        orderable: false,
-        render: function (data, type, row) {
-          const orderKey = `${row.발주일자}_${row.발주번호}`;
-          return `
-            <div class="action-buttons" id="orderActions-${orderKey}">
-              <button class="btn-icon orderBtnView" onclick="viewOrderDetail('${row.발주일자}', ${row.발주번호})" title="상세보기">상세</button>
-              <button class="btn-icon orderBtnEdit" style="display: none;" onclick="editOrder('${row.발주일자}', ${row.발주번호})" title="수정">수정</button>
-              <button class="btn-icon orderBtnDelete" style="display: none;" onclick="deleteOrder('${row.발주일자}', ${row.발주번호})" title="삭제">삭제</button>
-            </div>
-          `;
-        },
-      },
-    ],
-    language: {
-      lengthMenu: '페이지당 _MENU_ 개씩 보기',
-      zeroRecords: '발주 데이터가 없습니다',
-      info: '전체 _TOTAL_개 중 _START_-_END_개 표시',
-      infoEmpty: '데이터 없음',
-      infoFiltered: '(전체 _MAX_개 중 검색결과)',
-      search: '검색:',
-      paginate: {
-        first: '처음',
-        last: '마지막',
-        next: '다음',
-        previous: '이전',
-      },
-    },
-    order: [], // 백엔드에서 제공하는 등록 순서 유지 (최신 등록이 맨 위)
-    pageLength: 10,
-    lengthMenu: [10, 25, 50, 100],
-    responsive: true,
-    autoWidth: false,
-    drawCallback: function (settings) {
-      // 전체선택 체크박스 상태 확인
-      const isSelectAllChecked = $('#orderSelectAll').prop('checked');
-
-      // 전체선택 상태에 따라 현재 페이지의 모든 체크박스 동기화
-      $('.orderRowCheck').prop('checked', isSelectAllChecked);
-
-      // DataTable이 다시 그려질 때마다 체크박스 상태에 따라 버튼 표시
-      $('.orderRowCheck').each(function () {
-        const $checkbox = $(this);
-        const orderDate = $checkbox.data('order-date');
-        const orderNo = $checkbox.data('order-no');
-        const isChecked = $checkbox.prop('checked');
-        const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
-
-        if (isChecked) {
-          actionDiv.find('.orderBtnView').hide();
-          actionDiv.find('.orderBtnEdit').show();
-          actionDiv.find('.orderBtnDelete').show();
-        } else {
-          actionDiv.find('.orderBtnView').show();
-          actionDiv.find('.orderBtnEdit').hide();
-          actionDiv.find('.orderBtnDelete').hide();
-        }
-      });
-    },
-  });
-
-  // 전체선택 체크박스 이벤트 핸들러 등록
-  $(document)
-    .off('change.orderPage', '#orderSelectAll')
-    .on('change.orderPage', '#orderSelectAll', function () {
-      const isChecked = $(this).prop('checked');
-
-      console.log('[발주관리] 전체선택 체크박스 클릭');
-      console.log(`체크 상태: ${isChecked ? '전체 선택' : '전체 해제'}`);
-
-      // 전체선택 모드 플래그 설정
-      isSelectAllMode = true;
-      $('.orderRowCheck').prop('checked', isChecked).trigger('change');
-      isSelectAllMode = false;
-
-      console.log(' 전체선택 처리 완료');
-    });
-
-  // 개별 체크박스 이벤트 핸들러 등록
-  $(document)
-    .off('change.orderPage', '.orderRowCheck')
-    .on('change.orderPage', '.orderRowCheck', function () {
-      const $currentCheckbox = $(this);
-      const orderDate = $currentCheckbox.data('order-date');
-      const orderNo = $currentCheckbox.data('order-no');
-      const isChecked = $currentCheckbox.prop('checked');
-
-      console.log('[발주관리] 체크박스 이벤트 발생');
-      console.log(`발주일자: ${orderDate} (타입: ${typeof orderDate})`);
-      console.log(`🔢 발주번호: ${orderNo} (타입: ${typeof orderNo})`);
-      console.log(`체크 상태: ${isChecked ? '선택됨' : '해제됨'}`);
-      console.log(`전체선택 모드: ${isSelectAllMode}`);
-
-      // 개별 선택 모드일 때만 단일 선택 로직 실행
-      if (!isSelectAllMode && isChecked) {
-        // 체크된 경우: 다른 모든 체크박스 해제
-        $('.orderRowCheck')
-          .not($currentCheckbox)
-          .each(function () {
-            const $otherCheckbox = $(this);
-            const otherDate = $otherCheckbox.data('order-date');
-            const otherNo = $otherCheckbox.data('order-no');
-
-            // 다른 체크박스 해제
-            $otherCheckbox.prop('checked', false);
-
-            // 다른 행의 버튼 숨김 처리
-            const otherActionDiv = $(`#orderActions-${otherDate}_${otherNo}`);
-            otherActionDiv.find('.orderBtnView').show();
-            otherActionDiv.find('.orderBtnEdit').hide();
-            otherActionDiv.find('.orderBtnDelete').hide();
-          });
-
-        console.log(' 다른 모든 체크박스 해제됨 (개별 선택 모드)');
-      }
-
-      // 개별 선택 모드일 때만 전체 선택 체크박스 해제
-      if (!isSelectAllMode) {
-        $('#orderSelectAll').prop('checked', false);
-      }
-
-      // 현재 행의 버튼 표시/숨김 처리
-      const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
-      console.log(`찾을 액션 DIV ID: #orderActions-${orderDate}_${orderNo}`);
-      console.log(`actionDiv 발견됨: ${actionDiv.length > 0 ? '예' : '아니오'}`);
-      if (actionDiv.length === 0) {
-        console.error(`액션 DIV를 찾을 수 없습니다! ID: #orderActions-${orderDate}_${orderNo}`);
-        console.log('현재 페이지의 모든 액션 DIV:');
-        $('.action-buttons').each(function () {
-          console.log(`  - ${$(this).attr('id')}`);
-        });
-      }
-
-      if (isChecked) {
-        // 체크됨: 상세 버튼 숨기고 수정/삭제 버튼 표시
-        actionDiv.find('.orderBtnView').hide();
-        actionDiv.find('.orderBtnEdit').show();
-        actionDiv.find('.orderBtnDelete').show();
-      } else {
-        // 체크 해제: 수정/삭제 버튼 숨기고 상세 버튼 표시
-        actionDiv.find('.orderBtnView').show();
-        actionDiv.find('.orderBtnEdit').hide();
-        actionDiv.find('.orderBtnDelete').hide();
-      }
-    });
-}
-
-/**
- * 페이지 로드 시 초기화
- */
 $(document).ready(function () {
   // 발주서 작성 모달 드래그 기능
-  makeModalDraggable('orderModalContent', 'orderModalHeader');
+  makeModalDraggable('orderManageCreateModalContent', 'orderManageCreateModalHeader');
   // 발주서 수정 모달 드래그 기능
-  makeModalDraggable('orderEditModalContent', 'orderEditModalHeader');
+  makeModalDraggable('orderManageEditModalContent', 'orderManageEditModalHeader');
   // 발주 상세 보기 모달 드래그 기능
-  makeModalDraggable('orderDetailModalContent', 'orderDetailModalHeader');
+  makeModalDraggable('orderManageViewModalContent', 'orderManageViewModalHeader');
+  // 발주 상세내역 입력 모달 드래그 기능
+  makeModalDraggable('orderManageDetailAddModal', '.modal-header-draggable');
 
-  // 상세 보기 모달 닫기 버튼 (네임스페이스 적용)
-  $('#closeOrderDetailModal')
-    .off('click.orderPage')
-    .on('click.orderPage', () => {
-      closeOrderDetailModal();
-    });
+  // ✅ 상세 버튼 모달 닫기 함수
+  // function closeOrderManageViewModal() {
+  //   const modal = document.getElementById('orderManageViewModal');
+  //   if (modal) {
+  //     modal.classList.add('hidden');
+  //     modal.style.display = 'none';
+  //   }
+  //   // DataTable 정리 (메모리 누수 방지)
+  //   if (window.orderDetailDataTable) {
+  //     window.orderDetailDataTable.destroy();
+  //     window.orderDetailDataTable = null;
+  //     $('#orderDetailTable tbody').empty();
+  //   }
+  // }
 
-  // 상세보기 모달 배경 클릭시 닫기 (네임스페이스 적용)
-  $(document)
-    .off('click.orderPage', '#orderDetailModal')
-    .on('click.orderPage', '#orderDetailModal', function (e) {
-      if (e.target.id === 'orderDetailModal') {
-        closeOrderDetailModal();
-      }
-    });
+  // ✅ 전역으로 즉시 노출 (HTML에서 호출할 수 있도록)
+  // window.closeOrderManageViewModal = closeOrderManageViewModal;
 
-  // 수정 모달 닫기 버튼 (네임스페이스 적용)
-  $('#closeOrderEditModalBtn')
-    .off('click.orderPage')
-    .on('click.orderPage', () => {
-      closeOrderEditModal();
-    });
+  // ✅ 상세 보기 모달 닫기 버튼
+  $('#orderManageViewModalCloseBtn').on('click', () => {
+    closeOrderManageViewModal();
+  });
 
-  // 수정 모달 배경 클릭시 닫기 (네임스페이스 적용)
-  $(document)
-    .off('click.orderPage', '#orderEditModal')
-    .on('click.orderPage', '#orderEditModal', function (e) {
-      if (e.target.id === 'orderEditModal') {
-        closeOrderEditModal();
-      }
-    });
+  // ✅ 상세보기 모달 배경 클릭시 닫기
+  $(document).on('click', '#orderManageViewModal', function (e) {
+    if (e.target.id === 'orderManageViewModal') {
+      closeOrderManageViewModal();
+    }
+  });
 
-  // 발주서 작성 모달 닫기 버튼 (네임스페이스 적용)
-  $('#closeOrderModal')
-    .off('click.orderPage')
-    .on('click.orderPage', () => {
-      closeOrderModal();
-    });
+  // ✅ 수정 모달 닫기 버튼
+  $('#orderManageEditModalCloseBtn').on('click', () => {
+    closeOrderManageEditModal();
+  });
 
-  // 품목 추가 모달 닫기 버튼 (네임스페이스 적용)
-  $('#closeOrderDetailAddModal')
-    .off('click.orderPage')
-    .on('click.orderPage', () => {
-      closeOrderDetailAddModal();
-    });
+  // ✅ 수정 모달 배경 클릭시 닫기
+  $(document).on('click', '#orderManageEditModal', function (e) {
+    if (e.target.id === 'orderManageEditModal') {
+      closeOrderManageEditModal();
+    }
+  });
 
-  // 품목 수정 모달 닫기 버튼 (네임스페이스 적용)
-  $('#closeOrderDetailEditModal')
-    .off('click.orderPage')
-    .on('click.orderPage', () => {
-      closeOrderDetailEditModal();
-    });
+  // ✅ 품목 추가 모달 닫기 버튼
+  $('#closeOrderDetailAddModal').on('click', () => {
+    closeOrderManageDetailAddModal();
+  });
 
-  // 단가 이력 모달 닫기 버튼 (네임스페이스 적용)
-  $('#closeOrderPriceHistoryModal')
-    .off('click.orderPage')
-    .on('click.orderPage', () => {
-      closeOrderPriceHistoryModal();
-    });
+  // ✅ 품목 수정 모달 닫기 버튼
+  $('#closeOrderDetailEditModal').on('click', () => {
+    closeOrderManageDetailEditModal();
+  });
 
-  // 품목 추가 모달 - 금액 자동 계산 (발주량 × 입고단가) (네임스페이스 적용)
-  $('#addOrderDetailQuantity, #addOrderDetailInPrice')
-    .off('input.orderPage')
-    .on('input.orderPage', function () {
-      const 발주량 = parseFloat($('#addOrderDetailQuantity').val()) || 0;
-      const 입고단가 = parseFloat($('#addOrderDetailInPrice').val()) || 0;
-      const 금액 = 발주량 * 입고단가;
-      $('#addOrderDetailAmount').text(금액.toLocaleString() + '원');
-    });
+  // ✅ 단가 이력 모달 닫기 버튼
+  $('#orderManagePriceHistoryCloseBtn').on('click', () => {
+    closeOrderManagePriceHistoryModal();
+  });
 
-  // 품목 수정 모달 - 금액 자동 계산 (발주량 × 입고단가) (네임스페이스 적용)
-  $('#editOrderDetailQuantity, #editOrderDetailInPrice')
-    .off('input.orderPage')
-    .on('input.orderPage', function () {
-      const 발주량 = parseFloat($('#editOrderDetailQuantity').val()) || 0;
-      const 입고단가 = parseFloat($('#editOrderDetailInPrice').val()) || 0;
-      const 금액 = 발주량 * 입고단가;
-      $('#editOrderDetailAmount').text(금액.toLocaleString() + '원');
-    });
+  // ✅ 품목 추가 모달 - 금액 자동 계산
+  $('#addDetailQuantity, #addDetailPrice').on('input', function () {
+    const 수량 = parseFloat($('#addDetailQuantity').val()) || 0;
+    const 단가 = parseFloat($('#addDetailPrice').val()) || 0;
+    const 금액 = 수량 * 단가;
+    $('#addDetailAmount').val(금액.toLocaleString());
+  });
 
-  // 자재 검색 - Enter 키 이벤트 (네임스페이스 적용)
-  $(document)
-    .off('keypress.orderPage', '#orderMaterialSearchInput')
-    .on('keypress.orderPage', '#orderMaterialSearchInput', function (e) {
+  // ✅ 품목 수정 모달 - 금액 자동 계산
+  $('#editDetailQuantity, #editDetailPrice').on('input', function () {
+    const 수량 = parseFloat($('#editDetailQuantity').val()) || 0;
+    const 단가 = parseFloat($('#editDetailPrice').val()) || 0;
+    const 금액 = 수량 * 단가;
+    $('#editDetailAmount').val(금액.toLocaleString());
+  });
+
+  // ✅ 자재 검색 - Enter 키 이벤트
+  $(document).on(
+    'keypress',
+    '#materialSearchCode, #materialSearchName, #materialSearchSpec',
+    function (e) {
       if (e.which === 13) {
         // Enter 키
         e.preventDefault();
-        searchOrderMaterials();
+        searchMaterials();
       }
-    });
+    },
+  );
 
-  // 신규 발주서 자재 검색 - Enter 키 이벤트 (네임스페이스 적용)
-  $(document)
-    .off(
-      'keypress.orderPage',
-      '#newOrderMaterialSearchCode, #newOrderMaterialSearchName, #newOrderMaterialSearchSpec',
-    )
-    .on(
-      'keypress.orderPage',
-      '#newOrderMaterialSearchCode, #newOrderMaterialSearchName, #newOrderMaterialSearchSpec',
-      function (e) {
-        if (e.which === 13) {
-          // Enter 키
-          e.preventDefault();
-          searchNewOrderMaterials();
-        }
-      },
-    );
+  // 발주 데이터 로드 함수 (DataTable 초기화)
+  async function loadOrders() {
+    // ✅ 다른 페이지의 체크박스 이벤트 핸들러 제거
+    $(document).off('change.orderPage');
+    $(document).off('change.transactionManagePage');
+    $(document).off('change.purchasePage');
 
-  // 전역으로 접근 가능하도록 window에 등록
-  window.loadOrderList = loadOrderList;
-  window.loadOrders = loadOrderList; // 기존 호환용 alias
-});
+    // 페이지가 표시될 때마다 날짜를 오늘 날짜(로그인 날짜)로 초기화
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
 
-// ==================== 발주 상세 조회 및 모달 ====================
-/**
- * 발주 상세보기
- */
-async function viewOrderDetail(orderDate, orderNo) {
-  console.log('[발주관리테이블] 상세 버튼 클릭 → viewOrder() → 발주서조회모달 표시');
+    const startDateInput = document.getElementById('orderManageStartDate');
+    const endDateInput = document.getElementById('orderManageEndDate');
 
-  try {
-    const result = await apiCall(`/orders/${orderDate}/${orderNo}`);
-
-    if (!result.success) {
-      alert('발주 정보를 불러올 수 없습니다.');
-      return;
+    // 항상 오늘 날짜로 설정
+    if (startDateInput) {
+      startDateInput.value = todayStr;
+    }
+    if (endDateInput) {
+      endDateInput.value = todayStr;
     }
 
-    const master = result.data.master;
-    const details = result.data.detail || [];
+    // 이미 DataTable이 존재하면 파괴
+    if (orderManageTable) {
+      orderManageTable.destroy();
+      orderManageTable = null;
+    }
 
-    // 💾 현재 발주 상세 정보 저장 (출력 버튼용)
-    window.currentOrderDetail = {
-      발주일자: orderDate,
-      발주번호: orderNo,
-    };
+    // DataTable 초기화
+    orderManageTable = $('#orderManageTable').DataTable({
+      ajax: {
+        url: '/api/orders',
+        data: function (d) {
+          // 필터링 파라미터 추가
+          const 사업장코드 = currentUser?.사업장코드 || '01';
+          const 상태코드 = $('#orderManageStatusFilter').val();
+          const startDate = $('#orderManageStartDate').val()?.replace(/-/g, '') || '';
+          const endDate = $('#orderManageEndDate').val()?.replace(/-/g, '') || '';
 
-    // 기본 정보 표시
-    document.getElementById('orderDetailNo').textContent = `${orderDate}-${orderNo}`;
-    document.getElementById('orderDetailDate').textContent = orderDate.replace(
-      /(\d{4})(\d{2})(\d{2})/,
-      '$1-$2-$3',
-    );
-    document.getElementById('orderDetailSupplier').textContent = master.매입처명 || '-';
-    document.getElementById('orderDetailRemark').textContent = master.적요 || '-';
+          return {
+            사업장코드: 사업장코드,
+            상태코드: 상태코드,
+            startDate: startDate,
+            endDate: endDate,
+          };
+        },
+        dataSrc: function (json) {
+          // 발주 건수 업데이트
+          const countEl = document.getElementById('orderManageCount');
+          if (countEl && json.total !== undefined) {
+            countEl.innerText = `${json.total.toLocaleString()}`;
+          }
 
-    // DataTable 재사용 패턴: 최초 1회만 초기화, 이후 데이터만 갱신
-    // 안전장치: DataTable이 손상되었거나 잘못된 값인 경우 재초기화
-    if (!window.orderDetailTable || typeof window.orderDetailTable.clear !== 'function') {
-      // 기존 인스턴스가 있다면 완전히 제거
-      if ($.fn.DataTable.isDataTable('#orderDetailTable')) {
-        $('#orderDetailTable').DataTable().destroy();
-        $('#orderDetailTable').empty(); // 테이블 내용도 제거
-      }
-
-      window.orderDetailTable = $('#orderDetailTable').DataTable({
-        data: [],
-        columns: [
-          {
-            data: '자재코드',
-            defaultContent: '-',
-          },
-          {
-            data: '자재명',
-            defaultContent: '-',
-          },
-          {
-            data: '규격',
-            defaultContent: '-',
-          },
-          {
-            data: '단위',
-            defaultContent: '-',
-          },
-          {
-            data: '발주량',
-            defaultContent: 0,
-            render: function (data) {
-              return (data || 0).toLocaleString();
-            },
-            className: 'dt-right',
-          },
-          {
-            data: '입고단가',
-            defaultContent: 0,
-            render: function (data) {
-              return (data || 0).toLocaleString();
-            },
-            className: 'dt-right',
-          },
-          {
-            data: null,
-            defaultContent: 0,
-            render: function (data, type, row) {
-              const 금액 = (row.발주량 || 0) * (row.입고단가 || 0);
-              return 금액.toLocaleString();
-            },
-            className: 'dt-right',
-          },
-        ],
-        language: {
-          lengthMenu: '페이지당 _MENU_ 개씩 보기',
-          zeroRecords: '상세 내역이 없습니다',
-          info: '전체 _TOTAL_개 중 _START_-_END_개 표시',
-          infoEmpty: '데이터 없음',
-          infoFiltered: '(전체 _MAX_개 중 검색결과)',
-          search: '검색:',
-          paginate: {
-            first: '처음',
-            last: '마지막',
-            next: '다음',
-            previous: '이전',
+          return json.data || [];
+        },
+      },
+      columns: [
+        // 1. 체크박스
+        {
+          data: null,
+          orderable: false,
+          render: function (data, type, row) {
+            return `<input type="checkbox" class="orderRowCheck" data-date="${row.발주일자}" data-no="${row.발주번호}" />`;
           },
         },
-        order: [],
-        pageLength: 10,
-        lengthMenu: [5, 10, 25, 50],
-        responsive: true,
-        autoWidth: false,
-        searching: true,
-        paging: true,
-        info: true,
+        // 2. 순번 (역순: 가장 오래된 데이터 = 1, 최신 데이터 = 마지막 번호)
+        {
+          data: null,
+          orderable: false,
+          className: 'dt-center',
+          /* render: function (data, type, row, meta) {
+            const table = $('#orderManageTable').DataTable();
+            const info = table.page.info();
+            return info.recordsDisplay - meta.row;
+          }, */
+          render: (data, type, row, meta) => meta.row + 1,
+        },
+        // 3. 발주번호 (일자-번호)
+        {
+          data: null,
+          render: function (data, type, row) {
+            return `${row.발주일자}-${row.발주번호}`;
+          },
+        },
+        // 4. 매입처명
+        {
+          data: '매입처명',
+          defaultContent: '-',
+        },
+        // 5. 발주일자 (YYYY-MM-DD 포맷)
+        {
+          data: '발주일자',
+          render: function (data) {
+            if (!data || data.length !== 8) return '-';
+            return `${data.substring(0, 4)}-${data.substring(4, 6)}-${data.substring(6, 8)}`;
+          },
+        },
+        // 6. 제목
+        {
+          data: '제목',
+          defaultContent: '-',
+        },
+        // 7. 발주금액
+        {
+          // ✅ API에서 '합계금액'으로 반환 가능성 체크 (발주금액 또는 합계금액)
+          data: null,
+          render: function (_data, _type, row) {
+            const amount = row.발주금액 || row.합계금액 || 0;
+            if (!amount) return '0원';
+            return amount.toLocaleString() + '원';
+          },
+        },
+        // 8. 담당자
+        {
+          data: '담당자',
+          defaultContent: '-',
+        },
+        // 9. 상태 (배지)
+        {
+          data: null,
+          render: function (data, type, row) {
+            // 사용구분이 9이면 "삭제됨" 표시 (이탤릭 + 취소선)
+            if (row.사용구분 === 9) {
+              return `<span style="font-style: italic; text-decoration: line-through; color: #dc2626;">삭제됨</span>`;
+            }
+
+            // 상태코드에 따른 표시
+            const statusMap = {
+              1: { text: '작성중', class: 'status-pending' },
+              2: { text: '승인', class: 'status-active' },
+              3: { text: '반려', class: 'status-inactive' },
+            };
+            const status = statusMap[row.상태코드] || { text: '알수없음', class: '' };
+            return `<span class="status-badge ${status.class}">${status.text}</span>`;
+          },
+        },
+        // 10. 관리 버튼
+        {
+          data: null,
+          orderable: false,
+          render: function (data, type, row) {
+            const orderKey = `${row.발주일자}-${row.발주번호}`;
+            return `
+              <div class="action-buttons" id="orderActions-${orderKey.replace('-', '_')}">
+                <button class="btn-icon orderBtnView" onclick="viewOrderManageDetail('${
+                  row.발주일자
+                }', ${row.발주번호})" title="상세보기">상세</button>
+                <button class="btn-icon orderBtnEdit" style="display: none;" onclick="editOrderManage('${
+                  row.발주일자
+                }', ${row.발주번호})" title="수정">수정</button>
+                <button class="btn-icon orderBtnDelete" style="display: none;" onclick="deleteOrderManage('${
+                  row.발주일자
+                }', ${row.발주번호})" title="삭제">삭제</button>
+                ${
+                  row.상태코드 === 1
+                    ? `<button class="btn-icon orderBtnApprove" style="display: none; background: #28a745;" onclick="approveOrderManage('${row.발주일자}', ${row.발주번호})" title="승인">승인</button>`
+                    : ''
+                }
+              </div>
+            `;
+          },
+        },
+      ],
+      language: {
+        lengthMenu: '페이지당 _MENU_ 개씩 보기',
+        zeroRecords: '발주 데이터가 없습니다',
+        info: '전체 _TOTAL_개 중 _START_-_END_개 표시',
+        infoEmpty: '데이터 없음',
+        infoFiltered: '(전체 _MAX_개 중 검색결과)',
+        search: '검색:',
+        paginate: {
+          first: '처음',
+          last: '마지막',
+          next: '다음',
+          previous: '이전',
+        },
+      },
+      order: [], // 백엔드에서 제공하는 등록 순서 유지 (최신 등록이 맨 위)
+      pageLength: 10,
+      lengthMenu: [10, 25, 50, 100],
+      responsive: true,
+      autoWidth: false,
+      drawCallback: function () {
+        // DataTable이 다시 그려질 때 버튼 표시 상태 복원
+        // 주의: 체크박스 상태는 건드리지 않음 (개별 선택 시 전체선택 문제 방지)
+        $('.orderRowCheck').each(function () {
+          const $checkbox = $(this);
+          const orderDate = $checkbox.data('date');
+          const orderNo = $checkbox.data('no');
+          const isChecked = $checkbox.prop('checked');
+          const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
+
+          if (isChecked) {
+            actionDiv.find('.orderBtnView').hide();
+            actionDiv.find('.orderBtnEdit').show();
+            actionDiv.find('.orderBtnDelete').show();
+            actionDiv.find('.orderBtnApprove').show();
+          } else {
+            actionDiv.find('.orderBtnView').show();
+            actionDiv.find('.orderBtnEdit').hide();
+            actionDiv.find('.orderBtnDelete').hide();
+            actionDiv.find('.orderBtnApprove').hide();
+          }
+        });
+      },
+      // ✅ 각 행에 data 속성 추가 (삭제 기능에서 사용)
+      createdRow: function (row, data, dataIndex) {
+        $(row).attr('data-order-date', data.발주일자);
+        $(row).attr('data-order-no', data.발주번호);
+      },
+    });
+
+    // ✅ 전역 참조 통일 (window.orderManageTableInstance와 orderManageTable을 동일하게)
+    window.orderManageTableInstance = orderManageTable;
+
+    // 전체 선택 모드 플래그 (전체 선택 체크박스 클릭 시 true)
+    let isSelectAllMode = false;
+
+    // ✅ 전체선택 체크박스 클릭 이벤트 핸들러 등록 (click 이벤트 사용)
+    $(document)
+      .off('click.orderManagePage', '#orderManageSelectAll')
+      .on('click.orderManagePage', '#orderManageSelectAll', function () {
+        const isChecked = $(this).prop('checked');
+
+        // 전체 선택 모드 활성화
+        isSelectAllMode = true;
+
+        // 모든 개별 체크박스를 선택/해제
+        $('.orderRowCheck').each(function () {
+          const $checkbox = $(this);
+          const orderDate = $checkbox.data('date');
+          const orderNo = $checkbox.data('no');
+          const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
+
+          $checkbox.prop('checked', isChecked);
+
+          if (isChecked) {
+            // 체크됨: 상세 버튼 숨기고 수정/삭제/승인 버튼 표시
+            actionDiv.find('.orderBtnView').hide();
+            actionDiv.find('.orderBtnEdit').show();
+            actionDiv.find('.orderBtnDelete').show();
+            actionDiv.find('.orderBtnApprove').show();
+          } else {
+            // 체크 해제: 수정/삭제/승인 버튼 숨기고 상세 버튼 표시
+            actionDiv.find('.orderBtnView').show();
+            actionDiv.find('.orderBtnEdit').hide();
+            actionDiv.find('.orderBtnDelete').hide();
+            actionDiv.find('.orderBtnApprove').hide();
+          }
+        });
+
+        // 전체 선택 모드 비활성화
+        isSelectAllMode = false;
       });
-      console.log(' orderDetailTable 최초 초기화 완료');
+
+    // ✅ 개별 체크박스 이벤트 핸들러 등록
+    $(document)
+      .off('change.orderManagePage', '.orderRowCheck')
+      .on('change.orderManagePage', '.orderRowCheck', function () {
+        const orderDate = $(this).data('date');
+        const orderNo = $(this).data('no');
+        const isChecked = $(this).prop('checked');
+
+        // 전체 선택 모드가 아닐 때만 라디오 버튼처럼 동작
+        if (!isSelectAllMode && isChecked) {
+          // 새로운 체크박스를 선택하면 다른 모든 체크박스 해제
+          $('.orderRowCheck')
+            .not(this)
+            .each(function () {
+              const $otherCheckbox = $(this);
+              const otherDate = $otherCheckbox.data('date');
+              const otherNo = $otherCheckbox.data('no');
+              const otherActionDiv = $(`#orderActions-${otherDate}_${otherNo}`);
+
+              // 다른 체크박스 해제
+              $otherCheckbox.prop('checked', false);
+
+              // 다른 행의 버튼 상태 복원
+              otherActionDiv.find('.orderBtnView').show();
+              otherActionDiv.find('.orderBtnEdit').hide();
+              otherActionDiv.find('.orderBtnDelete').hide();
+              otherActionDiv.find('.orderBtnApprove').hide();
+            });
+        }
+
+        // 현재 행의 버튼 표시/숨김 처리
+        const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
+
+        if (isChecked) {
+          // 체크됨: 상세 버튼 숨기고 수정/삭제/승인 버튼 표시
+          actionDiv.find('.orderBtnView').hide();
+          actionDiv.find('.orderBtnEdit').show();
+          actionDiv.find('.orderBtnDelete').show();
+          actionDiv.find('.orderBtnApprove').show();
+        } else {
+          // 체크 해제: 수정/삭제/승인 버튼 숨기고 상세 버튼 표시
+          actionDiv.find('.orderBtnView').show();
+          actionDiv.find('.orderBtnEdit').hide();
+          actionDiv.find('.orderBtnDelete').hide();
+          actionDiv.find('.orderBtnApprove').hide();
+        }
+      });
+  }
+
+  // 전역 변수로 저장
+  window.loadOrders = loadOrders;
+});
+
+// ✅ 발주 상세 버튼 모달 열기 함수 (발주일자, 발주번호로 조회)
+async function openOrderManageViewModal(orderDate, orderNo) {
+  const modal = document.getElementById('orderManageViewModal');
+
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'block';
+  } else {
+    console.error('❌ orderManageViewModal 요소를 찾을 수 없습니다');
+    alert('상세보기 모달을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
+    return;
+  }
+
+  // 드래그 기능 활성화 (최초 1회만 실행)
+  if (typeof makeModalDraggable === 'function' && !window.orderManageViewModalDraggable) {
+    makeModalDraggable('orderManageViewModal', 'orderManageViewModalHeader');
+    window.orderManageViewModalDraggable = true;
+  }
+
+  // ✅ 출력 버튼을 위해 현재 발주 정보 저장
+  window.currentOrderDetail = {
+    발주일자: orderDate,
+    발주번호: orderNo,
+  };
+
+  try {
+    // 발주 마스터+상세 조회 (기존 API 사용)
+    const masterRes = await fetch(`/api/orders/${orderDate}/${orderNo}`);
+    const masterData = await masterRes.json();
+
+    if (!masterData.success || !masterData.data) {
+      throw new Error('발주 정보를 찾을 수 없습니다.');
     }
 
-    // 데이터만 갱신 (destroy 없이)
-    window.orderDetailTable
-      .clear()
-      .rows.add(details || [])
-      .draw();
-    console.log(`orderDetailTable 데이터 갱신 완료 (${details ? details.length : 0}건)`);
+    const master = masterData.data.master;
+    // ✅ API 응답이 details 또는 detail로 올 수 있으므로 둘 다 처리
+    const details = masterData.data.details || masterData.data.detail || [];
 
-    // 합계 금액 계산 (발주량 * 입고단가)
-    const totalAmount = (details || []).reduce((sum, item) => {
-      return sum + (item.발주량 || 0) * (item.입고단가 || 0);
+    // 기본 정보 표시 (올바른 요소 ID 사용)
+    $('#orderManageViewNo').text(`${master.발주일자}-${master.발주번호}`);
+    $('#orderManageViewDate').text(
+      master.발주일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
+    );
+    $('#orderManageViewSupplier').text(
+      master.매입처명 && master.매입처코드
+        ? `${master.매입처명}(${master.매입처코드})`
+        : master.매입처명 || '-',
+    );
+    $('#orderManageViewRemark').text(master.적요 || '-');
+
+    // ✅ DataTable이 이미 초기화되어 있으면 destroy 후 재생성
+    if ($.fn.DataTable.isDataTable('#orderManageViewDetailTable')) {
+      $('#orderManageViewDetailTable').DataTable().destroy();
+    }
+
+    // ✅ DataTable 초기화 (API 필드명에 맞게 수정)
+    window.orderManageViewDetailTable = $('#orderManageViewDetailTable').DataTable({
+      data: details,
+      columns: [
+        {
+          data: null,
+          render: function (data, type, row, meta) {
+            return meta.row + 1;
+          },
+          orderable: false,
+          className: 'dt-center',
+          width: '60px',
+        },
+        {
+          data: '자재코드',
+          defaultContent: '-',
+          orderable: false,
+        },
+        {
+          data: '자재명',
+          defaultContent: '-',
+          orderable: false,
+        },
+        {
+          data: '규격',
+          defaultContent: '-',
+          orderable: false,
+        },
+        {
+          data: '단위',
+          defaultContent: '-',
+          orderable: false,
+          className: 'dt-center',
+        },
+        {
+          data: '수량',
+          defaultContent: 0,
+          orderable: false,
+          render: function (data) {
+            return (data || 0).toLocaleString();
+          },
+          className: 'dt-right',
+        },
+        {
+          // ✅ API에서 '단가'로 반환 (출고단가 as 단가)
+          data: '단가',
+          defaultContent: 0,
+          render: function (data) {
+            return (data || 0).toLocaleString();
+          },
+          className: 'dt-right',
+        },
+        {
+          // ✅ API에서 '공급가액'으로 반환 (수량 * 출고단가)
+          data: '공급가액',
+          defaultContent: 0,
+          render: function (data) {
+            return (data || 0).toLocaleString();
+          },
+          className: 'dt-right',
+        },
+      ],
+      language: {
+        lengthMenu: '페이지당 _MENU_ 개씩 보기',
+        zeroRecords: '상세 내역이 없습니다',
+        info: '전체 _TOTAL_개 중 _START_-_END_개 표시',
+        infoEmpty: '데이터 없음',
+        infoFiltered: '(전체 _MAX_개 중 검색결과)',
+        search: '검색:',
+        paginate: {
+          first: '처음',
+          last: '마지막',
+          next: '다음',
+          previous: '이전',
+        },
+      },
+      order: [], // 자재코드 오름차순
+      pageLength: 10,
+      lengthMenu: [5, 10, 25, 50],
+      responsive: true,
+      autoWidth: false,
+      searching: true,
+      paging: true,
+      info: true,
+    });
+
+    // ✅ 합계 금액 계산 (API 필드명: 공급가액)
+    const totalAmount = details.reduce((sum, item) => {
+      return sum + (item.공급가액 || 0);
     }, 0);
 
     // 합계 표시
-    $('#orderDetailTotal').text(totalAmount.toLocaleString());
-    console.log(`발주 합계 금액: ${totalAmount.toLocaleString()}원`);
-
-    // 모달 표시
-    document.getElementById('orderDetailModal').style.display = 'block';
-    document.getElementById('orderDetailModal').classList.remove('hidden');
-
-    // 드래그 기능 활성화 (최초 1회만 실행)
-    if (typeof makeModalDraggable === 'function' && !window.orderDetailModalDraggable) {
-      makeModalDraggable('orderDetailModal', 'orderDetailModalHeader');
-      window.orderDetailModalDraggable = true;
-    }
-  } catch (error) {
-    console.error('발주 상세 조회 오류:', error);
-    alert('발주 정보를 불러오는 중 오류가 발생했습니다.');
+    $('#orderManageViewTotal').text(totalAmount.toLocaleString());
+  } catch (err) {
+    console.error('❌ 발주 상세 조회 오류:', err);
+    alert('발주 상세 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-/**
- * 발주 상세 모달 닫기
- */
-function closeOrderDetailModal() {
-  console.log('[발주서조회모달] 닫기 (onclick) → closeOrderViewModal()');
+// 전역 함수로 노출
+window.openOrderManageViewModal = openOrderManageViewModal;
 
-  const modal = document.getElementById('orderDetailModal');
+// ✅ 상세 버튼 모달 닫기 함수
+function closeOrderManageViewModal() {
+  const modal = document.getElementById('orderManageViewModal');
   if (modal) {
     modal.classList.add('hidden');
     modal.style.display = 'none';
   }
 
-  // 발주 체크박스만 초기화
-  $('#orderSelectAll').prop('checked', false);
+  // 체크박스 초기화
   $('.orderRowCheck').prop('checked', false);
 
   // 버튼 상태도 초기화
   $('.orderRowCheck').each(function () {
-    const orderDate = $(this).data('order-date');
-    const orderNo = $(this).data('order-no');
+    const orderDate = $(this).data('date');
+    const orderNo = $(this).data('no');
     const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
     actionDiv.find('.orderBtnView').show();
     actionDiv.find('.orderBtnEdit').hide();
     actionDiv.find('.orderBtnDelete').hide();
+    actionDiv.find('.orderBtnApprove').hide(); // ✅ 승인 버튼도 숨김
   });
 
-  // DataTable 재사용 패턴: 모달 닫을 때 destroy하지 않음 (재사용)
-  // DataTable은 다음 열 때 데이터만 갱신하여 재사용
-}
-
-// 전역으로 접근 가능하도록 window에 등록
-window.closeOrderDetailModal = closeOrderDetailModal;
-
-/**
- * 상태코드를 텍스트로 변환
- */
-function getOrderStatusText(statusCode) {
-  switch (statusCode) {
-    case 0:
-      return '<span class="status-badge status-pending">발주대기</span>';
-    case 1:
-      return '<span class="status-badge status-active">발주완료</span>';
-    case 2:
-      return '<span class="status-badge status-completed">입고완료</span>';
-    default:
-      return '-';
+  // DataTable 정리 (메모리 누수 방지)
+  if (window.orderManageViewDetailTable) {
+    window.orderManageViewDetailTable.destroy();
+    window.orderManageViewDetailTable = null;
+    $('#orderManageViewDetailTable tbody').empty();
   }
 }
 
-// ==================== 발주 수정 기능 ====================
-/**
- * 발주 수정 - 모달 열기 (발주내역 포함)
- */
-async function editOrder(orderDate, orderNo) {
-  console.log('[발주관리테이블] 수정 버튼 클릭 → editOrder() → 발주서수정모달 표시');
+// 필터링 함수
+// function filterOrders() {
+//   if (window.orderManageTableInstance) {
+//     window.orderManageTableInstance.ajax.reload();
+//   }
+// }
+
+// ✅ 발주 상세보기 함수 (DataTable 버튼에서 호출)
+function viewOrderManageDetail(orderDate, orderNo) {
+  console.log('===== orderManageTable > 상세 버튼 클릭 =====');
+
+  // openOrderManageViewModal 함수 호출
+  if (typeof window.openOrderManageViewModal === 'function') {
+    window.openOrderManageViewModal(orderDate, orderNo);
+  } else {
+    console.error('❌ orderManageTable > openOrderManageViewModal 함수를 찾을 수 없습니다');
+    alert('발주 상세보기 기능을 사용할 수 없습니다.');
+  }
+}
+
+// 전역 함수로 노출
+window.viewOrderManageDetail = viewOrderManageDetail;
+
+// ✅ 발주 수정 함수 - 모달 열기 (발주내역 포함)
+async function editOrderManage(orderDate, orderNo) {
+  console.log('===== orderManageTable > 수정 버튼 클릭 =====');
 
   try {
     // 현재 발주 정보 조회 (마스터 + 상세)
-    const result = await apiCall(`/orders/${orderDate}/${orderNo}`);
+    const response = await fetch(`/api/orders/${orderDate}/${orderNo}`);
+    const result = await response.json();
 
     if (!result.success || !result.data) {
       throw new Error('발주 정보를 찾을 수 없습니다.');
     }
 
     const master = result.data.master;
-    const details = result.data.detail || [];
+    const details = result.data.details || result.data.detail || [];
 
-    // 기본 정보 표시 (읽기 전용)
-    document.getElementById('editOrderNo').textContent = `${orderDate}-${orderNo}`;
-    document.getElementById('editOrderDate').textContent = orderDate.replace(
+    // ✅ 기본 정보 표시 (Prefix Rule 적용)
+    // readonly input 요소 - value 사용
+    document.getElementById('orderManageEditNo').value = `${orderDate}-${orderNo}`;
+    document.getElementById('orderManageEditDate').value = orderDate.replace(
       /(\d{4})(\d{2})(\d{2})/,
       '$1-$2-$3',
     );
-    document.getElementById('editSupplierName').textContent = master.매입처명 || '-';
+    document.getElementById('orderManageEditSupplierName').value = master.매입처명 || '-';
 
-    // 입고희망일자 (YYYYMMDD -> YYYY-MM-DD)
-    const deliveryDate = master.입고희망일자 || '';
-    if (deliveryDate && deliveryDate.length === 8) {
-      document.getElementById('editOrderDeliveryDate').value = `${deliveryDate.substring(
-        0,
-        4,
-      )}-${deliveryDate.substring(4, 6)}-${deliveryDate.substring(6, 8)}`;
-    } else {
-      document.getElementById('editOrderDeliveryDate').value = '';
+    // input/textarea 요소 - value 사용
+    const deliveryDateEl = document.getElementById('orderManageEditDeliveryDate');
+    if (deliveryDateEl && master.출고희망일자) {
+      const deliveryDate = master.출고희망일자.toString();
+      if (deliveryDate.length === 8) {
+        deliveryDateEl.value = `${deliveryDate.substring(0, 4)}-${deliveryDate.substring(
+          4,
+          6,
+        )}-${deliveryDate.substring(6, 8)}`;
+      }
     }
 
-    document.getElementById('editOrderPaymentMethod').value = master.결제방법 || '';
-    document.getElementById('editOrderStatus').value = master.상태코드 || 0;
-    document.getElementById('editOrderTitle').value = master.제목 || '';
-    document.getElementById('editOrderRemark').value = master.적요 || '';
+    const titleEl = document.getElementById('orderManageEditTitle');
+    if (titleEl) titleEl.value = master.제목 || '';
+
+    const remarkEl = document.getElementById('orderManageEditRemark');
+    if (remarkEl) remarkEl.value = master.적요 || '';
 
     // 모달에 발주일자, 번호 저장 (submit 시 사용)
-    const modal = document.getElementById('orderEditModal');
+    const modal = document.getElementById('orderManageEditModal');
     modal.dataset.orderDate = orderDate;
     modal.dataset.orderNo = orderNo;
     modal.dataset.매입처코드 = master.매입처코드;
-    modal.dataset.사업장코드 = master.사업장코드;
+    modal.dataset.결제방법 = master.결제방법 || 0;
+    modal.dataset.결제예정일자 = master.결제예정일자 || '';
+    modal.dataset.유효일수 = master.유효일수 || 0;
 
-    // DataTable 재사용 패턴: 최초 1회만 초기화, 이후 데이터만 갱신
-    // 안전장치: DataTable이 손상되었거나 잘못된 값인 경우 재초기화
-    if (!window.orderEditDetailTable || typeof window.orderEditDetailTable.clear !== 'function') {
-      // 기존 인스턴스가 있다면 완전히 제거
-      if ($.fn.DataTable.isDataTable('#orderEditDetailTable')) {
-        $('#orderEditDetailTable').DataTable().destroy();
-        $('#orderEditDetailTable').empty(); // 테이블 내용도 제거
+    // ✅ 모달을 먼저 표시 (DataTable 너비 계산을 위해)
+    modal.style.display = 'block';
+
+    // ✅ 브라우저 렌더링 대기 후 DataTable 초기화
+    setTimeout(() => {
+      // ✅ 발주내역 DataTable 초기화
+      if (window.orderManageEditDetailDataTable) {
+        window.orderManageEditDetailDataTable.destroy();
       }
 
-      window.orderEditDetailTable = $('#orderEditDetailTable').DataTable({
-        data: [],
+      // ✅ tbody 초기화 (placeholder 행 제거)
+      $('#orderManageEditDetailTableBody').empty();
+
+      window.orderManageEditDetailDataTable = $('#orderManageEditDetailTable').DataTable({
+        data: details,
         columns: [
           {
             // 순번
             data: null,
             orderable: false,
             className: 'dt-center',
+            width: '60px',
             render: function (data, type, row, meta) {
               return meta.row + 1;
             },
@@ -772,28 +760,60 @@ async function editOrder(orderDate, orderNo) {
           {
             data: '자재코드',
             defaultContent: '-',
+            orderable: false,
           },
           {
             data: '자재명',
             defaultContent: '-',
+            orderable: false,
           },
           {
             data: '규격',
             defaultContent: '-',
+            orderable: false,
           },
           {
-            data: '발주량',
+            data: '단위',
+            defaultContent: '-',
+            orderable: false,
+            className: 'dt-center',
+          },
+          {
+            data: '수량',
             defaultContent: 0,
+            orderable: false,
             render: function (data) {
               return (data || 0).toLocaleString();
             },
             className: 'dt-right',
           },
           {
-            data: '입고단가',
+            // ✅ API에서 '단가'로 반환 (출고단가 as 단가)
+            data: '단가',
             defaultContent: 0,
+            orderable: false,
             render: function (data) {
               return (data || 0).toLocaleString();
+            },
+            className: 'dt-right',
+          },
+          {
+            // ✅ API에서 '공급가액'으로 반환 (수량 * 출고단가)
+            data: '공급가액',
+            defaultContent: 0,
+            orderable: false,
+            render: function (data) {
+              return (data || 0).toLocaleString();
+            },
+            className: 'dt-right',
+          },
+          {
+            // 부가세 (공급가액 * 10%)
+            data: null,
+            orderable: false,
+            render: function (data, type, row) {
+              const vat = Math.round((row.공급가액 || 0) * 0.1);
+              return vat.toLocaleString();
             },
             className: 'dt-right',
           },
@@ -804,8 +824,10 @@ async function editOrder(orderDate, orderNo) {
             className: 'dt-center',
             render: function (data, type, row, meta) {
               return `
-              <button class="btn-icon" onclick="editOrderDetailRow(${meta.row})" style="background: #3b82f6; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;">수정</button>
-              <button class="btn-icon" onclick="deleteOrderDetailRow(${meta.row})" style="background: #ef4444; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+              <div style="display: flex; flex-direction: column; gap: 4px; align-items: center;">
+                <button type="button" class="btn-icon" onclick="editOrderManageDetailRow(${meta.row})" style="background: #3b82f6; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; min-width: 50px;">수정</button>
+                <button type="button" class="btn-icon" onclick="deleteOrderManageDetailRow(${meta.row})" style="background: #ef4444; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; min-width: 50px;">삭제</button>
+              </div>
             `;
             },
           },
@@ -833,554 +855,241 @@ async function editOrder(orderDate, orderNo) {
         paging: true,
         info: true,
       });
-      console.log(' orderEditDetailTable 최초 초기화 완료');
-    }
 
-    // 데이터만 갱신 (destroy 없이)
-    window.orderEditDetailTable.clear().rows.add(details).draw();
-    console.log(`orderEditDetailTable 데이터 갱신 완료 (${details.length}건)`);
+      // ✅ DataTable 칼럼 너비 재조정 (모달이 표시된 후)
+      window.orderManageEditDetailDataTable.columns.adjust().draw();
 
-    // 닫기 버튼 이벤트 (네임스페이스 적용 - 중복 방지)
-    $('#closeOrderEditModalBtn').off('click.orderPage').on('click.orderPage', closeOrderEditModal);
+      // ✅ 합계 금액 계산 (API 필드명: 공급가액)
+      const totalAmount = details.reduce((sum, item) => sum + (item.공급가액 || 0), 0);
+      $('#orderManageEditDetailTotal').text(totalAmount.toLocaleString());
 
-    // 모달 표시
-    modal.style.display = 'block';
+      // ✅ 전체 선택 체크박스 이벤트
+      $('#selectAllEditDetails')
+        .off('change')
+        .on('change', function () {
+          const isChecked = $(this).prop('checked');
+          $('.editDetailCheckbox').prop('checked', isChecked);
+        });
 
-    // 드래그 기능 활성화 (최초 1회만 실행)
-    if (!window.orderEditModalDraggable) {
-      makeModalDraggable('orderEditModal', 'orderEditModalHeader');
-      window.orderEditModalDraggable = true;
-    }
+      // 드래그 기능 활성화 (최초 1회만 실행)
+      if (typeof makeModalDraggable === 'function' && !window.orderManageEditModalDraggable) {
+        makeModalDraggable('orderManageEditModal', 'orderManageEditModalHeader');
+        window.orderManageEditModalDraggable = true;
+      }
+    }, 100); // 100ms 대기 후 DataTable 초기화 (브라우저 렌더링 완료 보장)
   } catch (err) {
-    console.error(' 발주 수정 모달 열기 오류:', err);
+    console.error('❌ 발주 수정 모달 열기 오류:', err);
     alert('발주 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-/**
- * 발주 수정 모달 닫기
- */
-function closeOrderEditModal() {
-  console.log('[발주서수정모달] 닫기 (onclick) → closeOrderEditModal()');
-
-  const modal = document.getElementById('orderEditModal');
+// ✅ 발주 수정 모달 닫기
+function closeOrderManageEditModal() {
+  const modal = document.getElementById('orderManageEditModal');
   if (modal) {
     modal.style.display = 'none';
   }
 
-  // DataTable 재사용 패턴: 모달 닫을 때 destroy하지 않음 (재사용)
-  // DataTable은 다음 열 때 데이터만 갱신하여 재사용
-}
+  // 체크박스 초기화
+  $('.orderRowCheck').prop('checked', false);
 
-/**
- * 발주 품목 수정 (행 단위)
- */
-function editOrderDetailRow(rowIndex) {
-  console.log('[발주서수정-상세테이블] 수정 버튼 클릭 → openOrderDetailEditModal() → 상세수정모달 표시');
+  // 버튼 상태도 초기화
+  $('.orderRowCheck').each(function () {
+    const orderDate = $(this).data('date');
+    const orderNo = $(this).data('no');
+    const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
 
-  try {
-    const table = window.orderEditDetailTable;
-    if (!table) {
-      alert('DataTable을 찾을 수 없습니다.');
-      return;
-    }
-
-    // 현재 행 데이터 가져오기
-    const rowData = table.row(rowIndex).data();
-    if (!rowData) {
-      alert('행 데이터를 찾을 수 없습니다.');
-      return;
-    }
-
-    // 모달에 데이터 설정
-    document.getElementById('editOrderDetailMaterialName').value = rowData.자재명 || '';
-    document.getElementById('editOrderDetailQuantity').value = rowData.발주량 || 0;
-    document.getElementById('editOrderDetailInPrice').value = rowData.입고단가 || 0;
-    document.getElementById('editOrderDetailOutPrice').value = rowData.출고단가 || 0;
-
-    // 금액 미리보기 초기값 계산
-    const 초기금액 = (rowData.발주량 || 0) * (rowData.입고단가 || 0);
-    $('#editOrderDetailAmount').text(초기금액.toLocaleString() + '원');
-
-    // 현재 수정 중인 행 인덱스 저장
-    window.currentEditOrderDetailRowIndex = rowIndex;
-
-    // 모달 열기
-    document.getElementById('orderDetailEditModal').style.display = 'block';
-
-    // 닫기 버튼 이벤트 (네임스페이스 적용 - 중복 방지)
-    $('#closeOrderDetailEditModal')
-      .off('click.orderPage')
-      .on('click.orderPage', closeOrderDetailEditModal);
-  } catch (error) {
-    console.error(' 품목 수정 모달 열기 오류:', error);
-    alert('품목 수정 모달을 여는 중 오류가 발생했습니다.');
-  }
-}
-
-/**
- * 발주 품목 수정 모달 닫기
- */
-function closeOrderDetailEditModal() {
-  console.log('[상세수정모달] 닫기 (onclick) → closeOrderDetailEditModal()');
-
-  document.getElementById('orderDetailEditModal').style.display = 'none';
-  window.currentEditOrderDetailRowIndex = null;
-}
-
-/**
- * 발주 품목 수정 확인
- */
-function confirmEditOrderDetail() {
-  console.log('[상세수정모달] 수정하기 (onclick) → confirmOrderDetailEdit()');
-
-  try {
-    const rowIndex = window.currentEditOrderDetailRowIndex;
-    if (rowIndex === null || rowIndex === undefined) {
-      alert('수정할 행을 찾을 수 없습니다.');
-      return;
-    }
-
-    const table = window.orderEditDetailTable;
-    if (!table) {
-      alert('DataTable을 찾을 수 없습니다.');
-      return;
-    }
-
-    // 수정된 데이터 가져오기
-    const 발주량 = parseFloat(document.getElementById('editOrderDetailQuantity').value) || 0;
-    const 입고단가 = parseFloat(document.getElementById('editOrderDetailInPrice').value) || 0;
-    const 출고단가 = parseFloat(document.getElementById('editOrderDetailOutPrice').value) || 0;
-
-    // 기존 행 데이터 가져오기
-    const rowData = table.row(rowIndex).data();
-
-    // 데이터 업데이트
-    rowData.발주량 = 발주량;
-    rowData.입고단가 = 입고단가;
-    rowData.출고단가 = 출고단가;
-
-    // 테이블에 반영
-    table.row(rowIndex).data(rowData).draw(false);
-
-    console.log(' 품목 수정 완료:', rowData);
-
-    closeOrderDetailEditModal();
-  } catch (error) {
-    console.error(' 품목 수정 오류:', error);
-    alert('품목 수정 중 오류가 발생했습니다.');
-  }
-}
-
-/**
- * 발주 품목 삭제 (행 단위)
- */
-function deleteOrderDetailRow(rowIndex) {
-  console.log('[발주서수정-상세테이블] 삭제 버튼 클릭 → deleteOrderDetail() → 상세삭제확인모달 표시');
-
-  try {
-    const table = window.orderEditDetailTable;
-    if (!table) {
-      alert('DataTable을 찾을 수 없습니다.');
-      return;
-    }
-
-    // 현재 행 데이터 가져오기
-    const rowData = table.row(rowIndex).data();
-
-    if (!rowData) {
-      alert('행 데이터를 찾을 수 없습니다.');
-      return;
-    }
-
-    // 모달에 정보 표시
-    document.getElementById(
-      'deleteOrderDetailInfo',
-    ).textContent = `[${rowData.자재코드}] ${rowData.자재명}`;
-
-    // 모달에 rowIndex 저장
-    const modal = document.getElementById('orderDetailDeleteModal');
-    modal.dataset.rowIndex = rowIndex;
-
-    // 모달 표시
-    modal.style.display = 'block';
-  } catch (err) {
-    console.error(' 품목 삭제 모달 열기 오류:', err);
-    alert('품목 삭제 모달을 여는 중 오류가 발생했습니다: ' + err.message);
-  }
-}
-
-// 발주내역 품목 삭제 모달 닫기
-function closeOrderDetailDeleteModal() {
-  console.log('[상세삭제확인모달] 닫기 (onclick) → closeOrderDetailDeleteConfirmModal()');
-
-  document.getElementById('orderDetailDeleteModal').style.display = 'none';
-}
-
-// 발주내역 품목 삭제 확인
-function confirmOrderDetailDelete() {
-  console.log('[상세삭제확인모달] 삭제하기 (onclick) → confirmOrderDetailDelete()');
-
-  try {
-    const modal = document.getElementById('orderDetailDeleteModal');
-    const rowIndex = parseInt(modal.dataset.rowIndex);
-
-    const table = window.orderEditDetailTable;
-
-    // 행 삭제
-    table.row(rowIndex).remove().draw();
-
-    // 합계 재계산 (있는 경우)
-    if (typeof recalculateOrderEditTotal === 'function') {
-      recalculateOrderEditTotal();
-    }
-
-    console.log(`품목 삭제 완료 (행 인덱스: ${rowIndex})`);
-
-    // 모달 닫기
-    closeOrderDetailDeleteModal();
-  } catch (err) {
-    console.error(' 품목 삭제 오류:', err);
-    alert('품목 삭제 중 오류가 발생했습니다: ' + err.message);
-  }
-}
-
-/**
- * 선택된 발주 품목 삭제
- */
-function deleteSelectedOrderDetails() {
-  console.log('[발주서수정-상세테이블] 선택삭제 (onclick) → deleteSelectedOrderDetails()');
-
-  const table = window.orderEditDetailTable;
-  if (!table) return;
-
-  const selectedRows = [];
-  $('.editOrderDetailCheckbox:checked').each(function () {
-    const row = $(this).closest('tr');
-    selectedRows.push(table.row(row));
+    actionDiv.find('.orderBtnView').show();
+    actionDiv.find('.orderBtnEdit').hide();
+    actionDiv.find('.orderBtnDelete').hide();
+    actionDiv.find('.orderBtnApprove').hide(); // ✅ 승인 버튼도 숨김
   });
 
-  if (selectedRows.length === 0) {
-    alert('삭제할 품목을 선택해주세요.');
-    return;
+  // DataTable 정리
+  if (window.orderManageEditDetailDataTable) {
+    window.orderManageEditDetailDataTable.destroy();
+    window.orderManageEditDetailDataTable = null;
+    $('#orderManageEditDetailTable tbody').empty();
   }
-
-  if (!confirm(`선택한 ${selectedRows.length}개 품목을 삭제하시겠습니까?`)) {
-    return;
-  }
-
-  selectedRows.forEach((row) => row.remove());
-  table.draw();
 }
 
-/**
- * 발주 품목 추가 (수정 모달 내) - 모달 열기
- */
-function addOrderDetailRowInEdit() {
-  console.log(
-    '[발주서수정모달] 품목추가 버튼 클릭 → openOrderDetailAddModal() → 품목추가모달 표시',
-  );
+// ✅ 선택된 자재 정보 (전역 변수)
+let selectedMaterial = null;
 
-  // 초기화
-  window.selectedOrderMaterial = null;
+// ✅ 신규/수정 모드 플래그 (전역 변수)
+let isNewOrderMode = false;
 
-  // 자재 검색 필드 초기화 (3개 필드)
-  const categoryInput = document.getElementById('orderMaterialSearchCategory');
-  const codeInput = document.getElementById('orderMaterialSearchCode');
-  const nameInput = document.getElementById('orderMaterialSearchName');
-  if (categoryInput) categoryInput.value = '';
-  if (codeInput) codeInput.value = '';
-  if (nameInput) nameInput.value = '';
-
-  const searchResults = document.getElementById('orderMaterialSearchResults');
-  if (searchResults) searchResults.style.display = 'none';
-
-  const materialInfo = document.getElementById('selectedOrderMaterialInfo');
-  if (materialInfo) materialInfo.style.display = 'none';
-
-  const quantityInput = document.getElementById('addOrderDetailQuantity');
-  if (quantityInput) quantityInput.value = '1';
-
-  const inPriceInput = document.getElementById('addOrderDetailInPrice');
-  if (inPriceInput) inPriceInput.value = '0';
-
-  const outPriceInput = document.getElementById('addOrderDetailOutPrice');
-  if (outPriceInput) outPriceInput.value = '0';
-
-  // 금액 미리보기 초기화
-  $('#addOrderDetailAmount').text('0원');
-
-  // 모달 표시
-  const modal = document.getElementById('orderDetailAddModal');
-  if (modal) modal.style.display = 'block';
-
-  // 드래그 기능 활성화 (최초 1회만 실행)
-  if (!window.orderDetailAddModalDraggable) {
-    makeModalDraggable('orderDetailAddModal', 'orderDetailAddModalHeader');
-    window.orderDetailAddModalDraggable = true;
-  }
-
-  // 닫기 버튼 이벤트 (네임스페이스 적용 - 중복 방지)
-  $('#closeOrderDetailAddModal')
-    .off('click.orderPage')
-    .on('click.orderPage', closeOrderDetailAddModal);
-}
-
-/**
- * 발주 품목 추가 모달 닫기
- */
-function closeOrderDetailAddModal() {
-  console.log('[품목추가모달] 닫기 (onclick) → closeOrderDetailAddModal()');
-
-  document.getElementById('orderDetailAddModal').style.display = 'none';
-}
-
-/**
- * 자재 검색
- */
-async function searchOrderMaterials() {
-  console.log('[품목추가모달] 검색 버튼 클릭 → searchOrderMaterials()');
-
+// ✅ 자재 검색 함수
+// ✅ [발주관리] 공통 자재 검색 (orderDetailAddModal)
+// HTML에 있는 materialSearchInput / materialSearchTableBody / materialSearchResults 기준으로 동작
+async function searchMaterials() {
+  console.log('===== orderManageDetailAddModal > 자재 검색 버튼 클릭 =====');
   try {
-    // 각 필드의 검색어 가져오기
-    const searchCategory = document.getElementById('orderMaterialSearchCategory').value.trim();
-    const searchCode = document.getElementById('orderMaterialSearchCode').value.trim();
-    const searchName = document.getElementById('orderMaterialSearchName').value.trim();
+    let keyword = document.getElementById('materialSearchInput').value.trim();
+    let searchSpec = ''; // 규격 검색어
 
-    // 최소 1개 이상의 검색어 입력 확인
-    if (!searchCategory && !searchCode && !searchName) {
-      alert('최소 1개 이상의 검색 조건을 입력해주세요.');
+    if (!keyword) {
+      alert('검색어를 입력해주세요.');
       return;
     }
 
-    console.log('발주 자재 검색:', {
-      분류: searchCategory,
-      자재코드: searchCode,
-      자재명: searchName,
-    });
+    // 검색어에서 쉼표로 분리하여 자재명과 규격 검색어 추출
+    // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
+    if (keyword.includes(',')) {
+      const parts = keyword.split(',').map(s => s.trim());
+      keyword = parts[0] || ''; // 첫 번째 부분: 자재명
+      searchSpec = parts[1] || ''; // 두 번째 부분: 규격
 
-    // 검색 조건을 쿼리 파라미터로 전달
+      console.log(`  검색어 분리: "${keyword}", 규격: "${searchSpec}"`);
+    }
+
+    // 서버는 /api/materials 에서 searchName을 처리
     const params = new URLSearchParams();
-    if (searchCategory) params.append('searchCategory', searchCategory);
-    if (searchCode) params.append('searchCode', searchCode);
-    if (searchName) params.append('searchName', searchName);
-    params.append('removeDuplicates', 'true');
+    params.append('searchCode', keyword);
+    params.append('searchName', keyword);
+    if (searchSpec) {
+      params.append('searchSpec', searchSpec); // 규격 검색어 추가 (쉼표로 분리된 경우)
+    } else {
+      params.append('searchSpec', keyword); // 단일 검색어인 경우 모든 필드에서 검색
+    }
+    params.append('removeDuplicates', 'true'); // 중복 제거 활성화
 
-    // 자재 검색 API 호출
-    const result = await apiCall(`/materials?${params.toString()}`);
+    const response = await fetch(`/api/materials?${params.toString()}`);
+    const result = await response.json();
 
-    if (!result.success || !result.data) {
-      alert('자재 검색에 실패했습니다.');
+    if (!result.success) throw new Error(result.message || '자재 조회 실패');
+
+    const tbody = document.getElementById('materialSearchTableBody');
+    const resultsDiv = document.getElementById('materialSearchResults');
+
+    if (!result.data || result.data.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="padding:40px;text-align:center;color:#999;">
+            검색 결과가 없습니다
+          </td>
+        </tr>`;
+      resultsDiv.style.display = 'block';
       return;
     }
 
-    const materials = result.data;
-
-    if (materials.length === 0) {
-      alert('검색 결과가 없습니다.');
-      return;
-    }
-
-    // 검색 결과 테이블에 표시
-    const tbody = document.getElementById('orderMaterialSearchTableBody');
     tbody.innerHTML = '';
+    result.data.forEach((material) => {
+      const 자재코드 = (material.분류코드 || '') + (material.세부코드 || '');
 
-    materials.forEach((material, index) => {
-      const row = document.createElement('tr');
-      row.style.transition = 'background 0.2s';
-      row.onmouseover = () => (row.style.background = '#f9fafb');
-      row.onmouseout = () => (row.style.background = 'white');
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.onmouseover = () => (tr.style.background = '#f8f9fa');
+      tr.onmouseout = () => (tr.style.background = 'white');
 
-      const 자재코드 = material.분류코드 + material.세부코드;
-
-      // 자재 데이터를 전역 변수에 임시 저장
-      if (!window.tempOrderMaterialsData) {
-        window.tempOrderMaterialsData = [];
-      }
-      window.tempOrderMaterialsData[index] = {
-        ...material,
-        자재코드,
-      };
-
-      row.innerHTML = `
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${
-          자재코드 || '-'
-        }</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${
-          material.자재명 || '-'
-        }</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${
-          material.규격 || '-'
-        }</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px; text-align: right; font-weight: 600; color: #2563eb;">${(
-          material.입고단가 || 0
-        ).toLocaleString()}원</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">
-          <button onclick='selectOrderMaterialForAdd(window.tempOrderMaterialsData[${index}])' style="
-            padding: 6px 12px;
-            background: #10b981;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-          ">선택</button>
+      tr.innerHTML = `
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${자재코드}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${material.자재명 || '-'}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${material.규격 || '-'}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${(
+          material.출고단가1 || 0
+        ).toLocaleString()}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center;">
+          <button type="button" class="btn btn-sm"
+            onclick='selectMaterialForOrder(${JSON.stringify(material).replace(
+              /'/g,
+              '&apos;',
+            )})'>
+            선택
+          </button>
         </td>
       `;
-
-      tbody.appendChild(row);
+      tbody.appendChild(tr);
     });
 
-    // 검색 결과 영역 표시
-    document.getElementById('orderMaterialSearchResults').style.display = 'block';
-  } catch (error) {
-    console.error(' 자재 검색 오류:', error);
+    resultsDiv.style.display = 'block';
+  } catch (err) {
+    console.error('❌ orderManageDetailAddModal > 자재 검색 오류:', err);
     alert('자재 검색 중 오류가 발생했습니다.');
   }
 }
 
-/**
- * 자재 선택 (선택 버튼 클릭) - 입력 필드에 정보 채우기
- */
-function selectOrderMaterialForAdd(material) {
-  console.log('[자재검색결과] 선택 (onclick) → selectOrderMaterial()');
+// ✅ 자재 선택 함수
+function selectMaterial(material) {
+  selectedMaterial = material;
 
-  if (!material) {
-    console.error(' material 객체가 없습니다!');
-    alert('자재 정보를 불러올 수 없습니다. 다시 시도해주세요.');
-    return;
-  }
-
-  // 선택된 자재 정보 저장
-  window.selectedOrderMaterial = material;
-  console.log(' window.selectedOrderMaterial 저장됨:', window.selectedOrderMaterial);
+  const 자재코드 = material.분류코드 + material.세부코드;
 
   // 선택된 자재 정보 표시
-  document.getElementById('selectedOrderMaterialName').textContent = material.자재명 || '-';
-  document.getElementById('selectedOrderMaterialCode').textContent = `품목코드: ${
-    material.자재코드 || '-'
+  document.getElementById('selectedMaterialName').textContent = material.자재명;
+  document.getElementById('selectedMaterialCode').textContent = `[${자재코드}] ${
+    material.규격 || ''
   }`;
-  document.getElementById('selectedOrderMaterialInfo').style.display = 'block';
+  document.getElementById('selectedMaterialInfo').style.display = 'block';
 
-  // 입력 필드에 기본값 설정
-  document.getElementById('addOrderDetailQuantity').value = '1';
-  document.getElementById('addOrderDetailInPrice').value = material.입고단가 || '0';
-  document.getElementById('addOrderDetailOutPrice').value = material.출고단가 || '0';
-
-  // 금액 미리보기 초기값 계산 (발주량 1 × 입고단가)
-  const 초기금액 = 1 * (material.입고단가 || 0);
-  $('#addOrderDetailAmount').text(초기금액.toLocaleString() + '원');
-
-  // 검색 결과 숨김
-  document.getElementById('orderMaterialSearchResults').style.display = 'none';
-
-  console.log(' 자재 선택 완료:', material);
+  // 검색 결과 숨기기
+  document.getElementById('materialSearchResults').style.display = 'none';
 }
 
-/**
- * 선택된 자재 취소
- */
-function clearSelectedOrderMaterial() {
-  console.log('[선택자재정보] 취소 (onclick) → clearOrderSelectedMaterial()');
+// ✅ 선택된 자재 취소
+function clearSelectedMaterial() {
+  selectedMaterial = null;
+  if (typeof newSelectedMaterial !== 'undefined') newSelectedMaterial = null;
 
-  window.selectedOrderMaterial = null;
-  document.getElementById('selectedOrderMaterialInfo').style.display = 'none';
-  document.getElementById('orderMaterialSearchResults').style.display = 'none';
+  const selectedInfo = document.getElementById('selectedMaterialInfo');
+  if (selectedInfo) selectedInfo.style.display = 'none';
 
-  // 3개 검색 필드 초기화
-  const categoryInput = document.getElementById('orderMaterialSearchCategory');
-  const codeInput = document.getElementById('orderMaterialSearchCode');
-  const nameInput = document.getElementById('orderMaterialSearchName');
-  if (categoryInput) categoryInput.value = '';
-  if (codeInput) codeInput.value = '';
-  if (nameInput) nameInput.value = '';
-
-  // 수량/단가 초기화
-  document.getElementById('addOrderDetailQuantity').value = '1';
-  document.getElementById('addOrderDetailInPrice').value = '0';
-  document.getElementById('addOrderDetailOutPrice').value = '0';
+  // 검색 결과 다시 표시
+  const resultsDiv = document.getElementById('materialSearchResults');
+  if (resultsDiv) resultsDiv.style.display = 'block';
 }
 
-/**
- * 발주 품목 추가 확인 (모달 하단의 추가하기 버튼)
- */
-function confirmAddOrderDetail() {
-  console.log('[품목추가모달] 추가하기 (onclick) → confirmOrderDetailAdd()');
+// ✅ 금액 자동 계산 (수량 * 단가)
+function calculateDetailAmount() {
+  const qtyEl = document.getElementById('addDetailQuantity');
+  const priceEl = document.getElementById('addDetailPrice');
+  const amtEl = document.getElementById('addDetailAmount');
 
-  try {
-    if (!window.selectedOrderMaterial) {
-      alert('자재를 선택해주세요.');
-      return;
-    }
-
-    const 발주량 = parseFloat(document.getElementById('addOrderDetailQuantity').value) || 0;
-    const 입고단가 = parseFloat(document.getElementById('addOrderDetailInPrice').value) || 0;
-    const 출고단가 = parseFloat(document.getElementById('addOrderDetailOutPrice').value) || 0;
-
-    if (발주량 <= 0) {
-      alert('발주량을 입력해주세요.');
-      return;
-    }
-
-    const table = window.orderEditDetailTable;
-    if (!table) {
-      alert('DataTable을 찾을 수 없습니다.');
-      return;
-    }
-
-    // 새 행 데이터 생성
-    const newRow = {
-      자재코드: window.selectedOrderMaterial.자재코드,
-      자재명: window.selectedOrderMaterial.자재명,
-      규격: window.selectedOrderMaterial.규격,
-      발주량: 발주량,
-      입고단가: 입고단가,
-      출고단가: 출고단가,
-    };
-
-    // DataTable에 추가
-    table.row.add(newRow).draw();
-
-    console.log(' 품목 추가 완료:', newRow);
-
-    // 모달 닫기
-    closeOrderDetailAddModal();
-  } catch (error) {
-    console.error(' 품목 추가 오류:', error);
-    alert('품목 추가 중 오류가 발생했습니다.');
+  if (qtyEl && priceEl && amtEl) {
+    const qty = parseFloat(qtyEl.value) || 0;
+    const price = parseFloat(priceEl.value) || 0;
+    const amount = qty * price;
+    amtEl.value = amount.toLocaleString();
   }
 }
 
-// 발주 입고단가 이력 관련 변수
-let tempMaterialForOrder = null;
-let currentOrderPriceHistoryTab = 'actual';
-
-/**
- * 발주용 이전단가 조회 모달 열기
- */
-async function showPriceHistoryForOrder(material) {
+// ✅ 출고단가 이력 보기
+async function showPriceHistory() {
   try {
-    // 매입처 코드 확인 (현재 수정 중인 발주의 매입처)
-    const modal = document.getElementById('orderEditModal');
-    const 매입처코드 = modal.dataset.매입처코드;
-
-    if (!매입처코드) {
-      alert('먼저 발주를 선택해주세요.');
+    // 자재가 선택되었는지 확인
+    if (!selectedMaterial) {
+      alert('먼저 자재를 검색하여 선택해주세요.');
       return;
     }
 
-    // 임시 자재 정보 저장
-    tempMaterialForOrder = material;
+    const 자재코드 = selectedMaterial.분류코드 + selectedMaterial.세부코드;
+
+    // 매입처코드 가져오기 (신규 발주서 또는 발주 수정)
+    let 매입처코드;
+
+    if (isNewOrderMode) {
+      // 신규 발주서 작성 모드
+      매입처코드 = document.getElementById('selectedSupplierCode').value;
+    } else {
+      // 발주 수정 모드
+      const orderManageEditModal = document.getElementById('orderManageEditModal');
+      매입처코드 = orderManageEditModal.dataset.매입처코드;
+    }
+
+    if (!매입처코드) {
+      alert('매입처 정보를 찾을 수 없습니다.');
+      return;
+    }
 
     // 자재 정보 표시
-    document.getElementById('orderPriceHistoryMaterialName').textContent = material.자재명;
-    document.getElementById('orderPriceHistoryMaterialCode').textContent = `[${
-      material.자재코드
-    }] ${material.규격 || ''}`;
+    document.getElementById('priceHistoryMaterialName').textContent = selectedMaterial.자재명;
+    document.getElementById('priceHistoryMaterialCode').textContent = `[${자재코드}] ${
+      selectedMaterial.규격 || ''
+    }`;
 
-    // 탭 초기화 (실제 입고가 탭으로 시작)
-    currentOrderPriceHistoryTab = 'actual';
-    const tabActual = document.getElementById('tabActualPurchasePrice');
+    // 탭 초기화 (실제 출고가 탭으로 시작)
+    currentPriceHistoryTab = 'actual';
+    const tabActual = document.getElementById('tabActualPrice');
     const tabOrder = document.getElementById('tabOrderPrice');
 
     tabActual.style.background = '#3b82f6';
@@ -1391,26 +1100,124 @@ async function showPriceHistoryForOrder(material) {
     tabOrder.style.color = '#6b7280';
     tabOrder.style.borderBottom = '3px solid transparent';
 
-    // 실제 입고가 데이터 로드
-    await loadActualPurchasePriceHistory(material.자재코드, 매입처코드);
+    // 실제 출고가 데이터 로드
+    await loadActualPriceHistory();
 
     // 모달 표시
-    document.getElementById('orderPriceHistoryModal').style.display = 'block';
-
-    console.log(' 발주용 단가 이력 조회:', material);
+    document.getElementById('orderManagePriceHistoryModal').style.display = 'block';
   } catch (err) {
-    console.error(' 단가 이력 조회 오류:', err);
+    console.error('❌ 단가 이력 조회 오류:', err);
     alert('단가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-/**
- * 발주용 실제 입고가 이력 로드
- */
-async function loadActualPurchasePriceHistory(자재코드, 매입처코드) {
+// ✅ 이력에서 단가 선택
+function selectPriceFromHistory(price) {
+  document.getElementById('addDetailPrice').value = price;
+
+  // 금액 자동 재계산
+  const 수량 = parseFloat(document.getElementById('addDetailQuantity').value) || 0;
+  const 금액 = 수량 * price;
+  document.getElementById('addDetailAmount').value = 금액.toLocaleString();
+
+  // 모달 닫기
+  closeOrderManagePriceHistoryModal();
+}
+
+// ✅ 단가 이력 모달 닫기
+function closeOrderManagePriceHistoryModal() {
+  document.getElementById('orderManagePriceHistoryModal').style.display = 'none';
+}
+
+// ✅ 단가 이력 탭 전환
+let currentOrderManagePriceHistoryTab = 'actual'; // 현재 활성화된 탭
+
+async function switchOrderManagePriceHistoryTab(tab) {
+  currentOrderManagePriceHistoryTab = tab;
+
+  // 탭 버튼 스타일 변경
+  const tabActual = document.getElementById('orderManagePriceHistoryActualTab');
+  const tabOrder = document.getElementById('orderManagePriceHistoryOrderTab');
+
+  if (tab === 'actual') {
+    // 실제 출고가 탭 활성화
+    tabActual.style.background = '#3b82f6';
+    tabActual.style.color = 'white';
+    tabActual.style.borderBottom = '3px solid #3b82f6';
+
+    tabOrder.style.background = 'transparent';
+    tabOrder.style.color = '#6b7280';
+    tabOrder.style.borderBottom = '3px solid transparent';
+
+    // 레이블 변경
+    document.getElementById('orderManagePriceHistoryLabel').textContent =
+      '이 거래처에 실제 출고한 이력 (클릭하여 단가 선택)';
+
+    // 테이블 헤더 변경
+    document.getElementById('orderManagePriceHistoryTableHead').innerHTML = `
+      <tr>
+        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고일자</th>
+        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고단가</th>
+        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고수량</th>
+        <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">적요</th>
+      </tr>
+    `;
+
+    // 실제 출고 데이터 로드
+    await loadActualPriceHistory();
+  } else if (tab === 'order') {
+    // 발주 제안가 탭 활성화
+    tabOrder.style.background = '#3b82f6';
+    tabOrder.style.color = 'white';
+    tabOrder.style.borderBottom = '3px solid #3b82f6';
+
+    tabActual.style.background = 'transparent';
+    tabActual.style.color = '#6b7280';
+    tabActual.style.borderBottom = '3px solid transparent';
+
+    // 레이블 변경
+    document.getElementById('orderManagePriceHistoryLabel').textContent =
+      '이 거래처에 제안한 발주 이력 (클릭하여 단가 선택)';
+
+    // 테이블 헤더 변경
+    document.getElementById('orderManagePriceHistoryTableHead').innerHTML = `
+      <tr>
+        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">발주일자</th>
+        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">수량</th>
+        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고단가</th>
+        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">합계</th>
+        <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">적요</th>
+      </tr>
+    `;
+
+    // 발주 제안가 데이터 로드
+    await loadOrderPriceHistory();
+  }
+}
+
+// ✅ 실제 출고 이력 로드
+async function loadActualPriceHistory() {
   try {
+    if (!selectedMaterial) return;
+
+    const 자재코드 = selectedMaterial.분류코드 + selectedMaterial.세부코드;
+
+    // 매입처코드 가져오기 (신규 발주서 또는 발주 수정)
+    let 매입처코드;
+
+    if (isNewOrderMode) {
+      // 신규 발주서 작성 모드
+      매입처코드 = document.getElementById('selectedSupplierCode').value;
+    } else {
+      // 발주 수정 모드
+      const orderManageEditModal = document.getElementById('orderManageEditModal');
+      매입처코드 = orderManageEditModal.dataset.매입처코드;
+    }
+
+    if (!매입처코드) return;
+
     const response = await fetch(
-      `/api/materials/${encodeURIComponent(자재코드)}/purchase-price-history/${매입처코드}`,
+      `/api/materials/${encodeURIComponent(자재코드)}/price-history/${매입처코드}`,
     );
     const result = await response.json();
 
@@ -1418,13 +1225,13 @@ async function loadActualPurchasePriceHistory(자재코드, 매입처코드) {
       throw new Error(result.message || '이력 조회 실패');
     }
 
-    const tbody = document.getElementById('orderPriceHistoryTableBody');
+    const tbody = document.getElementById('priceHistoryTableBody');
 
     if (result.data.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
-            최근 1년 이내 이 거래처에 입고한 이력이 없습니다
+            이 거래처에 출고한 이력이 없습니다
           </td>
         </tr>
       `;
@@ -1442,7 +1249,7 @@ async function loadActualPurchasePriceHistory(자재코드, 매입처코드) {
           this.style.background = 'white';
         };
         tr.onclick = function () {
-          selectPriceFromOrderHistory(item.입고단가);
+          selectPriceFromHistory(item.출고단가);
         };
 
         const 입출고일자 = item.입출고일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
@@ -1451,10 +1258,10 @@ async function loadActualPurchasePriceHistory(자재코드, 매입처코드) {
         tr.innerHTML = `
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${입출고일자}</td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right; font-weight: 600; color: #2563eb;">
-            ${(item.입고단가 || 0).toLocaleString()}원
+            ${(item.출고단가 || 0).toLocaleString()}원
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right;">
-            ${(item.입고수량 || 0).toLocaleString()}
+            ${(item.출고수량 || 0).toLocaleString()}
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: center; color: #6b7280;">
             ${적요}
@@ -1464,19 +1271,33 @@ async function loadActualPurchasePriceHistory(자재코드, 매입처코드) {
         tbody.appendChild(tr);
       });
     }
-
-    console.log(`실제 입고가 이력 조회 완료: ${result.data.length}건`);
   } catch (err) {
-    console.error(' 실제 입고가 이력 조회 오류:', err);
-    alert('실제 입고가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
+    console.error('❌ 실제 출고가 이력 조회 오류:', err);
+    alert('실제 출고가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-/**
- * 발주용 발주 제안가 이력 로드
- */
-async function loadOrderPriceHistory(자재코드, 매입처코드) {
+// ✅ 발주 제안가 이력 로드
+async function loadOrderPriceHistory() {
   try {
+    if (!selectedMaterial) return;
+
+    const 자재코드 = selectedMaterial.분류코드 + selectedMaterial.세부코드;
+
+    // 매입처코드 가져오기 (신규 발주서 또는 발주 수정)
+    let 매입처코드;
+
+    if (isNewOrderMode) {
+      // 신규 발주서 작성 모드
+      매입처코드 = document.getElementById('selectedSupplierCode').value;
+    } else {
+      // 발주 수정 모드
+      const orderManageEditModal = document.getElementById('orderManageEditModal');
+      매입처코드 = orderManageEditModal.dataset.매입처코드;
+    }
+
+    if (!매입처코드) return;
+
     const response = await fetch(
       `/api/materials/${encodeURIComponent(자재코드)}/order-history/${매입처코드}`,
     );
@@ -1486,24 +1307,13 @@ async function loadOrderPriceHistory(자재코드, 매입처코드) {
       throw new Error(result.message || '이력 조회 실패');
     }
 
-    const tbody = document.getElementById('orderPriceHistoryTableBody');
-    const thead = document.getElementById('orderPriceHistoryTableHead');
-
-    // 테이블 헤더 변경
-    thead.innerHTML = `
-      <tr>
-        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">발주일자</th>
-        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">입고단가</th>
-        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">발주량</th>
-        <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">상태</th>
-      </tr>
-    `;
+    const tbody = document.getElementById('priceHistoryTableBody');
 
     if (result.data.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
-            최근 1년 이내 이 거래처에 발주한 이력이 없습니다
+          <td colspan="5" style="padding: 40px; text-align: center; color: #9ca3af;">
+            이 거래처에 제안한 발주 이력이 없습니다
           </td>
         </tr>
       `;
@@ -1521,205 +1331,1641 @@ async function loadOrderPriceHistory(자재코드, 매입처코드) {
           this.style.background = 'white';
         };
         tr.onclick = function () {
-          selectPriceFromOrderHistory(item.입고단가);
+          selectPriceFromHistory(item.출고단가);
         };
 
         const 발주일자 = item.발주일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-        const 상태 = item.상태코드 === 1 ? '작성중' : item.상태코드 === 2 ? '발주' : '완료';
+        const 수량 = parseFloat(item.수량 || 0);
+        const 단가 = parseFloat(item.출고단가 || 0);
+        const 합계 = 수량 * 단가;
 
         tr.innerHTML = `
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${발주일자}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right;">
+            ${수량.toLocaleString()}
+          </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right; font-weight: 600; color: #2563eb;">
-            ${(item.입고단가 || 0).toLocaleString()}원
+            ${단가.toLocaleString()}원
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right;">
-            ${(item.발주량 || 0).toLocaleString()}
+            ${합계.toLocaleString()}원
           </td>
-          <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: center; color: #6b7280;">
-            ${상태}
+          <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: center; color: #6b7280; font-size: 12px;">
+            ${item.적요 || '-'}
           </td>
         `;
 
         tbody.appendChild(tr);
       });
     }
-
-    console.log(`발주 제안가 이력 조회 완료: ${result.data.length}건`);
   } catch (err) {
-    console.error(' 발주 제안가 이력 조회 오류:', err);
+    console.error('❌ 발주 제안가 이력 조회 오류:', err);
     alert('발주 제안가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-/**
- * 발주용 이력에서 단가 선택
- */
-function selectPriceFromOrderHistory(price) {
-  console.log('[단가이력테이블] 행 클릭 (onclick) → selectPriceFromHistory()');
+// ✅ 자재 추가 모달 열기
+// mode: 'create' (작성 모달) 또는 'edit' (수정 모달)
+function openOrderManageDetailAddModal(mode = 'create') {
+  const parentModal = mode === 'create' ? 'orderManageCreateModal' : 'orderManageEditModal';
+  console.log(`===== ${parentModal} > 자재 추가 버튼 클릭 =====`);
 
-  closeOrderPriceHistoryModal();
+  // 모달 초기화
+  selectedMaterialForAdd = null;
 
-  if (!tempMaterialForOrder) {
-    alert('자재 정보를 찾을 수 없습니다.');
-    return;
+  // 모달에 모드 저장 (확인 버튼에서 사용)
+  const modal = document.getElementById('orderManageDetailAddModal');
+  if (modal) {
+    modal.dataset.mode = mode;
   }
 
-  // 발주량 입력
-  const 수량 = prompt(`${tempMaterialForOrder.자재명}\n발주량을 입력하세요:`, '1');
+  // 자재 검색 섹션 ID 로깅
 
-  if (!수량 || isNaN(수량) || parseFloat(수량) <= 0) {
-    alert('유효한 수량을 입력해주세요.');
-    tempMaterialForOrder = null;
-    return;
+  // 자재 검색 필드 초기화
+  const categoryInput = document.getElementById('addDetailMaterialSearchCategory');
+  const codeInput = document.getElementById('addDetailMaterialSearchCode');
+  const nameInput = document.getElementById('addDetailMaterialSearchName');
+  if (categoryInput) categoryInput.value = '';
+  if (codeInput) codeInput.value = '';
+  if (nameInput) nameInput.value = '';
+
+  // 수량/단가/금액 필드 초기화
+  const quantityInput = document.getElementById('addDetailQuantity');
+  const priceInput = document.getElementById('addDetailPrice');
+  const amountInput = document.getElementById('addDetailAmount');
+  if (quantityInput) quantityInput.value = '1';
+  if (priceInput) priceInput.value = '0';
+  if (amountInput) amountInput.value = '0';
+
+  // 검색 결과 및 선택 정보 숨기기
+  const searchResults = document.getElementById('addDetailMaterialSearchResults');
+  const selectedInfo = document.getElementById('addDetailSelectedMaterialInfo');
+  if (searchResults) searchResults.style.display = 'none';
+  if (selectedInfo) selectedInfo.style.display = 'none';
+
+  // 검색 결과 테이블 초기화
+  const tbody = document.getElementById('addDetailMaterialSearchTableBody');
+  if (tbody) tbody.innerHTML = '';
+
+  // 모달 표시
+  if (modal) {
+    modal.style.display = 'block';
+
+    // 드래그로 인한 transform 초기화 (overflow-x 방지)
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) {
+      modalContent.style.transform = 'none';
+      modalContent.style.left = '';
+      modalContent.style.top = '';
+    }
   }
+}
 
-  // 출고단가 입력
-  const 출고단가 = prompt(
-    `${tempMaterialForOrder.자재명}\n출고단가를 입력하세요:`,
-    tempMaterialForOrder.출고단가 || '0',
-  );
+// ✅ 자재 검색 함수 (발주 상세내역 추가용)
+async function searchAddDetailMaterials() {
+  try {
+    const searchCategory = document.getElementById('addDetailMaterialSearchCategory').value.trim();
+    const searchCode = document.getElementById('addDetailMaterialSearchCode').value.trim();
+    let searchName = document.getElementById('addDetailMaterialSearchName').value.trim();
+    let searchSpec = ''; // 규격 검색어
 
-  if (!출고단가 || isNaN(출고단가) || parseFloat(출고단가) < 0) {
-    alert('유효한 출고단가를 입력해주세요.');
-    tempMaterialForOrder = null;
-    return;
+    // 자재명에서 쉼표로 분리하여 자재명과 규격 검색어 추출
+    // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
+    if (searchName && searchName.includes(',')) {
+      const parts = searchName.split(',').map(s => s.trim());
+      searchName = parts[0] || ''; // 첫 번째 부분: 자재명
+      searchSpec = parts[1] || ''; // 두 번째 부분: 규격
+
+      console.log(`  자재명 검색: "${searchName}", 규격 검색: "${searchSpec}"`);
+    }
+
+    if (!searchCategory && !searchCode && !searchName) {
+      alert('최소 1개 이상의 검색 조건을 입력해주세요.');
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (searchCategory) params.append('searchCategory', searchCategory);
+    if (searchCode) params.append('searchCode', searchCode);
+    if (searchName) params.append('searchName', searchName);
+    if (searchSpec) params.append('searchSpec', searchSpec); // 규격 검색어 추가
+    params.append('removeDuplicates', 'true'); // 중복 제거 활성화
+
+    const response = await fetch(`${API_BASE_URL}/materials?${params.toString()}`);
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '자재 조회 실패');
+    }
+
+    const materials = result.data || [];
+
+    const tbody = document.getElementById('addDetailMaterialSearchTableBody');
+    tbody.innerHTML = '';
+
+    if (materials.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="3" style="padding: 16px; text-align: center; color: #6b7280;">검색 결과가 없습니다.</td></tr>';
+    } else {
+      materials.forEach((material) => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.style.transition = 'background 0.2s';
+        row.onmouseover = function () {
+          this.style.background = '#f9fafb';
+        };
+        row.onmouseout = function () {
+          this.style.background = 'white';
+        };
+        row.onclick = function () {
+          selectAddDetailMaterial(material);
+        };
+
+        const 품목코드 = (material.분류코드 || '') + (material.세부코드 || '');
+
+        row.innerHTML = `
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${품목코드}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${
+            material.자재명 || '-'
+          }</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${
+            material.규격 || '-'
+          }</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // 검색 결과 표시
+    document.getElementById('addDetailMaterialSearchResults').style.display = 'block';
+  } catch (err) {
+    console.error('❌ 자재 검색 오류:', err);
+    alert('자재 검색 중 오류가 발생했습니다: ' + err.message);
   }
+}
 
-  const table = window.orderEditDetailTable;
-  if (!table) {
-    alert('DataTable을 찾을 수 없습니다.');
-    tempMaterialForOrder = null;
-    return;
-  }
+// ✅ 자재 검색 초기화 함수
+function clearAddDetailMaterialSearch() {
+  document.getElementById('addDetailMaterialSearchCategory').value = '';
+  document.getElementById('addDetailMaterialSearchCode').value = '';
+  document.getElementById('addDetailMaterialSearchName').value = '';
+  document.getElementById('addDetailMaterialSearchResults').style.display = 'none';
+}
 
-  // 선택한 단가로 자재 추가
-  const newRow = {
-    자재코드: tempMaterialForOrder.자재코드,
-    자재명: tempMaterialForOrder.자재명,
-    규격: tempMaterialForOrder.규격,
-    발주량: parseFloat(수량),
-    입고단가: parseFloat(price),
-    출고단가: parseFloat(출고단가),
+// ✅ 자재 선택 함수
+function selectAddDetailMaterial(material) {
+  selectedMaterialForAdd = {
+    품목코드: (material.분류코드 || '') + (material.세부코드 || ''),
+    품목명: material.자재명,
+    판매단가: material.출고단가 || material.출고단가1 || 0,
+    규격: material.규격 || '',
+    단위: material.단위 || '',
+    분류코드: material.분류코드 || '',
+    세부코드: material.세부코드 || '',
   };
 
-  // DataTable에 추가
-  table.row.add(newRow).draw();
+  // 선택된 자재 정보 표시
+  document.getElementById('addDetailSelectedMaterialName').textContent =
+    selectedMaterialForAdd.품목명 +
+    (selectedMaterialForAdd.규격 ? ` (${selectedMaterialForAdd.규격})` : '');
+  document.getElementById(
+    'addDetailSelectedMaterialCode',
+  ).textContent = `품목코드: ${selectedMaterialForAdd.품목코드}`;
 
-  tempMaterialForOrder = null;
+  document.getElementById('addDetailSelectedMaterialInfo').style.display = 'block';
 
-  console.log(`이전단가로 자재 추가: ${price}원`);
+  // 단가 자동 입력
+  document.getElementById('addDetailPrice').value = selectedMaterialForAdd.판매단가;
+
+  // 금액 자동 계산
+  calculateAddDetailAmount();
+
+  // 검색 결과 숨기기
+  document.getElementById('addDetailMaterialSearchResults').style.display = 'none';
 }
 
-/**
- * 발주용 단가 이력 탭 전환
- */
-async function switchOrderPriceHistoryTab(tabName) {
-  console.log('🔧 [단가이력모달] 탭 전환');
+// ✅ 선택 취소
+function clearAddDetailSelectedMaterial() {
+  selectedMaterialForAdd = null;
 
-  currentOrderPriceHistoryTab = tabName;
+  document.getElementById('addDetailSelectedMaterialInfo').style.display = 'none';
 
-  const tabActual = document.getElementById('tabActualPurchasePrice');
-  const tabOrder = document.getElementById('tabOrderPrice');
-  const label = document.getElementById('orderPriceHistoryLabel');
-  const thead = document.getElementById('orderPriceHistoryTableHead');
+  document.getElementById('addDetailPrice').value = '0';
 
-  if (tabName === 'actual') {
-    // 실제 입고가 탭 활성화
-    tabActual.style.background = '#3b82f6';
-    tabActual.style.color = 'white';
-    tabActual.style.borderBottom = '3px solid #3b82f6';
+  calculateAddDetailAmount();
+}
 
-    tabOrder.style.background = 'transparent';
-    tabOrder.style.color = '#6b7280';
-    tabOrder.style.borderBottom = '3px solid transparent';
+// ✅ 금액 자동 계산
+function calculateAddDetailAmount() {
+  const 수량 = parseFloat(document.getElementById('addDetailQuantity').value) || 0;
+  const 단가 = parseFloat(document.getElementById('addDetailPrice').value) || 0;
 
-    label.textContent = '이 거래처에 실제 입고한 이력 (최근 1년, 클릭하여 단가 선택)';
+  const 금액 = 수량 * 단가;
 
-    // 테이블 헤더 복원
-    thead.innerHTML = `
-      <tr>
-        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">입고일자</th>
-        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">입고단가</th>
-        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">입고수량</th>
-        <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">적요</th>
-      </tr>
-    `;
+  document.getElementById('addDetailAmount').value = 금액.toLocaleString();
+}
 
-    // 실제 입고가 이력 로드
-    if (tempMaterialForOrder) {
-      const modal = document.getElementById('orderEditModal');
-      const 매입처코드 = modal.dataset.매입처코드;
-      await loadActualPurchasePriceHistory(tempMaterialForOrder.자재코드, 매입처코드);
+// ✅ 이전 단가 조회
+async function showOrderManageDetailPriceHistory() {
+  try {
+    if (!selectedMaterialForAdd) {
+      alert('먼저 자재를 검색하여 선택해주세요.');
+      return;
     }
+
+    const 자재코드 =
+      selectedMaterialForAdd.품목코드 ||
+      selectedMaterialForAdd.분류코드 + selectedMaterialForAdd.세부코드;
+
+    // 매입처코드 가져오기 (발주서 작성 모달에서)
+    const 매입처코드 =
+      document.getElementById('orderManageCreateSupplierCode')?.value ||
+      document.getElementById('selectedSupplierCode')?.value;
+
+    if (!매입처코드) {
+      alert('매입처를 먼저 선택해주세요.');
+      return;
+    }
+
+    // 자재 정보 표시
+    const nameEl = document.getElementById('orderManagePriceHistoryMaterialName');
+    const codeEl = document.getElementById('orderManagePriceHistoryMaterialCode');
+
+    if (nameEl) nameEl.textContent = selectedMaterialForAdd.품목명;
+    if (codeEl) codeEl.textContent = `[${자재코드}] ${selectedMaterialForAdd.규격 || ''}`;
+
+    // 탭 초기화
+    currentOrderManagePriceHistoryTab = 'actual';
+    const actualTab = document.getElementById('orderManagePriceHistoryActualTab');
+    const orderTab = document.getElementById('orderManagePriceHistoryOrderTab');
+
+    if (actualTab) {
+      actualTab.style.background = '#3b82f6';
+      actualTab.style.color = 'white';
+      actualTab.style.borderBottom = '3px solid #3b82f6';
+    }
+    if (orderTab) {
+      orderTab.style.background = 'transparent';
+      orderTab.style.color = '#6b7280';
+      orderTab.style.borderBottom = '3px solid transparent';
+    }
+
+    // 실제 출고단가 이력 로드
+    await loadActualPriceHistoryForAddDetail(자재코드, 매입처코드);
+
+    // 모달 표시
+    const modal = document.getElementById('orderManagePriceHistoryModal');
+
+    if (modal) {
+      modal.style.display = 'block';
+    } else {
+      console.error('❌ orderManagePriceHistoryModal 요소를 찾을 수 없음!');
+    }
+  } catch (err) {
+    console.error('❌ 단가 이력 조회 오류:', err);
+    console.error('스택 트레이스:', err.stack);
+    alert('단가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 상세내역 추가용 실제 출고단가 이력 로드
+async function loadActualPriceHistoryForAddDetail(자재코드, 매입처코드) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/materials/${encodeURIComponent(
+        자재코드,
+      )}/order-history/${encodeURIComponent(매입처코드)}`,
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ HTTP 에러:', response.status, errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '단가 이력 조회 실패');
+    }
+
+    const history = result.data || [];
+    const tbody = document.getElementById('orderManagePriceHistoryTableBody');
+
+    if (!tbody) {
+      console.error('❌ orderManagePriceHistoryTableBody 요소를 찾을 수 없음!');
+      throw new Error('테이블 요소를 찾을 수 없습니다.');
+    }
+
+    tbody.innerHTML = '';
+
+    if (history.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align: center; padding: 20px; color: #6c757d;">
+            이력이 없습니다
+          </td>
+        </tr>
+      `;
+    } else {
+      history.forEach((item) => {
+        const row = tbody.insertRow();
+        row.style.cursor = 'pointer';
+        row.onclick = function () {
+          applyAddDetailPriceFromHistory(item.단가);
+        };
+
+        const 수량 = parseFloat(item.수량 || 0);
+        const 단가 = parseFloat(item.단가 || 0);
+        const 합계 = 수량 * 단가;
+
+        row.innerHTML = `
+          <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${
+            item.입출고일자?.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') || '-'
+          }</td>
+          <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: right;">${수량.toLocaleString()}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: right; font-weight: 600; color: #007bff;">${단가.toLocaleString()}원</td>
+          <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: right;">${합계.toLocaleString()}원</td>
+          <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center; color: #6b7280; font-size: 12px;">${
+            item.적요 || '-'
+          }</td>
+        `;
+      });
+    }
+  } catch (err) {
+    console.error('❌ 실제 출고단가 이력 조회 오류:', err);
+    alert('실제 출고단가 이력을 불러오는 중 오류가 발생했습니다.');
+  }
+}
+
+// ✅ 이력에서 단가 적용
+function applyAddDetailPriceFromHistory(price) {
+  document.getElementById('addDetailPrice').value = price;
+  calculateAddDetailAmount();
+  closeOrderManagePriceHistoryModal();
+}
+
+// ✅ 자재 추가 모달 닫기
+function closeOrderManageDetailAddModal() {
+  document.getElementById('orderManageDetailAddModal').style.display = 'none';
+
+  // 발주서 작성 모달 다시 표시
+  if (isNewOrderMode) {
+    const orderManageCreateModal = document.getElementById('orderManageCreateModal');
+    orderManageCreateModal.style.display =
+      orderManageCreateModal.dataset.previousDisplay || 'block';
+    isNewOrderMode = false;
+  }
+}
+
+// ✅ 자재 추가 확인 (작성/수정 모드 분기)
+function confirmOrderManageDetailAdd() {
+  try {
+    // 모드 확인
+    const modal = document.getElementById('orderManageDetailAddModal');
+    const mode = modal ? modal.dataset.mode : 'create';
+
+    // 선택된 자재 확인
+    if (!selectedMaterialForAdd) {
+      alert('품목을 검색하여 선택해주세요.');
+      return;
+    }
+
+    const 자재코드 =
+      selectedMaterialForAdd.품목코드 ||
+      selectedMaterialForAdd.분류코드 + selectedMaterialForAdd.세부코드;
+    const 수량 = parseFloat(document.getElementById('addDetailQuantity').value) || 0;
+    const 단가 = parseFloat(document.getElementById('addDetailPrice').value) || 0;
+
+    const 공급가액 = 수량 * 단가;
+
+    if (수량 <= 0) {
+      alert('수량을 1 이상 입력해주세요.');
+      return;
+    }
+
+    if (mode === 'edit') {
+      // 발주 수정 모드 - DataTable에 행 추가
+      const newRow = {
+        자재코드: 자재코드,
+        자재명: selectedMaterialForAdd.품목명 || selectedMaterialForAdd.자재명,
+        규격: selectedMaterialForAdd.규격 || '-',
+        단위: selectedMaterialForAdd.단위 || '-',
+        수량: 수량,
+        단가: 단가,
+        공급가액: 공급가액,
+        _isNew: true,
+      };
+
+      window.orderManageEditDetailDataTable.row.add(newRow).draw();
+
+      // 합계 재계산
+      recalculateOrderManageEditTotal();
+    } else {
+      // 신규 발주서 작성 모드: newOrderDetails 배열에 추가
+      const newDetail = {
+        자재코드: 자재코드,
+        자재명: selectedMaterialForAdd.품목명 || selectedMaterialForAdd.자재명,
+        규격: selectedMaterialForAdd.규격 || '',
+        단위: selectedMaterialForAdd.단위 || '',
+        수량: 수량,
+        단가: 단가,
+        공급가액: 공급가액,
+      };
+
+      newOrderDetails.push(newDetail);
+
+      // 테이블 렌더링
+      renderNewOrderDetailTable();
+    }
+
+    // 자재 추가 모달 닫기
+    closeOrderManageDetailAddModal();
+  } catch (err) {
+    console.error('❌ 자재 추가 오류:', err);
+    alert('자재 추가 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ [이전 코드 - 참고용] 발주 수정 모드의 자재 추가 (별도 함수로 분리 필요시 사용)
+function confirmOrderManageDetailAddForEdit() {
+  try {
+    if (!selectedMaterialForAdd) {
+      alert('품목을 검색하여 선택해주세요.');
+      return;
+    }
+
+    const 자재코드 =
+      selectedMaterialForAdd.품목코드 ||
+      selectedMaterialForAdd.분류코드 + selectedMaterialForAdd.세부코드;
+    const 수량 = parseFloat(document.getElementById('addDetailQuantity').value) || 0;
+    const 단가 = parseFloat(document.getElementById('addDetailPrice').value) || 0;
+    const 공급가액 = 수량 * 단가;
+
+    if (수량 <= 0) {
+      alert('수량을 1 이상 입력해주세요.');
+      return;
+    }
+
+    // 발주 수정 모드 - DataTable에 행 추가
+    const newRow = {
+      자재코드: 자재코드,
+      자재명: selectedMaterialForAdd.품목명 || selectedMaterialForAdd.자재명,
+      규격: selectedMaterialForAdd.규격 || '-',
+      단위: selectedMaterialForAdd.단위 || '-',
+      수량: 수량,
+      단가: 단가,
+      공급가액: 공급가액,
+      _isNew: true,
+    };
+
+    window.orderManageEditDetailDataTable.row.add(newRow).draw();
+
+    // 합계 재계산
+    recalculateOrderManageEditTotal();
+
+    // 모달 닫기
+    closeOrderManageDetailAddModal();
+  } catch (err) {
+    console.error('❌ 자재 추가 오류:', err);
+    alert('자재 추가 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 발주내역 품목 수정 함수 - 모달 열기
+function editOrderManageDetailRow(rowIndex) {
+  console.log(
+    '===== orderManageEditModal > orderManageEditDetailTable > 수정 버튼 클릭 =====',
+  );
+
+  try {
+    const table = window.orderManageEditDetailDataTable;
+    if (!table) {
+      console.error('❌ orderManageEditModal > DataTable을 찾을 수 없습니다.');
+      alert('DataTable을 찾을 수 없습니다.');
+      return;
+    }
+
+    // 현재 행 데이터 가져오기
+    const rowData = table.row(rowIndex).data();
+
+    if (!rowData) {
+      console.error('❌ orderManageEditModal > 행 데이터를 찾을 수 없습니다.');
+      alert('행 데이터를 찾을 수 없습니다.');
+      return;
+    }
+
+    // 모달에 데이터 표시
+    document.getElementById('editDetailCode').textContent = rowData.자재코드 || '-';
+    document.getElementById('editDetailName').textContent = rowData.자재명 || '-';
+    document.getElementById('editDetailSpec').textContent = rowData.규격 || '-';
+
+    document.getElementById('editDetailQuantity').value = rowData.수량 || 0;
+
+    // ✅ API에서 '단가'로 반환 (출고단가 as 단가)
+    document.getElementById('editDetailPrice').value = rowData.단가 || 0;
+
+    // ✅ API에서 '공급가액'으로 반환 (수량 * 출고단가)
+    document.getElementById('editDetailAmount').value = (rowData.공급가액 || 0).toLocaleString();
+
+    // 모달에 rowIndex 저장 (editIndex는 삭제하여 발주서 관리 모드로 설정)
+    const modal = document.getElementById('orderManageDetailEditModal');
+    delete modal.dataset.editIndex;
+    modal.dataset.rowIndex = rowIndex;
+
+    // 모달 표시
+    modal.style.display = 'block';
+
+    // 드래그 기능 활성화 (최초 1회만 실행)
+    if (
+      typeof makeModalDraggable === 'function' &&
+      !window.orderManageDetailEditModalDraggable
+    ) {
+      makeModalDraggable('orderManageDetailEditModal', 'orderManageDetailEditModalHeader');
+      window.orderManageDetailEditModalDraggable = true;
+    }
+  } catch (err) {
+    console.error('❌ orderManageDetailEditModal > 품목 수정 모달 열기 오류:', err);
+    alert('품목 수정 모달을 여는 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 공급가액 자동 계산 (품목 수정 모달)
+function calculateOrderManageEditDetailAmount() {
+  const quantity = parseFloat(document.getElementById('editDetailQuantity').value) || 0;
+  const price = parseFloat(document.getElementById('editDetailPrice').value) || 0;
+  const amount = quantity * price;
+
+  document.getElementById('editDetailAmount').value = amount.toLocaleString();
+}
+
+// ✅ 발주내역 품목 수정 모달 닫기
+function closeOrderManageDetailEditModal() {
+  console.log('===== orderManageDetailEditModal > 취소 버튼 클릭 =====');
+
+  const modal = document.getElementById('orderManageDetailEditModal');
+  modal.style.display = 'none';
+
+  // dataset 초기화
+  delete modal.dataset.rowIndex;
+  delete modal.dataset.editIndex;
+}
+
+// ✅ 발주내역 품목 수정 확인 (발주서 관리 + 신규 발주서)
+function confirmOrderManageDetailEdit() {
+  console.log('===== orderManageDetailEditModal > 저장 버튼 클릭 =====');
+
+  try {
+    const modal = document.getElementById('orderManageDetailEditModal');
+
+    // 신규 발주서 작성 모드인지 확인 (editIndex가 있으면 신규 발주서)
+    if (modal.dataset.editIndex !== undefined && modal.dataset.editIndex !== null && modal.dataset.editIndex !== '') {
+      confirmNewOrderDetailEdit();
+      return;
+    }
+
+    // 발주서 관리 모드 (rowIndex 사용)
+    const rowIndex = parseInt(modal.dataset.rowIndex);
+
+    const table = window.orderManageEditDetailDataTable;
+    if (!table) {
+      console.error('❌ orderManageEditModal > DataTable을 찾을 수 없습니다.');
+      alert('DataTable을 찾을 수 없습니다.');
+      return;
+    }
+
+    const rowData = table.row(rowIndex).data();
+    if (!rowData) {
+      console.error('❌ orderManageEditModal > 행 데이터를 찾을 수 없습니다.');
+      alert('행 데이터를 찾을 수 없습니다.');
+      return;
+    }
+
+    // 입력값 가져오기
+    const 수량 = parseFloat(document.getElementById('editDetailQuantity').value) || 0;
+    const 단가 = parseFloat(document.getElementById('editDetailPrice').value) || 0;
+    const 공급가액 = 수량 * 단가;
+
+    if (수량 <= 0) {
+      alert('수량을 1 이상 입력해주세요.');
+      return;
+    }
+
+    // 행 데이터 업데이트 (API 필드명에 맞춤)
+    rowData.수량 = 수량;
+    rowData.단가 = 단가;
+    rowData.공급가액 = 공급가액;
+
+    // DataTable 업데이트
+    table.row(rowIndex).data(rowData).invalidate().draw(false);
+
+    // 합계 재계산
+    recalculateOrderManageEditTotal();
+
+    // 모달 닫기
+    closeOrderManageDetailEditModal();
+  } catch (err) {
+    console.error('❌ 품목 수정 오류:', err);
+    alert('품목 수정 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 발주내역 품목 삭제 함수 - 모달 열기
+function deleteOrderManageDetailRow(rowIndex) {
+  console.log(
+    '===== orderManageEditModal > orderManageEditDetailTable > 삭제 버튼 클릭 =====',
+  );
+
+  try {
+    const table = window.orderManageEditDetailDataTable;
+    if (!table) {
+      console.error('❌ orderManageEditModal > DataTable을 찾을 수 없습니다.');
+      alert('DataTable을 찾을 수 없습니다.');
+      return;
+    }
+
+    // 현재 행 데이터 가져오기
+    const rowData = table.row(rowIndex).data();
+
+    if (!rowData) {
+      console.error('❌ orderManageEditModal > 행 데이터를 찾을 수 없습니다.');
+      alert('행 데이터를 찾을 수 없습니다.');
+      return;
+    }
+
+    // 모달에 정보 표시
+    document.getElementById('deleteOrderDetailInfo').textContent = `[${rowData.자재코드}] ${rowData.자재명}`;
+
+    // 모달에 rowIndex 저장 (deleteIndex는 삭제하여 발주서 수정 모드로 설정)
+    const modal = document.getElementById('orderManageDetailDeleteConfirmModal');
+    delete modal.dataset.deleteIndex;
+    modal.dataset.rowIndex = rowIndex;
+
+    // 모달 표시
+    modal.style.display = 'block';
+
+  } catch (err) {
+    console.error('❌ 품목 삭제 오류:', err);
+    alert('품목 삭제 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 발주 품목 삭제 모달 닫기
+function closeOrderManageDetailDeleteConfirmModal() {
+  console.log('===== orderManageDetailDeleteConfirmModal > 취소 버튼 클릭 =====');
+
+  const modal = document.getElementById('orderManageDetailDeleteConfirmModal');
+  modal.style.display = 'none';
+
+  // dataset 초기화
+  delete modal.dataset.rowIndex;
+  delete modal.dataset.deleteIndex;
+}
+
+// ✅ 발주 품목 삭제 확인 (발주서 수정 + 신규 발주서 작성)
+function confirmOrderManageDetailDelete() {
+  console.log('===== orderManageDetailDeleteConfirmModal > 삭제 확인 버튼 클릭 =====');
+
+  try {
+    const modal = document.getElementById('orderManageDetailDeleteConfirmModal');
+
+    // 신규 발주서 작성 모드인지 확인 (deleteIndex가 있으면 신규 발주서)
+    if (modal.dataset.deleteIndex !== undefined && modal.dataset.deleteIndex !== null && modal.dataset.deleteIndex !== '') {
+      const index = parseInt(modal.dataset.deleteIndex);
+
+      // newOrderDetails 배열에서 삭제
+      newOrderDetails.splice(index, 1);
+
+      // 테이블 다시 렌더링
+      renderNewOrderDetailTable();
+
+      // 모달 닫기
+      closeOrderManageDetailDeleteConfirmModal();
+      return;
+    }
+
+    // 발주서 수정 모드 (rowIndex 사용)
+    const rowIndex = parseInt(modal.dataset.rowIndex);
+
+    const table = window.orderManageEditDetailDataTable;
+    if (!table) {
+      console.error('❌ orderManageEditModal > DataTable을 찾을 수 없습니다.');
+      alert('DataTable을 찾을 수 없습니다.');
+      return;
+    }
+
+    // 행 삭제
+    table.row(rowIndex).remove().draw(false);
+
+    // 합계 재계산
+    recalculateOrderManageEditTotal();
+
+    // 모달 닫기
+    closeOrderManageDetailDeleteConfirmModal();
+  } catch (err) {
+    console.error('❌ 품목 삭제 오류:', err);
+    alert('품목 삭제 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 선택된 발주내역 삭제 함수
+function deleteSelectedOrderManageDetails() {
+  const checkedBoxes = $('.editDetailCheckbox:checked');
+
+  if (checkedBoxes.length === 0) {
+    alert('삭제할 항목을 선택해주세요.');
+    return;
+  }
+
+  if (!confirm(`선택한 ${checkedBoxes.length}개 항목을 삭제하시겠습니까?`)) {
+    return;
+  }
+
+  // DataTable에서 선택된 행 제거
+  const table = window.orderManageEditDetailDataTable;
+  checkedBoxes.each(function () {
+    const row = table.row($(this).closest('tr'));
+    row.remove();
+  });
+
+  table.draw();
+
+  // 합계 재계산
+  recalculateOrderManageEditTotal();
+}
+
+// ✅ 발주 수정 모달 합계 재계산
+function recalculateOrderManageEditTotal() {
+  if (!window.orderManageEditDetailDataTable) return;
+
+  const data = window.orderManageEditDetailDataTable.rows().data().toArray();
+  // ✅ API 필드명 '공급가액' 사용
+  const totalAmount = data.reduce((sum, item) => sum + (item.공급가액 || 0), 0);
+  $('#orderManageEditDetailTotal').text(totalAmount.toLocaleString());
+}
+
+// ✅ 발주 수정 제출 (마스터 + 상세)
+async function submitOrderManageEdit(event) {
+  // form submit 이벤트인 경우 기본 동작 방지
+  if (event) {
+    event.preventDefault();
+  }
+
+  const modal = document.getElementById('orderManageEditModal');
+  const orderDate = modal.dataset.orderDate;
+  const orderNo = modal.dataset.orderNo;
+
+  try {
+    // ✅ 1. 마스터 정보 업데이트 (Prefix Rule 적용)
+    const orderDateInput = document.getElementById('orderManageEditDate');
+    const orderDateText = orderDateInput.value || orderDateInput.textContent;
+    const deliveryDateInput = document.getElementById('orderManageEditDeliveryDate');
+    const titleInput = document.getElementById('orderManageEditTitle');
+    const remarkInput = document.getElementById('orderManageEditRemark');
+
+    const masterData = {
+      발주일자: orderDateText ? orderDateText.replace(/-/g, '') : orderDate,
+      매입처코드: modal.dataset.매입처코드,
+      출고희망일자: deliveryDateInput?.value ? deliveryDateInput.value.replace(/-/g, '') : '',
+      제목: titleInput?.value || '',
+      적요: remarkInput?.value || '',
+    };
+
+    const masterResponse = await fetch(`/api/orders/${orderDate}/${orderNo}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // 세션 쿠키 포함
+      body: JSON.stringify(masterData),
+    });
+
+    const masterResult = await masterResponse.json();
+
+    if (!masterResult.success) {
+      throw new Error(masterResult.message || '발주 마스터 수정 실패');
+    }
+
+    // 2. 발주 상세 정보 업데이트
+    const detailData = window.orderManageEditDetailDataTable.rows().data().toArray();
+
+    if (detailData.length > 0) {
+      // 상세 정보를 서버 형식에 맞게 변환
+      const detailPayload = detailData.map((item, index) => {
+        // 자재코드가 분리되어 있는 경우 합치기
+        let 자재코드 = item.자재코드;
+        if (item.분류코드 && item.세부코드) {
+          자재코드 = item.분류코드 + item.세부코드;
+        }
+
+        // 자재코드 길이 제한 (최대 18자)
+        if (자재코드 && 자재코드.length > 18) {
+          console.warn('⚠️ 자재코드가 18자를 초과하여 잘림:', 자재코드);
+          자재코드 = 자재코드.substring(0, 18);
+        }
+
+        // 자재코드가 없거나 빈 문자열인 경우 에러
+        if (!자재코드 || 자재코드.trim() === '') {
+          console.error('❌ 자재코드가 비어있음:', item);
+          throw new Error(`자재코드가 비어있습니다: ${item.자재명}`);
+        }
+
+        const payload = {
+          자재코드: 자재코드.trim(),
+          수량: parseFloat(item.수량) || 0,
+          // ✅ API 필드명: '단가' (출고단가 as 단가)
+          출고단가: parseFloat(item.단가 || item.출고단가) || 0,
+          // ✅ API 필드명: '공급가액' (수량 * 출고단가)
+          금액: parseFloat(item.공급가액 || item.금액) || 0,
+        };
+
+        if (index < 3) {
+          // 첫 3개만 로깅
+        }
+
+        return payload;
+      });
+
+      const detailResponse = await fetch(
+        `/api/orders/${orderDate}/${orderNo}/details`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // 세션 쿠키 포함
+          body: JSON.stringify(detailPayload),
+        },
+      );
+
+      const detailResult = await detailResponse.json();
+
+      if (!detailResult.success) {
+        throw new Error(detailResult.message || '발주 상세 수정 실패');
+      }
+    }
+
+    alert('✅ 발주이 성공적으로 수정되었습니다.');
+    closeOrderManageEditModal();
+
+    // DataTable 새로고침
+    if (window.orderManageTableInstance) {
+      window.orderManageTableInstance.ajax.reload();
+    }
+  } catch (err) {
+    console.error('❌ 발주 수정 오류:', err);
+    alert('발주 수정 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 발주 삭제 함수 - 모달 열기
+async function deleteOrderManage(orderDate, orderNo) {
+  console.log('===== orderManageTable > 삭제 버튼 클릭 =====');
+
+  // 모달 요소 확인
+  const modal = document.getElementById('orderManageDeleteConfirmModal');
+  if (!modal) {
+    console.error('❌ orderManageDeleteConfirmModal 요소를 찾을 수 없습니다');
+    alert('삭제 모달을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
+    return;
+  }
+
+  try {
+    // 발주 정보 조회 (세부내역 건수 가져오기)
+    const response = await fetch(`/api/orders/${orderDate}/${orderNo}`);
+    const result = await response.json();
+
+    let detailCount = 0;
+    if (result.success && result.data && result.data.details) {
+      detailCount = result.data.details.length;
+    }
+
+    // 단일 발주을 선택된 발주 형식으로 변환
+    const selectedOrders = [
+      {
+        orderDate,
+        orderNo,
+        supplierName: '',
+        title: '',
+        detailCount, // 세부내역 건수 추가
+      },
+    ];
+
+    // 모달에 발주 정보 표시 (세부내역 건수)
+    const deleteInfo = document.getElementById('orderManageDeleteInfo');
+    if (deleteInfo) {
+      deleteInfo.textContent = `세부내역 ${detailCount}건`;
+    } else {
+      console.error('❌ orderManageDeleteInfo 요소를 찾을 수 없습니다');
+    }
+
+    // 모달에 데이터 저장
+    modal.dataset.selectedOrders = JSON.stringify(selectedOrders);
+
+    // 모달 표시
+    modal.style.display = 'flex';
+  } catch (err) {
+    console.error('❌ 발주 정보 조회 오류:', err);
+    alert('발주 정보를 불러오는 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 발주 삭제 모달 닫기
+function closeOrderManageDeleteConfirmModal() {
+  const modal = document.getElementById('orderManageDeleteConfirmModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
+// ✅ 선택된 발주 삭제 (체크박스)
+function deleteSelectedOrders() {
+  const checkboxes = document.querySelectorAll(
+    '#orderManageTable tbody input[type="checkbox"]:checked',
+  );
+
+  if (checkboxes.length === 0) {
+    alert('삭제할 발주을 선택해주세요.');
+    return;
+  }
+
+  // 선택된 발주 정보 수집
+  const selectedOrders = [];
+  checkboxes.forEach((checkbox) => {
+    const row = checkbox.closest('tr');
+    const orderDate = row.dataset.orderDate;
+    const orderNo = row.dataset.orderNo;
+    const supplierName = row.querySelector('td:nth-child(4)').textContent; // 매입처명
+    const title = row.querySelector('td:nth-child(6)').textContent; // 제목
+
+    selectedOrders.push({
+      orderDate,
+      orderNo,
+      supplierName,
+      title,
+    });
+  });
+
+  // 모달에 선택된 발주 정보 표시
+  const deleteInfo = document.getElementById('orderManageDeleteInfo');
+  if (deleteInfo) {
+    deleteInfo.textContent = `${selectedOrders.length}건`;
   } else {
-    // 발주 제안가 탭 활성화
-    tabActual.style.background = 'transparent';
-    tabActual.style.color = '#6b7280';
-    tabActual.style.borderBottom = '3px solid transparent';
+    console.error('❌ orderManageDeleteInfo 요소를 찾을 수 없습니다');
+  }
 
-    tabOrder.style.background = '#3b82f6';
-    tabOrder.style.color = 'white';
-    tabOrder.style.borderBottom = '3px solid #3b82f6';
+  // 모달에 데이터 저장
+  const modal = document.getElementById('orderManageDeleteConfirmModal');
+  modal.dataset.selectedOrders = JSON.stringify(selectedOrders);
 
-    label.textContent = '이 거래처에 발주한 이력 (최근 1년, 클릭하여 단가 선택)';
+  // 모달 표시
+  modal.style.display = 'flex';
+}
 
-    // 발주 제안가 이력 로드
-    if (tempMaterialForOrder) {
-      const modal = document.getElementById('orderEditModal');
-      const 매입처코드 = modal.dataset.매입처코드;
-      await loadOrderPriceHistory(tempMaterialForOrder.자재코드, 매입처코드);
+// ✅ 발주 삭제 확인
+async function confirmOrderManageDelete() {
+  console.log('===== orderManageDeleteConfirmModal > 삭제 확인 버튼 클릭 =====');
+
+  const modal = document.getElementById('orderManageDeleteConfirmModal');
+
+  const selectedOrdersJson = modal.dataset.selectedOrders;
+
+  if (!selectedOrdersJson) {
+    console.error('❌ 삭제할 발주 정보가 없습니다');
+    alert('삭제할 발주 정보가 없습니다.');
+    return;
+  }
+
+  const selectedOrders = JSON.parse(selectedOrdersJson);
+
+  let successCount = 0;
+  let failCount = 0;
+
+  try {
+    // 각 발주에 대해 삭제 요청
+    for (const q of selectedOrders) {
+      try {
+        const response = await fetch(`/api/orders/${q.orderDate}/${q.orderNo}`, {
+          method: 'DELETE',
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+          console.error(`❌ 발주 삭제 실패: ${q.orderDate}-${q.orderNo}`, result.message);
+        }
+      } catch (err) {
+        failCount++;
+        console.error(`❌ 발주 삭제 오류: ${q.orderDate}-${q.orderNo}`, err);
+      }
+    }
+
+    // 결과 표시
+    if (failCount === 0) {
+      alert(`✅ ${successCount}건의 발주이 삭제되었습니다.`);
+    } else {
+      alert(`⚠️ ${successCount}건 삭제 완료, ${failCount}건 삭제 실패`);
+    }
+
+    closeOrderManageDeleteConfirmModal();
+
+    // 전체 선택 체크박스 해제
+    const selectAllCheckbox = document.getElementById('orderManageSelectAll');
+    if (selectAllCheckbox) {
+      selectAllCheckbox.checked = false;
+    }
+
+    // DataTable 새로고침
+    if (window.orderManageTableInstance) {
+      window.orderManageTableInstance.ajax.reload();
+    }
+  } catch (err) {
+    console.error('❌ 발주 삭제 오류:', err);
+    alert('발주 삭제 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 발주 승인 함수 - 모달 열기
+function approveOrderManage(orderDate, orderNo) {
+  console.log('===== orderManageTable > 승인 버튼 클릭 =====');
+
+  // 모달 요소 확인
+  const modal = document.getElementById('orderManageApproveConfirmModal');
+  if (!modal) {
+    console.error('❌ orderManageApproveConfirmModal 요소를 찾을 수 없습니다');
+    alert('승인 모달을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
+    return;
+  }
+
+  // 모달 내부 요소 ID 로깅
+
+  // 모달에 발주 정보 표시
+  const infoElement = document.getElementById('orderManageApproveInfo');
+  if (infoElement) {
+    infoElement.textContent = `발주번호: ${orderDate}-${orderNo}`;
+  }
+
+  // 모달에 데이터 저장
+  modal.dataset.orderDate = orderDate;
+  modal.dataset.orderNo = orderNo;
+
+  // 모달 표시
+  modal.style.display = 'flex';
+
+  // 드래그 기능 활성화 (최초 1회만 실행)
+  if (
+    typeof makeModalDraggable === 'function' &&
+    !window.orderManageApproveConfirmModalDraggable
+  ) {
+    makeModalDraggable(
+      'orderManageApproveConfirmModal',
+      'orderManageApproveConfirmModalHeader',
+    );
+    window.orderManageApproveConfirmModalDraggable = true;
+  }
+}
+
+// ✅ 발주 승인 모달 닫기
+function closeOrderManageApproveConfirmModal() {
+  const modal = document.getElementById('orderManageApproveConfirmModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
+// ✅ 발주 승인 확인
+async function confirmOrderManageApprove() {
+  console.log('===== orderManageApproveConfirmModal > 승인 확인 버튼 클릭 =====');
+
+  const modal = document.getElementById('orderManageApproveConfirmModal');
+
+  const orderDate = modal.dataset.orderDate;
+  const orderNo = modal.dataset.orderNo;
+
+  try {
+    const response = await fetch(`/api/orders/${orderDate}/${orderNo}/approve`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      alert('✅ 발주이 승인되었습니다.');
+      closeOrderManageApproveConfirmModal();
+
+      // DataTable 새로고침
+      if (window.orderManageTableInstance) {
+        window.orderManageTableInstance.ajax.reload();
+      }
+    } else {
+      throw new Error(result.message || '발주 승인 실패');
+    }
+  } catch (err) {
+    console.error('❌ 발주 승인 오류:', err);
+    alert('발주 승인 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ==================== 발주서 작성 모달 ====================
+
+// 발주서 작성용 상세내역 배열
+let newOrderDetails = [];
+
+// ✅ 발주서 작성 모달 열기
+function openOrderManageCreateModal() {
+  console.log('===== orderManagePage > 작성 버튼 클릭 =====');
+
+  // 모달 제목 설정
+  document.getElementById('orderManageCreateModalTitle').textContent = '발주서 작성';
+
+  // 폼 초기화
+  document.getElementById('orderManageCreateForm').reset();
+
+  // 매입처 정보 초기화
+  document.getElementById('orderManageCreateSupplierCode').value = '';
+  document.getElementById('orderManageCreateSupplierName').value = '';
+  const infoDiv = document.getElementById('orderManageCreateSupplierInfo');
+  if (infoDiv) {
+    infoDiv.style.display = 'none';
+  }
+
+  // 발주일자를 오늘 날짜로 설정
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('orderManageCreateDate').value = today;
+
+  // 상세내역 초기화
+  newOrderDetails = [];
+  renderNewOrderDetailTable();
+
+  // 모달 표시
+  const modal = document.getElementById('orderManageCreateModal');
+  modal.style.display = 'block';
+  modal.style.position = 'fixed';
+
+  // ✅ 드래그 기능 활성화 (최초 1회만 실행)
+  const modalContent = document.getElementById('orderModalContent');
+  if (!window.orderManageCreateModalDraggable) {
+    // 최초 실행시에만 modal-content에 드래그를 위한 positioning 설정
+    if (modalContent) {
+      modalContent.style.position = 'absolute';
+      modalContent.style.top = '50%';
+      modalContent.style.left = '50%';
+      modalContent.style.transform = 'translate(-50%, -50%)';
+      modalContent.style.margin = '0';
+    }
+
+    // makeModalDraggable 함수 호출 (modal-draggable.js에서 로드됨)
+    if (typeof makeModalDraggable === 'function') {
+      makeModalDraggable('orderManageCreateModal', 'orderModalHeader');
+      window.orderManageCreateModalDraggable = true;
+    } else {
+      console.error(
+        '❌ makeModalDraggable 함수를 찾을 수 없습니다. modal-draggable.js가 로드되었는지 확인하세요.',
+      );
     }
   }
 }
 
-/**
- * 발주용 단가 이력 모달 닫기
- */
-function closeOrderPriceHistoryModal() {
-  console.log('[단가이력모달] 닫기 (onclick) → closeOrderPriceHistoryModal()');
+// ✅ 발주서 작성 모달 닫기
+function closeOrderManageCreateModal() {
+  document.getElementById('orderManageCreateModal').style.display = 'none';
 
-  document.getElementById('orderPriceHistoryModal').style.display = 'none';
-  tempMaterialForOrder = null;
+  // 발주 체크박스만 초기화
+  $('#orderManageSelectAll').prop('checked', false);
+  $('.orderRowCheck').prop('checked', false);
+
+  // 버튼 상태도 초기화
+  $('.orderRowCheck').each(function () {
+    const orderDate = $(this).data('date');
+    const orderNo = $(this).data('no');
+    const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
+
+    actionDiv.find('.orderBtnView').show();
+    actionDiv.find('.orderBtnEdit').hide();
+    actionDiv.find('.orderBtnDelete').hide();
+    actionDiv.find('.orderBtnApprove').hide(); // ✅ 승인 버튼도 숨김
+  });
+
+  newOrderDetails = [];
+}
+
+// ✅ 발주서 작성용 매입처 검색 모달 열기 (공통 모달 1개 사용)
+function openOrderManageCreateSupplierSearchModal() {
+  // 발주 입력값을 공통 검색창에 전달
+  const searchValue = document.getElementById('orderManageCreateSupplierName').value.trim();
+
+  // [핵심] supplier.js의 공통 모달 열기 사용
+  // callerContext = 'order' (선택 결과를 발주에 주입하기 위한 컨텍스트)
+  // initialSearchValue = searchValue (매입처명 입력란의 값을 검색어로 전달)
+  if (typeof window.openSupplierSearchModal === 'function') {
+    window.openSupplierSearchModal('order', searchValue);
+  } else {
+    console.error('❌ window.openSupplierSearchModal 함수를 찾을 수 없습니다');
+  }
+
+  // 값이 있으면 자동검색 (모달이 열린 후 실행되도록 setTimeout 사용)
+  if (searchValue) {
+    setTimeout(() => {
+      if (typeof window.searchSuppliersForModal === 'function') {
+        window.searchSuppliersForModal();
+      } else {
+        searchOrderSuppliers();
+      }
+    }, 100);
+  }
+}
+
+// ✅ 전역으로 노출 (HTML에서 호출할 수 있도록)
+window.openOrderManageCreateSupplierSearchModal = openOrderManageCreateSupplierSearchModal;
+// ❌ 절대 두지 마세요: 공통 openSupplierSearchModal을 덮어씀 (충돌 원인)
+// window.openSupplierSearchModal = openOrderSupplierSearchModal;
+
+// ✅ 발주서용 매입처 검색
+// @deprecated - supplier.js의 공통 모달 검색 사용 (searchSuppliersForModal)
+// supplier.js가 이미 별칭 제공: window.searchOrderSuppliers = window.searchSuppliersForModal
+// 이 함수는 하위 호환성을 위해서만 유지됨
+async function searchOrderSuppliers() {
+  // supplier.js의 공통 검색 함수 사용
+  if (typeof window.searchSuppliersForModal === 'function') {
+    return window.searchSuppliersForModal();
+  }
+
+  console.error(
+    '❌ searchSuppliersForModal 함수를 찾을 수 없습니다. supplier.js가 로드되었는지 확인하세요.',
+  );
+}
+
+// ✅ 전역으로 노출 (하위 호환성)
+// 참고: supplier.js가 이미 별칭 제공 - window.searchOrderSuppliers = window.searchSuppliersForModal
+window.searchOrderSuppliers = searchOrderSuppliers;
+
+// ==================== 품목 선택 처리 ====================
+
+/**
+ * 품목 검색 모달 열기 (발주서 작성용)
+ * @description HTML에서 호출하는 발주 전용 함수 (material.js의 공용 모달 사용)
+ */
+window.openOrderMaterialSearch = function () {
+  // material.js의 공용 모달 열기 (context: 'order')
+  if (typeof window.openMaterialSearchModal === 'function') {
+    window.openMaterialSearchModal('order', '');
+  } else {
+    console.error('❌ material.js의 openMaterialSearchModal 함수를 찾을 수 없습니다.');
+  }
+};
+
+// ✅ [발주관리 - 신규] 품목 선택 처리 함수 (material.js에서 호출)
+window.selectOrderMaterial = function (material) {
+  // 자재코드 생성
+  const 자재코드 = (material.분류코드 || '') + (material.세부코드 || '');
+
+  // newOrderDetails 배열에 추가
+  newOrderDetails.push({
+    자재코드: 자재코드,
+    자재명: material.자재명,
+    규격: material.규격 || '',
+    수량: 1,
+    단가: material.출고단가1 || 0,
+  });
+
+  // 테이블 렌더링
+  renderNewOrderDetailTable();
+
+  // 모달 닫기
+  if (typeof window.closeMaterialSearchModal === 'function') {
+    window.closeMaterialSearchModal();
+  }
+};
+
+// ✅ [발주관리 - 수정] 품목 선택 처리 함수 (material.js에서 호출)
+window.selectOrderEditMaterial = function (material) {
+  // material.js에서 전달받은 데이터를 orderMaterialAddModal 형식에 맞게 변환
+  const materialForModal = {
+    품목코드: material.품목코드 || (material.분류코드 || '') + (material.세부코드 || ''),
+    품목명: material.자재명,
+    판매단가: material.출고단가 || material.출고단가1 || 0,
+    규격: material.규격 || '',
+  };
+
+  // 선택된 품목 저장
+  selectedMaterialForAdd = materialForModal;
+
+  // 품목 검색 모달 닫기
+  if (typeof window.closeMaterialSearchModal === 'function') {
+    window.closeMaterialSearchModal();
+  }
+
+  // 품목 추가 모달 열기 (수량/단가 입력용)
+  openOrderMaterialAddModal(materialForModal);
+};
+
+// ==================== 품목 추가 모달 관리 ====================
+
+// 선택된 품목 정보 저장 (전역 변수가 이미 존재하면 재사용)
+if (typeof selectedMaterialForAdd === 'undefined') {
+  var selectedMaterialForAdd = null;
 }
 
 /**
- * 발주 수정 모달 - 품목 추가에서 이전단가 버튼 클릭 시
+ * 품목 추가 모달 열기
+ * @param {Object} material - 미리 선택된 품목 정보 (선택적)
  */
-async function showEditOrderPriceHistory() {
-  console.log('[품목추가모달] 이전단가 버튼 클릭 → openOrderPriceHistoryModal() → 단가이력모달 표시');
+window.openOrderMaterialAddModal = function (material) {
+  const modal = document.getElementById('orderMaterialAddModal');
+  if (!modal) {
+    console.error('❌ orderMaterialAddModal 요소를 찾을 수 없습니다.');
+    return;
+  }
 
+  // 모달 초기화
+  document.getElementById('orderMaterialAddName').value = '';
+  document.getElementById('orderMaterialAddQuantity').value = '1';
+  document.getElementById('orderMaterialAddPrice').value = '0';
+  document.getElementById('orderMaterialAddAmount').value = '0';
+  document.getElementById('orderMaterialAddSelectedInfo').style.display = 'none';
+  selectedMaterialForAdd = null;
+
+  // 미리 선택된 품목이 있으면 표시
+  if (material) {
+    selectedMaterialForAdd = material;
+    document.getElementById('orderMaterialAddName').value =
+      material.품목명 || material.자재명 || '';
+    document.getElementById('orderMaterialAddPrice').value =
+      material.판매단가 || material.출고단가 || material.출고단가1 || 0;
+    document.getElementById('orderMaterialAddSelectedName').textContent =
+      material.품목명 || material.자재명 || '-';
+    document.getElementById('orderMaterialAddSelectedCode').textContent =
+      material.품목코드 || '-';
+    document.getElementById('orderMaterialAddSelectedInfo').style.display = 'block';
+    calculateOrderMaterialAddAmount();
+  }
+
+  modal.style.display = 'block';
+};
+
+/**
+ * 품목 추가 모달 닫기
+ */
+window.closeOrderMaterialAddModal = function () {
+  const modal = document.getElementById('orderMaterialAddModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  selectedMaterialForAdd = null;
+};
+
+/**
+ * 선택된 품목 정보 초기화
+ */
+window.clearOrderMaterialAddSelected = function () {
+  selectedMaterialForAdd = null;
+  document.getElementById('orderMaterialAddName').value = '';
+  document.getElementById('orderMaterialAddPrice').value = '0';
+  document.getElementById('orderMaterialAddSelectedInfo').style.display = 'none';
+  calculateOrderMaterialAddAmount();
+};
+
+/**
+ * 금액 자동계산
+ */
+window.calculateOrderMaterialAddAmount = function () {
+  const quantity = parseFloat(document.getElementById('orderMaterialAddQuantity').value) || 0;
+  const price = parseFloat(document.getElementById('orderMaterialAddPrice').value) || 0;
+  const amount = Math.round(quantity * price);
+  document.getElementById('orderMaterialAddAmount').value = amount.toLocaleString();
+};
+
+/**
+ * 품목 추가 확정 (직접 입력 또는 검색 선택 모두 지원)
+ */
+window.confirmOrderMaterialAdd = function () {
+  const materialName = document.getElementById('orderMaterialAddName').value.trim();
+  const quantity = parseFloat(document.getElementById('orderMaterialAddQuantity').value);
+  const price = parseFloat(document.getElementById('orderMaterialAddPrice').value);
+
+  // 품목명 입력 확인
+  if (!materialName) {
+    alert('품목명을 입력하거나 검색하여 선택해주세요.');
+    return;
+  }
+
+  // 수량 입력 확인
+  if (!quantity || quantity <= 0) {
+    alert('수량을 입력해주세요.');
+    return;
+  }
+
+  // ✅ 검색으로 선택한 경우와 직접 입력한 경우 모두 처리
+  let 자재코드 = '';
+  let 규격 = '';
+
+  if (selectedMaterialForAdd) {
+    // 검색 모달에서 선택한 경우
+    자재코드 = selectedMaterialForAdd.품목코드 || '';
+    규격 = selectedMaterialForAdd.규격 || '';
+  } else {
+    // 직접 입력한 경우 (자재코드 없음)
+    자재코드 = '';
+    규격 = '';
+  }
+
+  // newOrderDetails 배열에 추가
+  newOrderDetails.push({
+    자재코드: 자재코드,
+    자재명: materialName,
+    규격: 규격,
+    수량: quantity,
+    단가: price,
+  });
+
+  // 테이블 렌더링
+  renderNewOrderDetailTable();
+
+  // 모달 닫기
+  closeOrderMaterialAddModal();
+};
+
+/**
+ * 이전 단가 조회 (향후 구현)
+ */
+window.showOrderMaterialPriceHistory = function () {
+  if (!selectedMaterialForAdd) {
+    alert('품목을 먼저 선택해주세요.');
+    return;
+  }
+  alert('이전 단가 조회 기능은 향후 구현 예정입니다.');
+};
+
+/**
+ * 품목 검색 모달에서 품목 선택 시 호출되는 함수
+ * @description material.js에서 context='order_material_add'로 호출
+ */
+window.selectOrderMaterialAdd = function (material) {
+  // material.js에서 전달받은 데이터를 저장
+  selectedMaterialForAdd = {
+    품목코드: material.품목코드 || (material.분류코드 || '') + (material.세부코드 || ''),
+    품목명: material.자재명,
+    판매단가: material.출고단가 || material.출고단가1 || 0,
+    규격: material.규격 || '',
+    단위: material.단위 || '',
+    분류코드: material.분류코드 || '',
+    세부코드: material.세부코드 || '',
+  };
+
+  // UI 업데이트
+  const priceInput = document.getElementById('addDetailPrice');
+  const selectedNameEl = document.getElementById('selectedMaterialName');
+  const selectedCodeEl = document.getElementById('selectedMaterialCode');
+  const selectedInfoEl = document.getElementById('selectedMaterialInfo');
+
+  if (priceInput) priceInput.value = selectedMaterialForAdd.판매단가;
+  if (selectedNameEl)
+    selectedNameEl.textContent =
+      selectedMaterialForAdd.품목명 +
+      (selectedMaterialForAdd.규격 ? ` (${selectedMaterialForAdd.규격})` : '');
+  if (selectedCodeEl) selectedCodeEl.textContent = `품목코드: ${selectedMaterialForAdd.품목코드}`;
+  if (selectedInfoEl) selectedInfoEl.style.display = 'block';
+
+  // 금액 재계산
+  if (typeof calculateDetailAmount === 'function') {
+    calculateDetailAmount();
+  }
+
+  // 품목 검색 모달 닫기
+  if (typeof window.closeMaterialSearchModal === 'function') {
+    window.closeMaterialSearchModal();
+  }
+};
+async function searchMaterialsForOrder() {
   try {
-    // 선택된 자재가 있는지 확인
-    if (!window.selectedOrderMaterial) {
-      console.error(' selectedOrderMaterial이 null입니다!');
-      alert('먼저 자재를 검색한 후 검색 결과에서 "선택" 버튼을 클릭해주세요.');
+    let searchText = document.getElementById('materialSearchInput2').value.trim();
+    let searchSpec = ''; // 규격 검색어
+
+    // 검색어에서 쉼표로 분리하여 자재명과 규격 검색어 추출
+    // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
+    if (searchText && searchText.includes(',')) {
+      const parts = searchText.split(',').map(s => s.trim());
+      searchText = parts[0] || ''; // 첫 번째 부분: 자재명
+      searchSpec = parts[1] || ''; // 두 번째 부분: 규격
+
+      console.log(`  검색어 분리: "${searchText}", 규격: "${searchSpec}"`);
+    }
+
+    // API 호출
+    const params = new URLSearchParams();
+    if (searchText) {
+      params.append('search', searchText);
+    }
+    if (searchSpec) {
+      params.append('searchSpec', searchSpec); // 규격 검색어 추가
+    }
+
+    const response = await fetch(`/api/materials?${params.toString()}`);
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || '자재 조회 실패');
+    }
+
+    const tbody = document.getElementById('materialSearchTableBody');
+
+    if (result.data.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="padding: 40px; text-align: center; color: #999;">
+            검색 결과가 없습니다
+          </td>
+        </tr>
+      `;
       return;
     }
 
-    // 매입처 코드 확인 (현재 수정 중인 발주의 매입처)
-    const modal = document.getElementById('orderEditModal');
-    const 매입처코드 = modal.dataset.매입처코드;
-    console.log('🏢 매입처코드:', 매입처코드);
+    tbody.innerHTML = '';
+
+    result.data.forEach((material) => {
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.onmouseover = () => (tr.style.background = '#f8f9fa');
+      tr.onmouseout = () => (tr.style.background = 'white');
+
+      const 자재코드 = material.분류코드 + material.세부코드;
+
+      tr.innerHTML = `
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${자재코드}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${material.자재명}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${material.규격 || '-'}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${(
+          material.출고단가1 || 0
+        ).toLocaleString()}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">
+          <button onclick='showPriceHistoryForNewOrder(${JSON.stringify({
+            ...material,
+            자재코드,
+          }).replace(/'/g, '&apos;')})' style="
+            padding: 6px 12px;
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+          ">이전단가</button>
+        </td>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">
+          <button onclick='selectMaterialForOrder(${JSON.stringify({
+            ...material,
+            자재코드,
+          }).replace(/'/g, '&apos;')})' style="
+            padding: 6px 16px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+          ">추가</button>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('❌ 자재 검색 오류:', err);
+    alert('자재 검색 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// 신규 발주서 작성용 임시 자재 정보 저장
+let tempMaterialForNewOrder = null;
+
+// ✅ 신규 발주서 작성용 이전단가 조회
+async function showPriceHistoryForNewOrder(material) {
+  try {
+    // 매입처 코드 확인
+    const 매입처코드 = document.getElementById('selectedSupplierCode').value;
 
     if (!매입처코드) {
-      alert('먼저 발주를 선택해주세요.');
+      alert('먼저 매입처를 선택해주세요.');
       return;
     }
 
-    const material = window.selectedOrderMaterial;
-
-    // 임시 자재 정보 저장 (기존 tempMaterialForOrder와 구분)
-    window.tempMaterialForAddModal = material;
+    // 임시 자재 정보 저장
+    tempMaterialForNewOrder = material;
 
     // 자재 정보 표시
-    document.getElementById('orderPriceHistoryMaterialName').textContent = material.자재명;
-    document.getElementById('orderPriceHistoryMaterialCode').textContent = `[${
-      material.자재코드
-    }] ${material.규격 || ''}`;
+    document.getElementById('priceHistoryMaterialName').textContent = material.자재명;
+    document.getElementById('priceHistoryMaterialCode').textContent = `[${material.자재코드}] ${
+      material.규격 || ''
+    }`;
 
-    // 탭 초기화 (실제 입고가 탭으로 시작)
-    currentOrderPriceHistoryTab = 'actual';
-    const tabActual = document.getElementById('tabActualPurchasePrice');
+    // 탭 초기화 (실제 출고가 탭으로 시작)
+    currentPriceHistoryTab = 'actual';
+    const tabActual = document.getElementById('tabActualPrice');
     const tabOrder = document.getElementById('tabOrderPrice');
 
     tabActual.style.background = '#3b82f6';
@@ -1730,26 +2976,22 @@ async function showEditOrderPriceHistory() {
     tabOrder.style.color = '#6b7280';
     tabOrder.style.borderBottom = '3px solid transparent';
 
-    // 실제 입고가 데이터 로드
-    await loadActualPurchasePriceHistoryForAddModal(material.자재코드, 매입처코드);
+    // 실제 출고가 데이터 로드
+    await loadActualPriceHistoryForNewOrder(material.자재코드, 매입처코드);
 
     // 모달 표시
-    document.getElementById('orderPriceHistoryModal').style.display = 'block';
-
-    console.log(' 품목 추가 모달용 단가 이력 조회:', material);
+    document.getElementById('orderManagePriceHistoryModal').style.display = 'block';
   } catch (err) {
-    console.error(' 단가 이력 조회 오류:', err);
+    console.error('❌ 단가 이력 조회 오류:', err);
     alert('단가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-/**
- * 품목 추가 모달용 실제 입고가 이력 로드
- */
-async function loadActualPurchasePriceHistoryForAddModal(자재코드, 매입처코드) {
+// ✅ 신규 발주서용 실제 출고가 이력 로드
+async function loadActualPriceHistoryForNewOrder(자재코드, 매입처코드) {
   try {
     const response = await fetch(
-      `/api/materials/${encodeURIComponent(자재코드)}/purchase-price-history/${매입처코드}`,
+      `/api/materials/${encodeURIComponent(자재코드)}/price-history/${매입처코드}`,
     );
     const result = await response.json();
 
@@ -1757,13 +2999,13 @@ async function loadActualPurchasePriceHistoryForAddModal(자재코드, 매입처
       throw new Error(result.message || '이력 조회 실패');
     }
 
-    const tbody = document.getElementById('orderPriceHistoryTableBody');
+    const tbody = document.getElementById('priceHistoryTableBody');
 
     if (result.data.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
-            최근 1년 이내 이 거래처에 입고한 이력이 없습니다
+            이 거래처에 출고한 이력이 없습니다
           </td>
         </tr>
       `;
@@ -1781,7 +3023,7 @@ async function loadActualPurchasePriceHistoryForAddModal(자재코드, 매입처
           this.style.background = 'white';
         };
         tr.onclick = function () {
-          selectPriceForAddModal(item.입고단가);
+          selectPriceFromHistoryForNewOrder(item.출고단가);
         };
 
         const 입출고일자 = item.입출고일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
@@ -1790,10 +3032,10 @@ async function loadActualPurchasePriceHistoryForAddModal(자재코드, 매입처
         tr.innerHTML = `
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${입출고일자}</td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right; font-weight: 600; color: #2563eb;">
-            ${(item.입고단가 || 0).toLocaleString()}원
+            ${(item.출고단가 || 0).toLocaleString()}원
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right;">
-            ${(item.입고수량 || 0).toLocaleString()}
+            ${(item.출고수량 || 0).toLocaleString()}
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: center; color: #6b7280;">
             ${적요}
@@ -1803,613 +3045,385 @@ async function loadActualPurchasePriceHistoryForAddModal(자재코드, 매입처
         tbody.appendChild(tr);
       });
     }
-
-    console.log(`실제 입고가 이력 조회 완료: ${result.data.length}건`);
   } catch (err) {
-    console.error(' 실제 입고가 이력 조회 오류:', err);
-    alert('실제 입고가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
+    console.error('❌ 실제 출고가 이력 조회 오류:', err);
+    alert('실제 출고가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-/**
- * 품목 추가 모달용 단가 선택
- */
-function selectPriceForAddModal(price) {
-  console.log('[단가이력테이블] 행 클릭 (onclick) → selectPriceFromHistory()');
+// ✅ 신규 발주서용 이력에서 단가 선택
+function selectPriceFromHistoryForNewOrder(price) {
+  closeOrderManagePriceHistoryModal();
 
-  closeOrderPriceHistoryModal();
-
-  // 입고단가 필드에 선택한 단가 자동 입력
-  document.getElementById('addOrderDetailInPrice').value = price;
-
-  // 금액 미리보기 업데이트
-  const 발주량 = parseFloat($('#addOrderDetailQuantity').val()) || 0;
-  const 금액 = 발주량 * price;
-  $('#addOrderDetailAmount').text(금액.toLocaleString() + '원');
-
-  console.log(`품목 추가 모달: 이전단가 선택 (${price}원)`);
-}
-
-/**
- * 발주 수정 완료
- */
-async function submitOrderEdit() {
-  console.log('[발주서수정모달] 저장 (onclick) → saveOrderEdit()');
-
-  try {
-    const modal = document.getElementById('orderEditModal');
-    const orderDate = modal.dataset.orderDate;
-    const orderNo = modal.dataset.orderNo;
-
-    // 수정된 마스터 데이터 수집
-    const 입고희망일자 = document.getElementById('editOrderDeliveryDate').value.replace(/-/g, '');
-    const 결제방법 = document.getElementById('editOrderPaymentMethod').value;
-    const 상태코드 = parseInt(document.getElementById('editOrderStatus').value);
-    const 제목 = document.getElementById('editOrderTitle').value;
-    const 적요 = document.getElementById('editOrderRemark').value;
-
-    // 유효성 검사
-    if (!제목) {
-      alert('제목을 입력해주세요.');
-      return;
-    }
-
-    // 품목 데이터 수집 (DataTable에서)
-    const table = window.orderEditDetailTable;
-    const details = [];
-
-    if (table) {
-      const tableData = table.rows().data();
-      tableData.each(function (row) {
-        // 자재코드가 배열인 경우 첫 번째 값만 사용
-        let 자재코드 = row.자재코드;
-        if (Array.isArray(자재코드)) {
-          자재코드 = 자재코드[0];
-        }
-
-        details.push({
-          자재코드: 자재코드,
-          발주량: parseFloat(row.발주량) || 0,
-          입고단가: parseFloat(row.입고단가) || 0,
-          출고단가: parseFloat(row.출고단가) || 0,
-        });
-      });
-    }
-
-    // 품목 유효성 검사
-    if (details.length === 0) {
-      alert('발주 품목을 1개 이상 추가해주세요.');
-      return;
-    }
-
-    console.log(' 수정할 데이터:', {
-      마스터: { 입고희망일자, 결제방법, 제목, 적요, 상태코드 },
-      품목수: details.length,
-    });
-
-    // 서버로 전송 (마스터 + 품목)
-    const result = await apiCall(`/orders/${orderDate}/${orderNo}`, 'PUT', {
-      입고희망일자,
-      결제방법,
-      제목,
-      적요,
-      상태코드,
-      details, // 품목 데이터 추가
-    });
-
-    if (result.success) {
-      alert('발주가 수정되었습니다.');
-      closeOrderEditModal();
-      // DataTable 새로고침 - window.loadOrderList() 호출
-      if (typeof window.loadOrderList === 'function') {
-        window.loadOrderList();
-      }
-    } else {
-      alert(result.message || '발주 수정에 실패했습니다.');
-    }
-  } catch (error) {
-    console.error(' 발주 수정 오류:', error);
-    alert('발주 수정 중 오류가 발생했습니다.');
-  }
-}
-
-// ==================== 발주 삭제 기능 ====================
-/**
- * 발주 삭제
- */
-async function deleteOrder(orderDate, orderNo) {
-  console.log('[발주관리테이블] 삭제 버튼 클릭 → deleteOrder() → 발주서삭제확인모달 표시');
-
-  try {
-    const result = await apiCall(`/orders/${orderDate}/${orderNo}`, 'GET');
-
-    if (!result.success) {
-      alert('발주 정보를 불러올 수 없습니다.');
-      return;
-    }
-
-    const master = result.data.master;
-
-    // 발주번호 표시 (간단하게)
-    const orderNumber = `${master.발주일자}-${master.발주번호}`;
-    const deleteContent = document.getElementById('orderDeleteContent');
-    deleteContent.textContent = `발주번호: ${orderNumber}`;
-
-    // 현재 삭제할 발주 정보 저장
-    window.currentDeleteOrderDate = orderDate;
-    window.currentDeleteOrderNo = orderNo;
-
-    document.getElementById('orderDeleteModal').style.display = 'flex';
-  } catch (error) {
-    console.error(' 발주 삭제 모달 열기 오류:', error);
-    alert('발주 정보를 불러오는 중 오류가 발생했습니다.');
-  }
-}
-
-/**
- * 발주 삭제 확인
- */
-async function confirmDeleteOrder() {
-  console.log('[발주서삭제확인모달] 삭제하기 (onclick) → confirmOrderDelete()');
-
-  const orderDate = window.currentDeleteOrderDate;
-  const orderNo = window.currentDeleteOrderNo;
-
-  if (!orderDate || !orderNo) {
-    alert('삭제할 발주 정보가 없습니다.');
+  if (!tempMaterialForNewOrder) {
+    alert('자재 정보를 찾을 수 없습니다.');
     return;
   }
 
-  try {
-    const result = await apiCall(`/orders/${orderDate}/${orderNo}`, 'DELETE');
+  // 수량 입력
+  const 수량 = prompt(`${tempMaterialForNewOrder.자재명}\n수량을 입력하세요:`, '1');
 
-    if (result.success) {
-      alert('발주가 삭제되었습니다.');
-      closeOrderDeleteModal();
-
-      // DataTable 새로고침 - window.loadOrderList() 호출
-      if (typeof window.loadOrderList === 'function') {
-        window.loadOrderList();
-      }
-    } else {
-      alert(result.message || '발주 삭제에 실패했습니다.');
-    }
-  } catch (error) {
-    console.error(' 발주 삭제 오류:', error);
-    alert('발주 삭제 중 오류가 발생했습니다.');
-  }
-}
-
-/**
- * 발주 삭제 모달 닫기
- */
-function closeOrderDeleteModal() {
-  console.log('[발주서삭제확인모달] 닫기 (onclick) → closeOrderDeleteConfirmModal()');
-
-  document.getElementById('orderDeleteModal').style.display = 'none';
-  window.currentDeleteOrderDate = null;
-  window.currentDeleteOrderNo = null;
-}
-
-// ==================== 필터링 및 엑셀 내보내기 ====================
-/**
- * 필터링 (상태, 날짜 범위) - 조회 버튼 클릭 시
- */
-window.filterOrders = function filterOrders() {
-  console.log('[발주관리] 조회 (id: searchOrderBtn) → searchOrder()');
-
-  if (window.orderTable) {
-    window.orderTable.ajax.reload();
-  } else {
-    console.warn(' window.orderTable이 초기화되지 않았습니다.');
-  }
-};
-
-/**
- * Google Sheets로 내보내기 (임시)
- */
-function exportOrdersToExcel() {
-  console.log('[발주관리] Google Sheets 내보내기 (id: exportBtn) → exportOrdersToGoogleSheets()');
-
-  alert('Google Sheets 내보내기 기능은 준비 중입니다.');
-}
-
-// makeModalDraggable 함수는 js/modal-draggable.js에서 전역으로 로드됨
-
-// ==================== 신규 발주서 작성 기능 (견적서 작성과 동일 패턴) ====================
-
-let newOrderDetails = [];
-
-/**
- * 발주서 작성 모달 열기 (새 패턴)
- */
-function openNewOrderModal() {
-  console.log('[발주관리] + 발주서 작성 버튼 클릭 → openNewOrderModal() → 발주서작성모달 표시');
-
-  // 모달 제목 설정
-  document.getElementById('newOrderModalTitle').textContent = '발주서 작성';
-
-  // 폼 초기화
-  document.getElementById('orderForm').reset();
-
-  // 매입처 정보 초기화
-  document.getElementById('selectedSupplierCode').value = '';
-  document.getElementById('selectedSupplierName').value = '';
-  const infoDiv = document.getElementById('selectedSupplierInfo');
-  if (infoDiv) {
-    infoDiv.style.display = 'none';
+  if (!수량 || isNaN(수량) || parseFloat(수량) <= 0) {
+    alert('유효한 수량을 입력해주세요.');
+    return;
   }
 
-  // 발주일자를 오늘 날짜로 설정
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('orderDate').value = today;
-
-  // 상세내역 초기화
-  newOrderDetails = [];
-  renderNewOrderDetailTable();
-
-  // 모달 표시
-  document.getElementById('newOrderModal').style.display = 'block';
-
-  // 드래그 기능 활성화 (최초 1회만 실행)
-  if (!window.orderCreateModalDraggable) {
-    makeModalDraggable('newOrderModal', 'newOrderModalHeader');
-    window.orderCreateModalDraggable = true;
-  }
-}
-
-/**
- * 발주서 작성 모달 닫기
- */
-function closeOrderModal() {
-  console.log('[발주서작성모달] 닫기 (onclick) → closeNewOrderModal()');
-
-  // 모달 닫기
-  document.getElementById('newOrderModal').style.display = 'none';
-  // 발주 체크박스만 초기화
-  $('#orderSelectAll').prop('checked', false);
-  $('.orderRowCheck').prop('checked', false);
-
-  // 버튼 상태도 초기화
-  $('.orderRowCheck').each(function () {
-    const orderDate = $(this).data('order-date');
-    const orderNo = $(this).data('order-no');
-    const actionDiv = $(`#orderActions-${orderDate}_${orderNo}`);
-
-    actionDiv.find('.orderBtnView').show();
-    actionDiv.find('.orderBtnEdit').hide();
-    actionDiv.find('.orderBtnDelete').hide();
+  // 선택한 단가로 자재 추가
+  newOrderDetails.push({
+    자재코드: tempMaterialForNewOrder.자재코드,
+    자재명: tempMaterialForNewOrder.자재명,
+    규격: tempMaterialForNewOrder.규격,
+    수량: parseFloat(수량),
+    단가: parseFloat(price),
   });
-  newOrderDetails = [];
+
+  renderNewOrderDetailTable();
+  tempMaterialForNewOrder = null;
 }
 
-/**
- * 사업장 목록 로드
- */
-async function loadWorkplacesForNewOrder() {
-  try {
-    const result = await apiCall('/workplaces');
-    const select = document.getElementById('orderWorkplace');
-    select.innerHTML = '<option value="">사업장 선택</option>';
+// ✅ 자재 선택 및 추가 (발주서 작성용)
+// ✅ [발주관리] 자재 선택 (공통 - 모달 내 입력 필드 사용)
+function selectMaterialForOrder(material) {
+  // 선택된 자재를 변수에 저장 (신규/수정 모두 호환)
+  selectedMaterial = material;
+  if (typeof newSelectedMaterial !== 'undefined') {
+    newSelectedMaterial = material;
+  }
 
-    if (result.success && result.data) {
-      result.data.forEach((workplace) => {
-        const option = document.createElement('option');
-        option.value = workplace.사업장코드;
-        option.textContent = `${workplace.사업장코드} - ${workplace.사업장명 || ''}`;
-        select.appendChild(option);
-      });
-    }
-  } catch (error) {
-    console.error('사업장 목록 로드 오류:', error);
+  // 자재코드 생성
+  const 자재코드 = (material.분류코드 || '') + (material.세부코드 || '');
+
+  // 선택된 자재 정보 표시
+  const selectedInfo = document.getElementById('selectedMaterialInfo');
+  const selectedName = document.getElementById('selectedMaterialName');
+  const selectedCode = document.getElementById('selectedMaterialCode');
+
+  if (selectedInfo) selectedInfo.style.display = 'block';
+  if (selectedName) selectedName.textContent = material.자재명 || '-';
+  if (selectedCode) selectedCode.textContent = `품목코드: ${자재코드}`;
+
+  // 기본 단가 설정 (값이 없을 때만)
+  const priceEl = document.getElementById('addDetailPrice');
+  if (priceEl && (!priceEl.value || priceEl.value === '0')) {
+    priceEl.value = material.출고단가1 || 0;
+  }
+
+  // 검색 결과 숨기기
+  const resultsDiv = document.getElementById('materialSearchResults');
+  if (resultsDiv) resultsDiv.style.display = 'none';
+
+  // 금액 자동 계산
+  calculateDetailAmount();
+
+  // 수량 입력란에 포커스
+  const qtyEl = document.getElementById('addDetailQuantity');
+  if (qtyEl) {
+    setTimeout(() => qtyEl.focus(), 100);
   }
 }
 
-/**
- * 매입처 검색 모달 열기
- */
-function openSupplierSearchModal() {
-  console.log('[발주서작성모달] 매입처검색 버튼 클릭 → openSupplierSearchModal() → 매입처검색모달 표시');
+// ✅ 새 발주서 상세내역 테이블 렌더링
+function renderNewOrderDetailTable() {
+  const tbody = document.getElementById('orderManageCreateDetailTableBody');
 
-  // 사용자가 입력한 매입처명 가져오기 (Prefix 규칙 적용)
-  const supplierNameInput = document.getElementById('selectedSupplierName').value.trim();
+  if (!tbody) {
+    console.warn('⚠️ orderManageCreateDetailTableBody 요소를 찾을 수 없습니다');
+    return;
+  }
 
-  // 모달 열기
-  const modal = document.getElementById('supplierSearchModal');
-  if (modal) {
-    // 모달 위치 보장
+  if (newOrderDetails.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" style="padding: 40px; text-align: center; color: #999;">
+          자재 추가 버튼을 클릭하여 발주 상세내역을 입력하세요
+        </td>
+      </tr>
+    `;
+
+    // 합계 초기화
+    document.getElementById('totalSupplyPrice').textContent = '0';
+    document.getElementById('totalVat').textContent = '0';
+    document.getElementById('grandTotal').textContent = '0';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  let totalSupply = 0;
+  let totalVat = 0;
+
+  newOrderDetails.forEach((detail, index) => {
+    const 공급가 = detail.수량 * detail.단가;
+    const 부가세 = Math.round(공급가 * 0.1);
+
+    totalSupply += 공급가;
+    totalVat += 부가세;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${
+        index + 1
+      }</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.자재코드 || '-'}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.자재명 || '-'}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.규격 || '-'}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${
+        detail.단위 || '-'
+      }</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${detail.수량.toLocaleString()}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${detail.단가.toLocaleString()}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${공급가.toLocaleString()}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${부가세.toLocaleString()}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
+        <div style="display: flex; flex-direction: column; gap: 4px; align-items: center;">
+          <button type="button" onclick="openNewOrderDetailEditModal(${index})" style="
+            padding: 4px 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            width: 60px;
+          ">수정</button>
+          <button type="button" onclick="removeNewOrderDetail(${index})" style="
+            padding: 4px 12px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            width: 60px;
+          ">삭제</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // 합계 표시
+  document.getElementById('totalSupplyPrice').textContent = totalSupply.toLocaleString();
+  document.getElementById('totalVat').textContent = totalVat.toLocaleString();
+  document.getElementById('grandTotal').textContent = (totalSupply + totalVat).toLocaleString();
+}
+
+// ✅ 신규 발주서 상세내역 수정 모달 열기
+function openNewOrderDetailEditModal(index) {
+  try {
+    const detail = newOrderDetails[index];
+
+    if (!detail) {
+      alert('항목을 찾을 수 없습니다.');
+      return;
+    }
+
+    // 모달에 데이터 표시
+    document.getElementById('editDetailCode').textContent = detail.자재코드 || '-';
+    document.getElementById('editDetailName').textContent = detail.자재명 || '-';
+    document.getElementById('editDetailSpec').textContent = detail.규격 || '-';
+    document.getElementById('editDetailQuantity').value = detail.수량 || 0;
+    document.getElementById('editDetailPrice').value = detail.단가 || 0;
+    document.getElementById('editDetailAmount').value = (
+      detail.수량 * detail.단가
+    ).toLocaleString();
+
+    // 모달에 index 저장 (rowIndex는 삭제하여 신규 발주서 모드로 설정)
+    const modal = document.getElementById('orderManageDetailEditModal');
+    delete modal.dataset.rowIndex;
+    modal.dataset.editIndex = index;
+
+    // 자동 계산 이벤트 리스너 추가
+    const quantityInput = document.getElementById('editDetailQuantity');
+    const priceInput = document.getElementById('editDetailPrice');
+    const amountInput = document.getElementById('editDetailAmount');
+
+    const calculateEditAmount = () => {
+      const qty = parseFloat(quantityInput.value) || 0;
+      const price = parseFloat(priceInput.value) || 0;
+      amountInput.value = (qty * price).toLocaleString();
+    };
+
+    quantityInput.oninput = calculateEditAmount;
+    priceInput.oninput = calculateEditAmount;
+
+    // 모달 표시
     modal.style.display = 'block';
-    modal.style.position = 'fixed';
-
-    // modal-content에 드래그를 위한 positioning 설정
-    const modalContent = document.getElementById('supplierSearchModalContent');
-    if (modalContent) {
-      modalContent.style.position = 'absolute';
-      modalContent.style.top = '50%';
-      modalContent.style.left = '50%';
-      modalContent.style.transform = 'translate(-50%, -50%)';
-      modalContent.style.margin = '0';
-    }
-
-    // 드래그 기능 활성화
-    if (typeof window.makeModalDraggable === 'function') {
-      window.makeModalDraggable('supplierSearchModal', 'supplierSearchModalHeader');
-    }
-
-    // DataTable 칼럼 너비 안정화 (모달 표시 후 조정)
-    setTimeout(() => {
-      if (
-        window.orderSupplierSearchTable &&
-        typeof window.orderSupplierSearchTable.columns === 'object'
-      ) {
-        window.orderSupplierSearchTable.columns.adjust().draw(false);
-      }
-    }, 50);
+  } catch (err) {
+    console.error('❌ 상세내역 수정 모달 열기 오류:', err);
+    alert('상세내역 수정 모달을 여는 중 오류가 발생했습니다: ' + err.message);
   }
-
-  // 검색 입력란에 사용자가 입력한 값 설정
-  const input = document.getElementById('orderSupplierSearchInput');
-  if (input) {
-    input.value = supplierNameInput || '';
-    input.focus();
-
-    // 입력값이 있으면 자동으로 검색 실행
-    if (supplierNameInput && typeof searchOrderSuppliers === 'function') {
-      setTimeout(() => {
-        searchOrderSuppliers();
-      }, 100);
-    }
-  }
-
-  console.log(' 매입처 검색 모달 열기:', supplierNameInput);
 }
 
-// 매입처 검색 모달 닫기 함수는 파일 최상단의 window.closeOrderSupplierSearchModal로 통합됨
+// ✅ 상세내역 수정 모달 닫기
+function closeOrderManageDetailEditModal() {
+  document.getElementById('orderManageDetailEditModal').style.display = 'none';
+}
 
-// 발주서용 매입처 검색
-async function searchOrderSuppliers() {
-  console.log('[매입처검색모달] 검색 (onclick) → searchOrderSuppliers()');
-
+// ✅ 신규 발주서 상세내역 수정 확인
+function confirmNewOrderDetailEdit() {
   try {
-    const searchText = document.getElementById('orderSupplierSearchInput').value.trim();
+    const modal = document.getElementById('orderManageDetailEditModal');
+    const index = parseInt(modal.dataset.editIndex);
 
-    // API 호출 (매출처 검색과 동일하게 pageSize=1000 추가)
-    let apiUrl = API_BASE_URL + '/suppliers?pageSize=1000';
-    if (searchText) {
-      apiUrl += `&search=${encodeURIComponent(searchText)}`;
+    if (isNaN(index) || index < 0 || index >= newOrderDetails.length) {
+      alert('유효하지 않은 항목입니다.');
+      return;
     }
 
-    const response = await fetch(apiUrl, { credentials: 'include' });
+    // 입력값 가져오기
+    const 수량 = parseFloat(document.getElementById('editDetailQuantity').value) || 0;
+    const 단가 = parseFloat(document.getElementById('editDetailPrice').value) || 0;
+
+    if (수량 <= 0) {
+      alert('수량을 1 이상 입력해주세요.');
+      return;
+    }
+
+    // 배열 데이터 업데이트
+    newOrderDetails[index].수량 = 수량;
+    newOrderDetails[index].단가 = 단가;
+    newOrderDetails[index].공급가액 = 수량 * 단가;
+
+    // 테이블 다시 렌더링
+    renderNewOrderDetailTable();
+
+    // 모달 닫기
+    closeOrderManageDetailEditModal();
+  } catch (err) {
+    console.error('❌ 상세내역 수정 오류:', err);
+    alert('상세내역 수정 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 상세내역 삭제 - 모달 열기
+function removeNewOrderDetail(index) {
+  console.log('===== orderManageCreateModal > orderManageCreateDetailTable > 삭제 버튼 클릭 =====');
+
+  try {
+    const detail = newOrderDetails[index];
+    if (!detail) {
+      alert('항목을 찾을 수 없습니다.');
+      return;
+    }
+
+    // 모달에 정보 표시
+    document.getElementById('deleteOrderDetailInfo').textContent = `[${detail.자재코드}] ${detail.자재명}`;
+
+    // 모달에 index 저장 (rowIndex는 삭제하여 신규 발주서 모드로 설정)
+    const modal = document.getElementById('orderManageDetailDeleteConfirmModal');
+    delete modal.dataset.rowIndex;
+    modal.dataset.deleteIndex = index;
+
+    // 모달 표시
+    modal.style.display = 'block';
+  } catch (err) {
+    console.error('❌ 품목 삭제 모달 열기 오류:', err);
+    alert('품목 삭제 모달을 여는 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// ✅ 발주서 저장
+async function submitOrderManageCreate(event) {
+  console.log('===== orderManageCreateModal > 저장 버튼 클릭 =====');
+  event.preventDefault();
+
+  try {
+    // 입력값 가져오기
+    const 발주일자 = document.getElementById('orderManageCreateDate').value.replace(/-/g, '');
+    const 출고희망일자 =
+      document.getElementById('orderManageCreateDeliveryDate').value.replace(/-/g, '') || '';
+    const 매입처코드 = document.getElementById('orderManageCreateSupplierCode').value;
+    const 제목 = document.getElementById('orderManageCreateTitle').value;
+    const 적요 = document.getElementById('orderManageCreateRemark').value;
+
+    // 유효성 검사
+    if (!매입처코드) {
+      console.error('❌ orderManageCreateModal > 유효성 검사 실패: 매입처 미선택');
+      alert('매입처를 선택해주세요.');
+      return;
+    }
+
+    if (newOrderDetails.length === 0) {
+      console.error('❌ orderManageCreateModal > 유효성 검사 실패: 상세내역 없음');
+      alert('발주 상세내역을 최소 1개 이상 추가해주세요.');
+      return;
+    }
+
+    // API 호출 데이터 구성
+    const orderData = {
+      master: {
+        발주일자,
+        출고희망일자,
+        매입처코드,
+        제목,
+        적요,
+        상태코드: 1, // 작성중
+      },
+      details: newOrderDetails.map((detail) => ({
+        자재코드: detail.자재코드,
+        수량: detail.수량,
+        출고단가: detail.단가, // '단가' 필드를 '출고단가'로 변환
+      })),
+    };
+
+    // API 호출
+    const response = await fetch('/api/orders_add', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // 세션 쿠키 포함
+      body: JSON.stringify(orderData),
+    });
+
     const result = await response.json();
 
     if (!result.success) {
-      throw new Error(result.message || '매입처 조회 실패');
+      throw new Error(result.message || '발주서 저장 실패');
     }
 
-    const suppliers = result.data || [];
+    alert('발주서가 성공적으로 저장되었습니다.');
+    closeOrderManageCreateModal();
 
-    console.log(` 검색어: "${searchText}", 검색 결과: ${suppliers.length}건`);
-
-    // DataTable 재사용 패턴 (견적서 패턴과 동일)
-    if (
-      !window.orderSupplierSearchTable ||
-      typeof window.orderSupplierSearchTable.clear !== 'function'
-    ) {
-      // DataTable 인스턴스가 없거나 손상된 경우 재생성
-      if ($.fn.DataTable.isDataTable('#orderSupplierSearchTable')) {
-        $('#orderSupplierSearchTable').DataTable().destroy();
-      }
-
-      // DataTable 초기화
-      window.orderSupplierSearchTable = $('#orderSupplierSearchTable').DataTable({
-        data: [],
-        columns: [
-          {
-            data: '매입처코드',
-            title: '코드',
-            width: '120px',
-            orderable: true,
-          },
-          {
-            data: '매입처명',
-            title: '매입처명',
-            width: '250px',
-            orderable: true,
-          },
-          {
-            data: '대표자명',
-            title: '대표자명',
-            defaultContent: '-',
-            width: '150px',
-            orderable: false,
-          },
-          {
-            data: '사업자번호',
-            title: '사업자번호',
-            defaultContent: '-',
-            width: '150px',
-            orderable: false,
-          },
-          {
-            data: '전화번호',
-            title: '전화번호',
-            defaultContent: '-',
-            width: '150px',
-            orderable: false,
-          },
-          {
-            data: null,
-            title: '선택',
-            orderable: false,
-            className: 'text-center',
-            width: '100px',
-            render: function (data, type, row) {
-              return `<button onclick='window.selectOrderSupplier(${JSON.stringify(row).replace(
-                /'/g,
-                '&#39;',
-              )})'
-                        class="btn-icon btn-view" style="padding: 6px 12px; font-size: 13px;">
-                      선택
-                    </button>`;
-            },
-          },
-        ],
-        language: {
-          lengthMenu: '페이지당 _MENU_ 개씩 보기',
-          zeroRecords: '검색 결과가 없습니다',
-          info: '전체 _TOTAL_개 중 _START_ - _END_',
-          infoEmpty: '데이터 없음',
-          infoFiltered: '(전체 _MAX_개 중 검색결과)',
-          search: '검색:',
-          paginate: {
-            first: '처음',
-            last: '마지막',
-            next: '다음',
-            previous: '이전',
-          },
-        },
-        order: [[0, 'asc']], // 매입처코드 오름차순
-        pageLength: 10,
-        lengthMenu: [10, 25, 50, 100],
-        responsive: false,
-        autoWidth: false,
-        scrollCollapse: false,
-      });
+    // 발주 목록 새로고침 (DataTable reload)
+    if ($.fn.DataTable.isDataTable('#orderManageTable')) {
+      $('#orderManageTable').DataTable().ajax.reload();
     }
-
-    // DataTable에 데이터 업데이트 및 매입처코드 순 정렬
-    window.orderSupplierSearchTable
-      .clear()
-      .rows.add(suppliers)
-      .order([[0, 'asc']])
-      .draw();
-
-    console.log(`매입처 검색 완료: ${suppliers.length}건`);
   } catch (err) {
-    console.error(' 매입처 검색 오류:', err);
-    alert('매입처 검색 중 오류가 발생했습니다: ' + err.message);
+    console.error('❌ orderManageCreateModal > 발주서 저장 오류:', err);
+    alert('발주서 저장 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-// 매입처 선택 함수는 파일 최상단의 window.selectOrderSupplier로 통합됨
+// ==================== 모달 드래그 기능 ====================
+// makeModalDraggable 함수는 js/modal-draggable.js에서 전역으로 로드됨
 
-/**
- * 매입처 검색
- */
-async function searchSuppliersForOrder(searchTerm) {
-  try {
-    const result = await apiCall(`/suppliers?search=${encodeURIComponent(searchTerm)}`);
-    if (result.success && result.data && result.data.length > 0) {
-      // 첫 번째 검색 결과 선택 (Prefix 규칙 적용)
-      const supplier = result.data[0];
-      document.getElementById('selectedSupplierCode').value = supplier.매입처코드;
-      document.getElementById('selectedSupplierName').value = supplier.매입처명;
-    } else {
-      alert('검색 결과가 없습니다.');
-    }
-  } catch (error) {
-    console.error('매입처 검색 오류:', error);
-    alert('매입처 검색 중 오류가 발생했습니다.');
-  }
-}
+// ==================== 신규 발주서용 품목 추가 모달 ====================
 
-// 신규 발주서 작성 모드 플래그
-let isNewSupplierSearchMode = false;
+let newSelectedMaterial = null;
 
-/**
- * 자재 검색 모달 열기 (견적서 패턴과 동일)
- */
-function openOrderMaterialSearchModal() {
-  console.log(
-    '[발주서작성-상세] + 자재 추가 버튼 클릭 → openOrderMaterialSearchModal() → 자재추가모달 표시',
-  );
+// ❌ [중복 삭제됨] openMaterialSearchModal() - 위의 공통 함수(라인 1887) 사용
+// 이전에는 newOrderMaterialModal을 사용했으나, 이제 orderDetailAddModal 1개로 통합
 
-  // 선택된 자재 초기화
-  newOrderSelectedMaterial = null;
-
-  // 자재 검색 필드 초기화
-  document.getElementById('newOrderMaterialSearchCategory').value = '';
-  document.getElementById('newOrderMaterialSearchCode').value = '';
-  document.getElementById('newOrderMaterialSearchName').value = '';
-
-  // 수량/단가/금액 필드 초기화
-  document.getElementById('newOrderDetailQuantity').value = '1';
-  document.getElementById('newOrderDetailPrice').value = '0';
-  document.getElementById('newOrderDetailAmount').value = '0';
-
-  // 검색 결과 및 선택 정보 숨기기
-  document.getElementById('newOrderMaterialSearchResults').style.display = 'none';
-  document.getElementById('newOrderSelectedMaterialInfo').style.display = 'none';
-
-  // 검색 결과 테이블 초기화
-  const tbody = document.getElementById('newOrderMaterialSearchTableBody');
-  if (tbody) tbody.innerHTML = '';
-
-  // 모달 표시 (발주서 작성 모달은 그대로 유지)
-  const modal = document.getElementById('newOrderMaterialModal');
-  if (modal) {
-    modal.style.display = 'block';
-    modal.style.zIndex = '9999';
-    modal.style.position = 'fixed';
-
-    // modal-content에 드래그를 위한 positioning 설정
-    const modalContent = document.getElementById('newOrderMaterialModalContent');
-    if (modalContent) {
-      modalContent.style.position = 'absolute';
-      modalContent.style.top = '50%';
-      modalContent.style.left = '50%';
-      modalContent.style.transform = 'translate(-50%, -50%)';
-      modalContent.style.margin = '0';
-    }
-
-    // 드래그 기능 활성화
-    if (typeof window.makeModalDraggable === 'function') {
-      window.makeModalDraggable('newOrderMaterialModal', 'newOrderMaterialModalHeader');
-    }
-  }
-
-  // 자재명 검색 입력란에 포커스
-  const nameInput = document.getElementById('newOrderMaterialSearchName');
-  if (nameInput) {
-    setTimeout(() => {
-      nameInput.focus();
-    }, 100);
-  }
-}
-
-// 모달 닫기 (견적서 패턴과 동일)
+// 모달 닫기
 function closeNewOrderMaterialModal() {
-  console.log('[자재추가모달] 닫기 (onclick) → closeNewOrderMaterialModal()');
-
   document.getElementById('newOrderMaterialModal').style.display = 'none';
   // 발주서 작성 모달은 그대로 유지되므로 별도 처리 불필요
 }
 
-// 자재 검색 초기화 함수 (견적서 패턴과 동일)
-function clearNewOrderMaterialSearch() {
-  console.log('🔧 [자재추가모달] 검색 초기화');
-
-  document.getElementById('newOrderMaterialSearchCategory').value = '';
-  document.getElementById('newOrderMaterialSearchCode').value = '';
-  document.getElementById('newOrderMaterialSearchName').value = '';
-  document.getElementById('newOrderMaterialSearchResults').style.display = 'none';
-}
-
-// 자재 검색 (견적서 패턴과 동일)
-async function searchNewOrderMaterials() {
-  console.log('[자재추가모달] 검색 (onclick) → searchNewOrderMaterials()');
-
+// 자재 검색
+async function searchNewMaterials() {
   try {
     // 각 필드의 검색어 가져오기
-    const searchCategory = document.getElementById('newOrderMaterialSearchCategory').value.trim();
-    const searchCode = document.getElementById('newOrderMaterialSearchCode').value.trim();
-    let searchName = document.getElementById('newOrderMaterialSearchName').value.trim();
+    const searchCategory = document.getElementById('newMaterialSearchCategory').value.trim();
+    const searchCode = document.getElementById('newMaterialSearchCode').value.trim();
+    let searchName = document.getElementById('newMaterialSearchName').value.trim();
     let searchSpec = ''; // 규격 검색어
 
     // 자재명에서 쉼표로 분리하여 자재명과 규격 검색어 추출
     // 예: "케이블, 200mm" → 자재명: "케이블", 규격: "200mm"
     if (searchName && searchName.includes(',')) {
-      const parts = searchName.split(',').map((s) => s.trim());
+      const parts = searchName.split(',').map(s => s.trim());
       searchName = parts[0] || ''; // 첫 번째 부분: 자재명
       searchSpec = parts[1] || ''; // 두 번째 부분: 규격
 
@@ -2430,8 +3444,7 @@ async function searchNewOrderMaterials() {
     if (searchSpec) params.append('searchSpec', searchSpec); // 규격 검색어 추가
     params.append('removeDuplicates', 'true'); // 중복 제거 활성화
 
-    const response = await fetch(`/api/materials?${params.toString()}`);
-    const result = await response.json();
+    const result = await apiCall(`/materials?${params.toString()}`);
 
     if (!result.success || !result.data) {
       throw new Error('자재 목록을 불러올 수 없습니다.');
@@ -2441,34 +3454,26 @@ async function searchNewOrderMaterials() {
 
     if (filteredMaterials.length === 0) {
       alert('검색 결과가 없습니다.');
-      document.getElementById('newOrderMaterialSearchResults').style.display = 'none';
+      document.getElementById('newMaterialSearchResults').style.display = 'none';
       return;
     }
 
-    const tbody = document.getElementById('newOrderMaterialSearchTableBody');
+    const tbody = document.getElementById('newMaterialSearchTableBody');
     tbody.innerHTML = '';
 
-    // 자재 데이터를 전역 배열에 저장
-    if (!window.tempNewOrderMaterialsData) {
-      window.tempNewOrderMaterialsData = [];
-    }
-
-    filteredMaterials.forEach((m, index) => {
+    filteredMaterials.forEach((m) => {
       const 자재코드 = m.분류코드 + m.세부코드;
-
-      // 자재 데이터 저장
-      window.tempNewOrderMaterialsData[index] = {
-        ...m,
-        자재코드,
-      };
-
       const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
       tr.style.transition = 'background 0.2s';
       tr.onmouseover = function () {
         this.style.background = '#f3f4f6';
       };
       tr.onmouseout = function () {
         this.style.background = 'white';
+      };
+      tr.onclick = function () {
+        selectNewMaterial(m);
       };
 
       tr.innerHTML = `
@@ -2479,133 +3484,146 @@ async function searchNewOrderMaterials() {
         <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${
           m.규격 || '-'
         }</td>
-        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right; font-weight: 600; color: #2563eb;">${(
-          m.입고단가 || 0
-        ).toLocaleString()}원</td>
-        <td style="padding: 8px; border-bottom: 1px solid #f3f4f6; text-align: center;">
-          <button onclick='selectNewOrderMaterial(window.tempNewOrderMaterialsData[${index}])' style="
-            padding: 6px 12px;
-            background: #10b981;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-          ">선택</button>
-        </td>
       `;
 
       tbody.appendChild(tr);
     });
 
-    document.getElementById('newOrderMaterialSearchResults').style.display = 'block';
-    console.log(`자재 검색 완료: ${filteredMaterials.length}건`);
+    document.getElementById('newMaterialSearchResults').style.display = 'block';
   } catch (err) {
-    console.error(' 자재 검색 오류:', err);
+    console.error('❌ 자재 검색 오류:', err);
     alert('자재 검색 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-// 자재 선택 함수 (견적서 패턴과 동일)
-function selectNewOrderMaterial(material) {
-  console.log('[자재검색결과] 선택 (onclick) → selectOrderMaterial()');
-
-  // 견적서와 동일한 객체 구조로 저장
-  newOrderSelectedMaterial = {
-    품목코드: (material.분류코드 || '') + (material.세부코드 || ''),
-    품목명: material.자재명,
-    구매단가: material.입고단가 || material.입고단가1 || 0,
-    규격: material.규격 || '',
-    단위: material.단위 || '',
-    분류코드: material.분류코드 || '',
-    세부코드: material.세부코드 || '',
-  };
-
-  // 선택된 자재 정보 표시
-  document.getElementById('newOrderSelectedMaterialName').textContent =
-    newOrderSelectedMaterial.품목명 +
-    (newOrderSelectedMaterial.규격 ? ` (${newOrderSelectedMaterial.규격})` : '');
-  document.getElementById(
-    'newOrderSelectedMaterialCode',
-  ).textContent = `품목코드: ${newOrderSelectedMaterial.품목코드}`;
-
-  document.getElementById('newOrderSelectedMaterialInfo').style.display = 'block';
-
-  // 단가 자동 입력
-  document.getElementById('newOrderDetailPrice').value = newOrderSelectedMaterial.구매단가;
-
-  // 금액 자동 계산
-  calculateNewOrderDetailAmount();
-
-  // 검색 결과 숨기기
-  document.getElementById('newOrderMaterialSearchResults').style.display = 'none';
-
-  console.log(' 자재 선택 완료:', newOrderSelectedMaterial);
+// 자재 검색 초기화
+function clearNewMaterialSearch() {
+  document.getElementById('newMaterialSearchCategory').value = '';
+  document.getElementById('newMaterialSearchCode').value = '';
+  document.getElementById('newMaterialSearchName').value = '';
+  document.getElementById('newMaterialSearchResults').style.display = 'none';
 }
 
-// 선택 취소 함수 (견적서 패턴과 동일)
-function clearNewOrderSelectedMaterial() {
-  console.log('[자재추가모달] 선택취소 (onclick) → clearNewOrderSelectedMaterial()');
+// 자재 선택
+function selectNewMaterial(material) {
+  newSelectedMaterial = material;
 
-  newOrderSelectedMaterial = null;
+  const 자재코드 = material.분류코드 + material.세부코드;
 
-  document.getElementById('newOrderSelectedMaterialInfo').style.display = 'none';
+  document.getElementById('newSelectedMaterialName').textContent = material.자재명;
+  document.getElementById('newSelectedMaterialCode').textContent = `[${자재코드}] ${
+    material.규격 || ''
+  }`;
+  document.getElementById('newSelectedMaterialInfo').style.display = 'block';
 
-  document.getElementById('newOrderDetailPrice').value = '0';
-
-  calculateNewOrderDetailAmount();
+  document.getElementById('newMaterialSearchResults').style.display = 'none';
 }
 
-// 금액 자동 계산 함수 (견적서 패턴과 동일)
-function calculateNewOrderDetailAmount() {
-  const 수량 = parseFloat(document.getElementById('newOrderDetailQuantity').value) || 0;
-  const 단가 = parseFloat(document.getElementById('newOrderDetailPrice').value) || 0;
-
-  const 금액 = 수량 * 단가;
-
-  document.getElementById('newOrderDetailAmount').value = 금액.toLocaleString();
+// 선택된 자재 취소
+function clearNewSelectedMaterial() {
+  newSelectedMaterial = null;
+  document.getElementById('newSelectedMaterialInfo').style.display = 'none';
+  document.getElementById('newMaterialSearchCode').value = '';
+  document.getElementById('newMaterialSearchName').value = '';
+  document.getElementById('newMaterialSearchSpec').value = '';
 }
 
-let currentNewOrderPriceHistoryTab = 'actual'; // 현재 활성화된 탭
-
-// 신규 발주서 단가 이력 모달 열기
-async function showNewOrderPriceHistory() {
-  console.log(
-    '[자재추가모달] 이전단가 버튼 클릭 → openNewOrderPriceHistoryModal() → 단가이력모달 표시',
-  );
-
+// 자재 추가 확인
+function confirmNewOrderMaterialAdd() {
   try {
-    if (!newOrderSelectedMaterial) {
+    if (!newSelectedMaterial) {
+      alert('자재를 검색하여 선택해주세요.');
+      return;
+    }
+
+    const 자재코드 = newSelectedMaterial.분류코드 + newSelectedMaterial.세부코드;
+    const 수량 = parseFloat(document.getElementById('newDetailQuantity').value) || 0;
+    const 출고단가 = parseFloat(document.getElementById('newDetailPrice').value) || 0;
+
+    if (수량 <= 0) {
+      alert('수량을 1 이상 입력해주세요.');
+      return;
+    }
+
+    // newOrderDetails 배열에 추가
+    newOrderDetails.push({
+      자재코드: 자재코드,
+      자재명: newSelectedMaterial.자재명,
+      규격: newSelectedMaterial.규격,
+      수량: 수량,
+      단가: 출고단가,
+    });
+
+    // 테이블 렌더링
+    renderNewOrderDetailTable();
+
+    // 모달 닫기 (발주서 작성 모달은 그대로 유지)
+    closeNewOrderMaterialModal();
+  } catch (err) {
+    console.error('❌ 자재 추가 오류:', err);
+    alert('자재 추가 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// 금액 자동 계산
+$(document).ready(function () {
+  $('#newDetailQuantity, #newDetailPrice').on('input', function () {
+    const 수량 = parseFloat($('#newDetailQuantity').val()) || 0;
+    const 단가 = parseFloat($('#newDetailPrice').val()) || 0;
+    const 금액 = 수량 * 단가;
+    $('#newDetailAmount').val(금액.toLocaleString());
+  });
+});
+
+// ========================================
+// 신규 발주서 단가 이력 조회
+// ========================================
+
+// ✅ 신규 발주서 단가 이력 모달 열기 (기존 orderManagePriceHistoryModal 재사용)
+async function showNewPriceHistory() {
+  try {
+    // 자재가 선택되었는지 확인
+    if (!newSelectedMaterial) {
       alert('먼저 자재를 검색하여 선택해주세요.');
       return;
     }
 
-    // 매입처 코드 확인 (Prefix 규칙 적용)
     const 매입처코드 = document.getElementById('selectedSupplierCode').value;
     if (!매입처코드) {
       alert('매입처를 먼저 선택해주세요.');
       return;
     }
 
-    const 자재코드 =
-      newOrderSelectedMaterial.품목코드 ||
-      newOrderSelectedMaterial.분류코드 + newOrderSelectedMaterial.세부코드;
+    // 기존 단가 이력 모달 재사용 - selectedMaterial 설정
+    selectedMaterial = newSelectedMaterial;
+    isNewOrderMode = true;
 
-    // 임시 자재 정보 저장 (기존 발주 수정과 구분)
-    window.tempMaterialForNewOrder = newOrderSelectedMaterial;
+    // 단가 이력 모달의 z-index를 더 높게 설정 (신규 발주서 모달 위에 표시)
+    const orderManagePriceHistoryModal = document.getElementById(
+      'orderManagePriceHistoryModal',
+    );
+    if (orderManagePriceHistoryModal) {
+      orderManagePriceHistoryModal.style.zIndex = '10000';
+    }
 
-    // 자재 정보 표시 (기존 orderPriceHistoryModal 사용)
-    document.getElementById('orderPriceHistoryMaterialName').textContent =
-      newOrderSelectedMaterial.품목명;
-    document.getElementById('orderPriceHistoryMaterialCode').textContent = `[${자재코드}] ${
-      newOrderSelectedMaterial.규격 || ''
-    }`;
+    // 기존 showPriceHistory 함수 호출 (공통 모달 사용)
+    await showPriceHistory();
+  } catch (err) {
+    console.error('❌ 단가 이력 조회 오류:', err);
+    alert('단가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
+  }
+}
 
-    // 탭 초기화 (실제 입고가 탭으로 시작)
-    currentNewOrderPriceHistoryTab = 'actual';
-    const tabActual = document.getElementById('tabActualPurchasePrice');
-    const tabOrder = document.getElementById('tabOrderPrice');
+// ✅ 신규 발주서 단가 이력 탭 전환
+async function switchNewPriceHistoryTab(tab) {
+  currentNewPriceHistoryTab = tab;
 
+  // 탭 버튼 스타일 변경
+  const tabActual = document.getElementById('newTabActualPrice');
+  const tabOrder = document.getElementById('newTabOrderPrice');
+
+  if (tab === 'actual') {
+    // 실제 출고가 탭 활성화
     tabActual.style.background = '#3b82f6';
     tabActual.style.color = 'white';
     tabActual.style.borderBottom = '3px solid #3b82f6';
@@ -2614,165 +3632,44 @@ async function showNewOrderPriceHistory() {
     tabOrder.style.color = '#6b7280';
     tabOrder.style.borderBottom = '3px solid transparent';
 
-    // 실제 입고가 데이터 로드
-    await loadActualPurchasePriceHistoryForNewOrder(자재코드, 매입처코드);
-
-    // 모달 표시 (기존 orderPriceHistoryModal 사용)
-    const modal = document.getElementById('orderPriceHistoryModal');
-    modal.style.display = 'block';
-
-    console.log(' 신규 발주서 단가 이력 모달 열기');
-  } catch (err) {
-    console.error(' 단가 이력 조회 오류:', err);
-    alert('단가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
-  }
-}
-
-/**
- * 신규 발주서용 실제 입고가 이력 로드
- */
-async function loadActualPurchasePriceHistoryForNewOrder(자재코드, 매입처코드) {
-  try {
-    const response = await fetch(
-      `/api/materials/${encodeURIComponent(자재코드)}/purchase-price-history/${매입처코드}`,
-    );
-    const result = await response.json();
-
-    if (!result.success) {
-      throw new Error(result.message || '이력 조회 실패');
-    }
-
-    const tbody = document.getElementById('orderPriceHistoryTableBody');
-
-    if (result.data.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
-            최근 1년 이내 이 거래처에 입고한 이력이 없습니다
-          </td>
-        </tr>
-      `;
-    } else {
-      tbody.innerHTML = '';
-
-      result.data.forEach((item) => {
-        const tr = document.createElement('tr');
-        tr.style.cursor = 'pointer';
-        tr.style.transition = 'background 0.2s';
-        tr.onmouseover = function () {
-          this.style.background = '#f9fafb';
-        };
-        tr.onmouseout = function () {
-          this.style.background = 'white';
-        };
-        tr.onclick = function () {
-          selectPriceForNewOrder(item.입고단가);
-        };
-
-        const 입출고일자 = item.입출고일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-
-        tr.innerHTML = `
-          <td style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb;">${입출고일자}</td>
-          <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #2563eb;">${(
-            item.입고단가 || 0
-          ).toLocaleString()}원</td>
-          <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb;">${(
-            item.입고수량 || 0
-          ).toLocaleString()}</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">${
-            item.적요 || '-'
-          }</td>
-        `;
-
-        tbody.appendChild(tr);
-      });
-    }
-
-    console.log(`신규 발주서 입고가 이력 로드 완료: ${result.data.length}건`);
-  } catch (err) {
-    console.error(' 입고가 이력 로드 오류:', err);
-    alert('입고가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
-  }
-}
-
-/**
- * 신규 발주서용 단가 선택
- */
-function selectPriceForNewOrder(입고단가) {
-  console.log('[단가이력테이블] 행 클릭 (onclick) → selectPriceFromHistory()');
-
-  // 신규 발주서 모달의 입력란에 단가 설정
-  const inputField = document.getElementById('newOrderDetailPrice');
-  if (inputField) {
-    inputField.value = 입고단가;
-  }
-
-  // 모달 닫기
-  document.getElementById('orderPriceHistoryModal').style.display = 'none';
-
-  console.log(' 신규 발주서 단가 선택:', 입고단가);
-}
-
-// 신규 발주서 단가 이력 모달 닫기
-function closeNewOrderPriceHistoryModal() {
-  document.getElementById('orderPriceHistoryModal').style.display = 'none';
-}
-
-// 신규 발주서 단가 이력 탭 전환
-async function switchNewOrderPriceHistoryTab(tab) {
-  currentNewOrderPriceHistoryTab = tab;
-
-  // 탭 버튼 스타일 변경
-  const tabActual = document.getElementById('newTabOrderActualPrice');
-  const ordertab = document.getElementById('newTabOrderPrice');
-
-  if (ordertab === 'actual') {
-    // 실제 출고가 탭 활성화
-    tabActual.style.background = '#3b82f6';
-    tabActual.style.color = 'white';
-    tabActual.style.borderBottom = '3px solid #3b82f6';
-
-    ordertab.style.background = 'transparent';
-    ordertab.style.color = '#6b7280';
-    tabOrder.style.borderBottom = '3px solid transparent';
-
     // 레이블 변경
-    document.getElementById('newOrderPriceHistoryLabel').textContent =
-      '이 거래처에 실제 입고한 이력 (클릭하여 단가 선택)';
+    document.getElementById('newPriceHistoryLabel').textContent =
+      '이 거래처에 실제 출고한 이력 (클릭하여 단가 선택)';
 
     // 테이블 헤더 변경
-    document.getElementById('newOrderPriceHistoryTableHead').innerHTML = `
+    document.getElementById('newPriceHistoryTableHead').innerHTML = `
       <tr>
-        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">입고일자</th>
-        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">입고단가</th>
-        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">입고수량</th>
+        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고일자</th>
+        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고단가</th>
+        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고수량</th>
         <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">적요</th>
       </tr>
     `;
 
-    // 실제 입고 데이터 로드
-    await loadNewOrderActualPriceHistory();
+    // 실제 출고 데이터 로드
+    await loadNewActualPriceHistory();
   } else if (tab === 'order') {
-    // 견적 제안가 탭 활성화
-    ordertab.style.background = '#3b82f6';
-    ordertab.style.color = 'white';
-    ordertab.style.borderBottom = '3px solid #3b82f6';
+    // 발주 제안가 탭 활성화
+    tabOrder.style.background = '#3b82f6';
+    tabOrder.style.color = 'white';
+    tabOrder.style.borderBottom = '3px solid #3b82f6';
 
     tabActual.style.background = 'transparent';
     tabActual.style.color = '#6b7280';
     tabActual.style.borderBottom = '3px solid transparent';
 
     // 레이블 변경
-    document.getElementById('newOrderPriceHistoryLabel').textContent =
+    document.getElementById('newPriceHistoryLabel').textContent =
       '이 거래처에 제안한 발주 이력 (클릭하여 단가 선택)';
 
     // 테이블 헤더 변경
-    document.getElementById('newOrderPriceHistoryTableHead').innerHTML = `
+    document.getElementById('newPriceHistoryTableHead').innerHTML = `
       <tr>
         <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 13px;">발주일자</th>
-        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">입고단가</th>
         <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">수량</th>
-        <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">상태</th>
+        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">출고단가</th>
+        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #e5e7eb; font-size: 13px;">합계</th>
+        <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e5e7eb; font-size: 13px;">적요</th>
       </tr>
     `;
 
@@ -2781,13 +3678,13 @@ async function switchNewOrderPriceHistoryTab(tab) {
   }
 }
 
-// 신규 발주서 실제 입고 이력 로드
-async function loadNewOrderActualPriceHistory() {
+// ✅ 신규 발주서 실제 출고 이력 로드
+async function loadNewActualPriceHistory() {
   try {
     if (!newSelectedMaterial) return;
 
     const 자재코드 = newSelectedMaterial.분류코드 + newSelectedMaterial.세부코드;
-    const 매입처코드 = document.getElementById('selectedOrderCode').value;
+    const 매입처코드 = document.getElementById('selectedSupplierCode').value;
 
     if (!매입처코드) return;
 
@@ -2800,13 +3697,13 @@ async function loadNewOrderActualPriceHistory() {
       throw new Error(result.message || '이력 조회 실패');
     }
 
-    const tbody = document.getElementById('newOrderPriceHistoryTableBody');
+    const tbody = document.getElementById('newPriceHistoryTableBody');
 
     if (result.data.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
-            최근 1년 이내 이 거래처에 입고한 이력이 없습니다
+          <td colspan="5" style="padding: 40px; text-align: center; color: #9ca3af;">
+            이 거래처에 출고한 이력이 없습니다
           </td>
         </tr>
       `;
@@ -2824,43 +3721,46 @@ async function loadNewOrderActualPriceHistory() {
           this.style.background = 'white';
         };
         tr.onclick = function () {
-          selectNewOrderPriceFromHistory(item.입고단가);
+          selectNewPriceFromHistory(item.출고단가);
         };
 
         const 입출고일자 = item.입출고일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-        const 적요 = item.적요 || '-';
+        const 수량 = parseFloat(item.출고수량 || 0);
+        const 단가 = parseFloat(item.출고단가 || 0);
+        const 합계 = 수량 * 단가;
 
         tr.innerHTML = `
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${입출고일자}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right;">
+            ${수량.toLocaleString()}
+          </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right; font-weight: 600; color: #2563eb;">
-            ${(item.입고단가 || 0).toLocaleString()}원
+            ${단가.toLocaleString()}원
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right;">
-            ${(item.입고수량 || 0).toLocaleString()}
+            ${합계.toLocaleString()}원
           </td>
-          <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: center; color: #6b7280;">
-            ${적요}
+          <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: center; color: #6b7280; font-size: 12px;">
+            ${item.적요 || '-'}
           </td>
         `;
 
         tbody.appendChild(tr);
       });
     }
-
-    console.log(`신규 발주서 실제 입고가 이력 조회 완료: ${result.data.length}건`);
   } catch (err) {
-    console.error(' 실제 입고가 이력 조회 오류:', err);
-    alert('실제 입고가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
+    console.error('❌ 실제 출고가 이력 조회 오류:', err);
+    alert('실제 출고가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-// 신규 발주서 견적 제안가 이력 로드
+// ✅ 신규 발주서 발주 제안가 이력 로드
 async function loadNewOrderPriceHistory() {
   try {
     if (!newSelectedMaterial) return;
 
     const 자재코드 = newSelectedMaterial.분류코드 + newSelectedMaterial.세부코드;
-    const 매입처코드 = document.getElementById('selectedOrderCode').value;
+    const 매입처코드 = document.getElementById('selectedSupplierCode').value;
 
     if (!매입처코드) return;
 
@@ -2873,12 +3773,12 @@ async function loadNewOrderPriceHistory() {
       throw new Error(result.message || '이력 조회 실패');
     }
 
-    const tbody = document.getElementById('newOrderPriceHistoryTableBody');
+    const tbody = document.getElementById('newPriceHistoryTableBody');
 
     if (result.data.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="padding: 40px; text-align: center; color: #9ca3af;">
+          <td colspan="5" style="padding: 40px; text-align: center; color: #9ca3af;">
             이 거래처에 제안한 발주 이력이 없습니다
           </td>
         </tr>
@@ -2897,437 +3797,132 @@ async function loadNewOrderPriceHistory() {
           this.style.background = 'white';
         };
         tr.onclick = function () {
-          selectNewOrderPriceFromHistory(item.입고단가);
+          selectNewPriceFromHistory(item.출고단가);
         };
 
         const 발주일자 = item.발주일자.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-        const 상태 = item.상태코드 === 1 ? '작성중' : item.상태코드 === 2 ? '승인' : '반려';
-        const 상태색 =
-          item.상태코드 === 1 ? '#f59e0b' : item.상태코드 === 2 ? '#10b981' : '#ef4444';
+        const 수량 = parseFloat(item.수량 || 0);
+        const 단가 = parseFloat(item.출고단가 || 0);
+        const 합계 = 수량 * 단가;
 
         tr.innerHTML = `
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px;">${발주일자}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right;">
+            ${수량.toLocaleString()}
+          </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right; font-weight: 600; color: #2563eb;">
-            ${(item.입고단가 || 0).toLocaleString()}원
+            ${단가.toLocaleString()}원
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: right;">
-            ${(item.수량 || 0).toLocaleString()}
+            ${합계.toLocaleString()}원
           </td>
-          <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: center;">
-            <span style="padding: 2px 8px; border-radius: 4px; background: ${상태색}22; color: ${상태색}; font-size: 11px; font-weight: 600;">
-              ${상태}
-            </span>
+          <td style="padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; text-align: center; color: #6b7280; font-size: 12px;">
+            ${item.적요 || '-'}
           </td>
         `;
 
         tbody.appendChild(tr);
       });
     }
-
-    console.log(`신규 발주서 발주 제안가 이력 조회 완료: ${result.data.length}건`);
   } catch (err) {
-    console.error(' 발주 제안가 이력 조회 오류:', err);
+    console.error('❌ 발주 제안가 이력 조회 오류:', err);
     alert('발주 제안가 이력을 불러오는 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-// 신규 발주서 이력에서 단가 선택
-function selectNewOrderPriceFromHistory(price) {
-  console.log('[단가이력테이블] 행 클릭 (onclick) → selectPriceFromHistory()');
+// ✅ 신규 발주서 이력에서 단가 선택
+function selectNewPriceFromHistory(price) {
+  document.getElementById('newDetailPrice').value = price;
 
-  document.getElementById('newOrderDetailPrice').value = price;
-
-  // 금액 자동 재계산 (견적서 패턴과 동일)
-  calculateNewOrderDetailAmount();
+  // 금액 자동 재계산
+  const 수량 = parseFloat(document.getElementById('newDetailQuantity').value) || 0;
+  const 금액 = 수량 * price;
+  document.getElementById('newDetailAmount').value = 금액.toLocaleString();
 
   // 모달 닫기
-  closeNewOrderPriceHistoryModal();
-
-  console.log(`신규 발주서 단가 선택: ${price}원`);
+  closeNewPriceHistoryModal();
 }
 
-// 신규 발주서 단가 이력 모달 닫기
-function closeNewOrderPriceHistoryModal() {
-  document.getElementById('newOrderPriceHistoryModal').style.display = 'none';
+// ✅ 모달 드래그 기능
+// makeModalDraggable 함수는 js/modal-draggable.js에서 전역으로 로드됨
+// (아래는 간소화된 버전으로 MutationObserver 등 일부 기능이 누락되어 주석 처리)
+/*
+function makeModalDraggable(modalContentId, dragHandleId) {
+  const modalContent = document.getElementById(modalContentId);
+  const dragHandle = document.getElementById(dragHandleId);
+
+  if (!modalContent || !dragHandle) return;
+
+  let isDragging = false;
+  let currentX;
+  let currentY;
+  let initialX;
+  let initialY;
+  let xOffset = 0;
+  let yOffset = 0;
+
+  dragHandle.addEventListener('mousedown', dragStart);
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', dragEnd);
+
+  function dragStart(e) {
+    initialX = e.clientX - xOffset;
+    initialY = e.clientY - yOffset;
+
+    if (e.target === dragHandle || dragHandle.contains(e.target)) {
+      // 닫기 버튼 클릭시에는 드래그 안함
+      if (e.target.tagName === 'BUTTON') return;
+      isDragging = true;
+    }
+  }
+
+  function drag(e) {
+    if (isDragging) {
+      e.preventDefault();
+      currentX = e.clientX - initialX;
+      currentY = e.clientY - initialY;
+
+      xOffset = currentX;
+      yOffset = currentY;
+
+      setTranslate(currentX, currentY, modalContent);
+    }
+  }
+
+  function dragEnd() {
+    initialX = currentX;
+    initialY = currentY;
+    isDragging = false;
+  }
+
+  function setTranslate(xPos, yPos, el) {
+    el.style.transform = `translate(${xPos}px, ${yPos}px)`;
+  }
 }
+*/
 
-// 자재 추가 확인 (견적서 패턴과 동일)
-function confirmNewOrderMaterialAdd() {
-  console.log('[자재추가모달] 추가 (onclick) → addNewOrderMaterial()');
+// ==================== 필터링 함수 ====================
 
-  try {
-    if (!newOrderSelectedMaterial) {
-      alert('자재를 검색하여 선택해주세요.');
-      return;
-    }
-
-    const 자재코드 =
-      newOrderSelectedMaterial.품목코드 ||
-      newOrderSelectedMaterial.분류코드 + newOrderSelectedMaterial.세부코드;
-    const 수량 = parseFloat(document.getElementById('newOrderDetailQuantity').value) || 0;
-    const 입고단가 = parseFloat(document.getElementById('newOrderDetailPrice').value) || 0;
-
-    const 공급가액 = 수량 * 입고단가;
-
-    if (수량 <= 0) {
-      alert('수량을 1 이상 입력해주세요.');
-      return;
-    }
-
-    // newOrderDetails 배열에 추가
-    newOrderDetails.push({
-      자재코드: 자재코드,
-      자재명: newOrderSelectedMaterial.품목명,
-      규격: newOrderSelectedMaterial.규격,
-      단위: newOrderSelectedMaterial.단위,
-      발주량: 수량,
-      입고단가: 입고단가,
-      출고단가: 입고단가, // 발주서는 입고단가만 사용
-      공급가액: 공급가액,
-    });
-
-    // 테이블 렌더링
-    renderNewOrderDetailTable();
-
-    // 모달 닫기 (발주서 작성 모달은 그대로 유지)
-    closeNewOrderMaterialModal();
-
-    console.log(' 신규 발주서에 자재 추가 완료:', newOrderSelectedMaterial.자재명);
-  } catch (err) {
-    console.error(' 자재 추가 오류:', err);
-    alert('자재 추가 중 오류가 발생했습니다: ' + err.message);
+// 발주 필터링 함수 (상태, 시작일, 종료일 기준으로 데이터 재조회)
+function filterOrders() {
+  if (orderManageTable) {
+    orderManageTable.ajax.reload();
+  } else {
+    console.warn('⚠️ orderManageTable이 초기화되지 않았습니다.');
   }
 }
 
-console.log(' order.js 로드 완료');
-
-/**
- * 자재 검색 (발주용)
- */
-async function searchMaterialsForOrder(searchTerm) {
-  try {
-    const result = await apiCall(`/materials?search=${encodeURIComponent(searchTerm)}`);
-    if (result.success && result.data && result.data.length > 0) {
-      // 첫 번째 검색 결과로 자재 추가 모달 표시
-      const material = result.data[0];
-      const 자재코드 = material.분류코드 + material.세부코드;
-
-      const 발주량 = prompt(`${material.자재명}\n발주량을 입력하세요:`, '1');
-      if (!발주량 || isNaN(발주량) || parseFloat(발주량) <= 0) {
-        return;
-      }
-
-      const 입고단가 = prompt(
-        `${material.자재명}\n입고단가를 입력하세요:`,
-        material.입고단가 || '0',
-      );
-      if (!입고단가 || isNaN(입고단가)) {
-        return;
-      }
-
-      const 출고단가 = prompt(
-        `${material.자재명}\n출고단가를 입력하세요:`,
-        material.출고단가 || '0',
-      );
-      if (!출고단가 || isNaN(출고단가)) {
-        return;
-      }
-
-      // 상세내역에 추가
-      newOrderDetails.push({
-        자재코드: 자재코드,
-        자재명: material.자재명,
-        규격: material.규격,
-        단위: material.단위,
-        발주량: parseFloat(발주량),
-        입고단가: parseFloat(입고단가),
-        출고단가: parseFloat(출고단가),
-      });
-
-      renderNewOrderDetailTable();
-    } else {
-      alert('검색 결과가 없습니다.');
-    }
-  } catch (error) {
-    console.error('자재 검색 오류:', error);
-    alert('자재 검색 중 오류가 발생했습니다.');
-  }
-}
-
-/**
- * 발주 상세내역 테이블 렌더링 (견적서 패턴과 동일)
- */
-function renderNewOrderDetailTable() {
-  const tbody = document.getElementById('newOrderDetailTableBody');
-
-  if (!tbody) {
-    console.warn(' newOrderDetailTableBody 요소를 찾을 수 없습니다');
-    return;
-  }
-
-  if (newOrderDetails.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="9" style="padding: 40px; text-align: center; color: #999;">
-          자재 추가 버튼을 클릭하여 발주 상세내역을 입력하세요
-        </td>
-      </tr>
-    `;
-
-    // 합계 초기화
-    document.getElementById('orderTotalSupplyPrice').textContent = '0';
-    return;
-  }
-
-  tbody.innerHTML = '';
-  let totalSupply = 0;
-
-  newOrderDetails.forEach((detail, index) => {
-    const 공급가 = detail.발주량 * detail.입고단가;
-    totalSupply += 공급가;
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${
-        index + 1
-      }</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.자재코드 || '-'}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.자재명 || '-'}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${detail.규격 || '-'}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${
-        detail.단위 || '-'
-      }</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${detail.발주량.toLocaleString()}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${detail.입고단가.toLocaleString()}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${공급가.toLocaleString()}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
-        <div style="display: flex; flex-direction: column; gap: 4px; align-items: center;">
-          <button id="NewOrderDetailEditModalEditBtn" type="button" onclick="openNewOrderDetailEditModal(${index})" style="
-            padding: 4px 12px;
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            width: 60px;
-          ">수정</button>
-          <button id="NewOrderDetailEditModalDeleteBtn" type="button" onclick="removeNewOrderDetail(${index})" style="
-            padding: 4px 12px;
-            background: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            width: 60px;
-          ">삭제</button>
-        </div>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  // 합계 표시
-  document.getElementById('orderTotalSupplyPrice').textContent = totalSupply.toLocaleString();
-}
-
-/**
- * 신규 발주서 상세내역 수정 모달 열기 (견적서 패턴과 동일)
- */
-function openNewOrderDetailEditModal(index) {
-  console.log(
-    'id=newOrderDetailTableBody > 버튼 id=NewOrderDetailEditModalEditBtn > 함수 openNewOrderDetailEditModal',
-  );
-  try {
-    const detail = newOrderDetails[index];
-
-    if (!detail) {
-      alert('항목을 찾을 수 없습니다.');
-      return;
-    }
-
-    // 모달에 데이터 표시 (발주서 전용 element ID 사용)
-    document.getElementById('editOrderDetailCode').textContent = detail.자재코드 || '-';
-    document.getElementById('editOrderDetailName').textContent = detail.자재명 || '-';
-    document.getElementById('editOrderDetailSpec').textContent = detail.규격 || '-';
-    document.getElementById('editOrderDetailQuantity').value = detail.발주량 || 0;
-    document.getElementById('editOrderDetailPrice').value = detail.입고단가 || 0;
-    document.getElementById('editOrderDetailAmount').value = (
-      detail.발주량 * detail.입고단가
-    ).toLocaleString();
-
-    // 모달에 index 저장
-    const modal = document.getElementById('orderManageDetailEditModal');
-    modal.dataset.editIndex = index;
-
-    // 자동 계산 이벤트 리스너 추가
-    const quantityInput = document.getElementById('editOrderDetailQuantity');
-    const priceInput = document.getElementById('editOrderDetailPrice');
-    const amountInput = document.getElementById('editOrderDetailAmount');
-
-    const calculateEditAmount = () => {
-      const qty = parseFloat(quantityInput.value) || 0;
-      const price = parseFloat(priceInput.value) || 0;
-      amountInput.value = (qty * price).toLocaleString();
-    };
-
-    quantityInput.oninput = calculateEditAmount;
-    priceInput.oninput = calculateEditAmount;
-
-    // 모달 표시
-    modal.style.display = 'block';
-
-    // 드래그 기능 활성화 (최초 1회만 실행)
-    if (typeof makeModalDraggable === 'function' && !window.orderManageDetailEditModalDraggable) {
-      makeModalDraggable('orderManageDetailEditModal', 'orderManageDetailEditModalHeader');
-      window.orderManageDetailEditModalDraggable = true;
-    }
-  } catch (err) {
-    console.error(' 상세내역 수정 모달 열기 오류:', err);
-    alert('상세내역 수정 모달을 여는 중 오류가 발생했습니다: ' + err.message);
-  }
-}
-
-/**
- * 발주서 상세내역 수정 모달 닫기 (견적서 패턴과 동일)
- */
-function closeOrderManageDetailEditModal() {
-  document.getElementById('orderManageDetailEditModal').style.display = 'none';
-}
-
-/**
- * 신규 발주서 상세내역 수정 확인 (견적서 패턴과 동일)
- */
-function confirmNewOrderDetailEdit() {
-  try {
-    const modal = document.getElementById('orderManageDetailEditModal');
-    const index = parseInt(modal.dataset.editIndex);
-
-    if (isNaN(index) || index < 0 || index >= newOrderDetails.length) {
-      alert('유효하지 않은 항목입니다.');
-      return;
-    }
-
-    // 입력값 가져오기 (발주서 전용 element ID 사용)
-    const 발주량 = parseFloat(document.getElementById('editOrderDetailQuantity').value) || 0;
-    const 입고단가 = parseFloat(document.getElementById('editOrderDetailPrice').value) || 0;
-
-    if (발주량 <= 0) {
-      alert('발주량을 1 이상 입력해주세요.');
-      return;
-    }
-
-    // 배열 데이터 업데이트
-    newOrderDetails[index].발주량 = 발주량;
-    newOrderDetails[index].입고단가 = 입고단가;
-    newOrderDetails[index].공급가액 = 발주량 * 입고단가;
-
-    // 테이블 다시 렌더링
-    renderNewOrderDetailTable();
-
-    // 모달 닫기
-    closeOrderManageDetailEditModal();
-  } catch (err) {
-    console.error(' 상세내역 수정 오류:', err);
-    alert('상세내역 수정 중 오류가 발생했습니다: ' + err.message);
-  }
-}
-
-/**
- * 발주 상세내역 삭제
- */
-function removeNewOrderDetail(index) {
-  console.log('[발주서작성-상세테이블] 삭제 (onclick) → removeNewOrderDetail()');
-
-  newOrderDetails.splice(index, 1);
-  renderNewOrderDetailTable();
-}
-
-/**
- * 발주서 저장
- */
-async function submitNewOrder(event) {
-  console.log('[발주서작성모달] 저장 (onclick) → saveNewOrder()');
-
-  event.preventDefault();
-
-  try {
-    // 입력값 수집 (Prefix 규칙 적용)
-    const 사업장코드 = currentUser?.사업장코드 || '01'; // 로그인한 사용자의 사업장 코드 사용
-    const 매입처코드 = document.getElementById('selectedSupplierCode').value;
-    const 발주일자 = document.getElementById('orderDate').value.replace(/-/g, '');
-    const 입고희망일자 = document.getElementById('orderDeliveryDate').value.replace(/-/g, '');
-    const 결제방법 = document.getElementById('orderPaymentMethod').value;
-    const 상태코드 = document.getElementById('orderStatus').value;
-    const 제목 = document.getElementById('orderTitle').value;
-    const 적요 = document.getElementById('orderRemarks').value;
-
-    // 유효성 검사
-    if (!매입처코드) {
-      alert('매입처를 선택해주세요.');
-      return;
-    }
-
-    if (newOrderDetails.length === 0) {
-      alert('최소 1개 이상의 품목을 추가해주세요.');
-      return;
-    }
-
-    // 전송할 데이터 구성
-    const requestData = {
-      master: {
-        사업장코드,
-        매입처코드,
-        발주일자,
-        입고희망일자: 입고희망일자 || '',
-        결제방법: 결제방법 || '',
-        상태코드: parseInt(상태코드) || 0,
-        제목: 제목 || '',
-        적요: 적요 || '',
-      },
-      details: newOrderDetails.map((detail) => ({
-        자재코드: detail.자재코드,
-        발주량: parseFloat(detail.발주량) || 0,
-        입고단가: parseFloat(detail.입고단가) || 0,
-        출고단가: parseFloat(detail.출고단가) || 0,
-      })),
-    };
-
-    console.log('📤 발주서 저장 요청 데이터:', requestData);
-
-    // API 호출
-    const result = await apiCall('/orders', 'POST', requestData);
-
-    if (result.success) {
-      alert('발주서가 저장되었습니다.');
-      closeOrderModal();
-
-      // 목록 새로고침 - window.loadOrderList() 호출
-      if (typeof window.loadOrderList === 'function') {
-        window.loadOrderList();
-      }
-    } else {
-      alert('저장 실패: ' + (result.message || '알 수 없는 오류'));
-    }
-  } catch (error) {
-    console.error(' 발주서 저장 오류:', error);
-    alert('발주서 저장 중 오류가 발생했습니다: ' + error.message);
-  }
-}
-
-// ==================== 발주서 출력 기능 ====================
 /**
  * 발주서 출력 함수
  * @param {string} orderDate - 발주일자 (YYYYMMDD)
  * @param {number} orderNo - 발주번호
  */
 async function printOrder(orderDate, orderNo, mode = 1) {
-  console.log('[발주관리테이블] 출력 (class: btn-print) → printOrder()');
-
   try {
     // 새로운 인쇄 전용 API 호출
-    const response = await fetch(`/api/orders/${orderDate}/${orderNo}/print?mode=${mode}`);
+    const response = await fetch(
+      `/api/orders/${orderDate}/${orderNo}/print?mode=${mode}`,
+    );
     const result = await response.json();
 
     if (!result.success || !result.data) {
@@ -3340,11 +3935,11 @@ async function printOrder(orderDate, orderNo, mode = 1) {
     // 출력 창 생성 (A4 크기)
     const printWindow = window.open('', '_blank', 'width=800,height=900');
 
-    // 날짜 포맷팅 함수
-    const formatDate = (dateStr) => {
-      if (!dateStr) return '-';
-      return dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-    };
+    // 날짜 포맷팅 함수 (common.js의 formatDate 사용)
+    // const formatDate = (dateStr) => {
+    //   if (!dateStr) return '-';
+    //   return dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+    // };
 
     // 숫자를 한자로 변환하는 함수
     const numberToKoreanHanja = (num) => {
@@ -3468,20 +4063,20 @@ async function printOrder(orderDate, orderNo, mode = 1) {
             color: #000;
           }
 
-          /* 견적 정보 섹션 */
-          .quotation-info {
+          /* 발주 정보 섹션 */
+          .order-info {
             border: 2px solid #333;
             padding: 3mm;
             margin-bottom: 8mm;
           }
 
-          .quotation-info-row {
+          .order-info-row {
             display: flex;
             margin-bottom: 1.5mm;
             font-size: 9pt;
           }
 
-          .quotation-info-row .info-label {
+          .order-info-row .info-label {
             width: 90px;
           }
 
@@ -3522,33 +4117,26 @@ async function printOrder(orderDate, orderNo, mode = 1) {
               page-break-inside: avoid;
             }
 
-            .quotation-info {
-              page-break-after: auto;
-            }
-
-            table {
+            .order-info {
               page-break-after: auto;
             }
 
             .total-section {
               page-break-before: avoid;
-              page-break-inside: avoid;
-              page-break-after: avoid;
             }
 
             .notes {
               page-break-before: avoid;
-              page-break-inside: avoid;
             }
           }
 
           td {
             border: none;
             border-bottom: 1px solid #333;
-            padding: 1mm 1mm;
+            padding: 1.5mm 1mm;
             text-align: center;
             font-size: 8.5pt;
-            min-height: 10mm;
+            min-height: 15mm;
           }
 
           td.left {
@@ -3583,7 +4171,6 @@ async function printOrder(orderDate, orderNo, mode = 1) {
             border: 2px solid #333;
             padding: 3mm;
             background-color: #f9f9f9;
-            page-break-inside: avoid;
           }
 
           .total-row {
@@ -3618,7 +4205,6 @@ async function printOrder(orderDate, orderNo, mode = 1) {
             background-color: #fafafa;
             font-size: 8pt;
             line-height: 1.6;
-            page-break-inside: avoid;
           }
 
           @media print {
@@ -3637,7 +4223,7 @@ async function printOrder(orderDate, orderNo, mode = 1) {
       <body>
         <div class="document">
           <!-- 제목 -->
-          <div class="title">발 주 서</div>
+          <div class="title">견 적 서</div>
 
           <!-- 정보 박스 (주석 처리)
           <div class="info-container">
@@ -3646,47 +4232,47 @@ async function printOrder(orderDate, orderNo, mode = 1) {
               ...
             </div>
             <div class="info-box">
-              <div class="info-box-title">고객 정보</div>
+              <div class="info-box-title">매입처 정보</div>
               ...
             </div>
           </div>
           -->
 
-          <!-- 견적 정보 (공급자 위치로 이동) -->
-          <div class="quotation-info">
-            <div class="quotation-info-row">
+          <!-- 발주 정보 (공급자 위치로 이동) -->
+          <div class="order-info">
+            <div class="order-info-row">
               <span class="info-label">발주번호:</span>
               <span class="info-value">${header.발주일자}-${header.발주번호}</span>
             </div>
-            <div class="quotation-info-row">
+            <div class="order-info-row">
               <span class="info-label">발주일자:</span>
               <span class="info-value">${formatDate(header.발주일자)}</span>
             </div>
-            <div class="quotation-info-row">
+            <div class="order-info-row">
               <span class="info-label">수신:</span>
               <span class="info-value">${header.매입처명}</span>
             </div>
-            <div class="quotation-info-row">
+            <div class="order-info-row">
               <span class="info-label">담당자:</span>
               <span class="info-value">${header.매입처담당자}</span>
             </div>
-            <div class="quotation-info-row">
+            <div class="order-info-row">
               <span class="info-label">전화번호:</span>
               <span class="info-value">${header.매입처전화}</span>
             </div>
-            <div class="quotation-info-row">
+            <div class="order-info-row">
               <span class="info-label">팩스번호:</span>
               <span class="info-value">${header.매입처팩스}</span>
             </div>
-            <div class="quotation-info-row">
-              <span class="info-label">입고희망일:</span>
-              <span class="info-value">${formatDate(header.입고희망일자)}</span>
+            <div class="order-info-row">
+              <span class="info-label">출고희망일:</span>
+              <span class="info-value">${formatDate(header.출고희망일자)}</span>
             </div>
-            <div class="quotation-info-row">
+            <div class="order-info-row">
               <span class="info-label">제목:</span>
               <span class="info-value">${header.제목}</span>
             </div>
-            <div class="quotation-info-row">
+            <div class="order-info-row">
               <span class="info-label">적요:</span>
               <span class="info-value">${header.적요}</span>
             </div>
@@ -3738,33 +4324,11 @@ async function printOrder(orderDate, orderNo, mode = 1) {
             </tbody>
           </table>
 
-          ${
-            mode === 1
-              ? `
-          <!-- 합계 섹션 -->
-          <div class="total-section">
-            <div class="total-row">
-              <span class="total-label">공급가액:</span>
-              <span class="total-value">${header.총공급가액.toLocaleString()} 원</span>
-            </div>
-            <div class="total-row">
-              <span class="total-label">부가세(10%):</span>
-              <span class="total-value">${header.총부가세.toLocaleString()} 원</span>
-            </div>
-            <div class="total-row grand-total">
-              <span class="total-label">합계금액:</span>
-              <span class="total-value">${header.총합계.toLocaleString()} 원</span>
-            </div>
-          </div>
-          `
-              : ''
-          }
-
           <!-- 하단 참고사항 -->
           <div class="notes">
             <strong>※ 참고사항</strong><br>
             · 본 발주서는 ${formatDate(header.발주일자)}부터 ${header.유효일수}일간 유효합니다.<br>
-            · 상기 금액으로 견적 드립니다.<br>
+            · 상기 금액으로 발주 드립니다.<br>
             · 기타 문의사항은 연락 바랍니다.
           </div>
         </div>
@@ -3782,33 +4346,139 @@ async function printOrder(orderDate, orderNo, mode = 1) {
 
     printWindow.document.write(html);
     printWindow.document.close();
-
-    console.log(' 발주서 출력 완료');
   } catch (error) {
-    console.error(' 발주서 출력 실패:', error);
+    console.error('❌ 발주서 출력 실패:', error);
     alert('발주서 출력 중 오류가 발생했습니다.');
   }
 }
 
-// 전역으로 접근 가능하도록 window에 등록
-window.printOrder = printOrder;
-
 /**
- * 발주 상세 모달에서 출력 버튼 클릭 시 호출되는 래퍼 함수
- * 현재 저장된 발주 정보를 사용하여 printOrder 함수 호출 (항상 가격 표시)
+ * 상세 모달에서 출력 버튼 클릭 시 호출되는 래퍼 함수
  */
 function printOrderFromDetail() {
-  console.log('[발주서조회모달] 출력 (onclick) → printOrderFromView()');
-
   if (!window.currentOrderDetail) {
-    alert('출력할 발주서 정보가 없습니다.');
+    alert('출력할 발주 정보가 없습니다.');
     return;
   }
 
   const { 발주일자, 발주번호 } = window.currentOrderDetail;
-  printOrder(발주일자, 발주번호); // 항상 가격 표시 모드
-  console.log(' 발주서 출력:', { 발주일자, 발주번호 });
+  printOrder(발주일자, 발주번호);
 }
 
-// 전역으로 접근 가능하도록 window에 등록
+// 전역 함수 노출
+window.editOrderManage = editOrderManage;
+window.deleteOrderManage = deleteOrderManage;
+window.closeOrderManageDeleteConfirmModal = closeOrderManageDeleteConfirmModal;
+window.confirmOrderManageDelete = confirmOrderManageDelete;
+window.approveOrderManage = approveOrderManage;
+window.closeOrderManageApproveConfirmModal = closeOrderManageApproveConfirmModal;
+window.confirmOrderManageApprove = confirmOrderManageApprove;
+window.makeModalDraggable = makeModalDraggable;
+window.filterOrders = filterOrders;
+window.printOrder = printOrder;
 window.printOrderFromDetail = printOrderFromDetail;
+window.closeOrderManageViewModal = closeOrderManageViewModal;
+window.searchNewMaterials = searchNewMaterials;
+window.clearNewMaterialSearch = clearNewMaterialSearch;
+window.searchAddDetailMaterials = searchAddDetailMaterials;
+window.clearAddDetailMaterialSearch = clearAddDetailMaterialSearch;
+window.closeOrderManagePriceHistoryModal = closeOrderManagePriceHistoryModal;
+window.switchOrderManagePriceHistoryTab = switchOrderManagePriceHistoryTab;
+window.showOrderManageDetailPriceHistory = showOrderManageDetailPriceHistory;
+
+/**
+ * 발주 데이터를 CSV로 내보내기 (Google Sheets 가져오기용)
+ * DataTable 기반으로 전체 데이터 또는 현재 표시된 데이터 내보내기
+ */
+function exportOrdersToExcel() {
+  try {
+    if (!orderManageTable) {
+      alert('발주 테이블이 초기화되지 않았습니다.');
+      return;
+    }
+
+    // DataTable에서 현재 표시된 데이터 가져오기
+    const dataToExport = orderManageTable.rows({ search: 'applied' }).data().toArray();
+
+    if (dataToExport.length === 0) {
+      alert('내보낼 발주 데이터가 없습니다.');
+      return;
+    }
+
+    // CSV 헤더
+    const headers = ['발주번호', '매입처명', '발주일자', '제목', '발주금액', '담당자', '상태'];
+
+    // CSV 특수문자 처리
+    const escapeCsv = (value) => {
+      const text = (value ?? '').toString().replace(/"/g, '""');
+      return `"${text}"`;
+    };
+
+    // CSV 내용 생성
+    let csvContent = '\uFEFF' + headers.join(',') + '\n'; // UTF-8 BOM 추가
+
+    dataToExport.forEach((row) => {
+      const statusMap = {
+        1: '작성중',
+        2: '승인',
+        3: '반려',
+      };
+      const status = statusMap[row.상태코드] || '알수없음';
+
+      // 발주일자 포맷 (YYYYMMDD → YYYY-MM-DD)
+      let formattedDate = row.발주일자 || '';
+      if (formattedDate.length === 8) {
+        formattedDate = `${formattedDate.substring(0, 4)}-${formattedDate.substring(
+          4,
+          6,
+        )}-${formattedDate.substring(6, 8)}`;
+      }
+
+      const rowData = [
+        `${row.발주일자}-${row.발주번호}`,
+        row.매입처명 || '-',
+        formattedDate,
+        row.제목 || '-',
+        (row.발주금액 || 0).toLocaleString() + '원',
+        row.담당자 || '-',
+        status,
+      ].map(escapeCsv);
+
+      csvContent += rowData.join(',') + '\n';
+    });
+
+    // Blob 생성 및 다운로드
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const date = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const fileName = `발주관리_${year}${month}${date}_${hours}${minutes}${seconds}.csv`;
+
+    if (navigator.msSaveBlob) {
+      // IE 10+
+      navigator.msSaveBlob(blob, fileName);
+    } else {
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    alert(
+      `${dataToExport.length}개의 발주 정보가 CSV로 내보내졌습니다.\n\n📊 Google Sheets에서 불러오려면:\n1. sheets.google.com 접속\n2. 파일 > 가져오기 > 업로드\n3. 다운로드된 CSV 파일 선택`,
+    );
+  } catch (error) {
+    console.error('❌ 발주 Google Sheets 내보내기 오류:', error);
+    alert('내보내기 중 오류가 발생했습니다: ' + error.message);
+  }
+}
+
+window.exportOrdersToExcel = exportOrdersToExcel;
