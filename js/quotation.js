@@ -722,6 +722,10 @@ async function editQuotationManage(quotationDate, quotationNo) {
     const remarkEl = document.getElementById('quotationManageEditRemark');
     if (remarkEl) remarkEl.value = master.적요 || '';
 
+    // ✅ 매출처코드 hidden 필드에 저장 (이전단가 조회 시 사용)
+    const customerCodeEl = document.getElementById('quotationManageEditCustomerCode');
+    if (customerCodeEl) customerCodeEl.value = master.매출처코드 || '';
+
     // 모달에 견적일자, 번호 저장 (submit 시 사용)
     const modal = document.getElementById('quotationManageEditModal');
     modal.dataset.quotationDate = quotationDate;
