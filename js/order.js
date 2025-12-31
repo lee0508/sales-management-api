@@ -930,9 +930,9 @@ let isNewOrderMode = false;
 
 // ✅ 금액 자동 계산 (수량 * 단가)
 function calculateDetailAmount() {
-  const qtyEl = document.getElementById('addDetailQuantity');
-  const priceEl = document.getElementById('addDetailPrice');
-  const amtEl = document.getElementById('addDetailAmount');
+  const qtyEl = document.getElementById('addDetailQuantityForOrder');
+  const priceEl = document.getElementById('addDetailPriceForOrder');
+  const amtEl = document.getElementById('addDetailAmountForOrder');
 
   if (qtyEl && priceEl && amtEl) {
     const qty = parseFloat(qtyEl.value) || 0;
@@ -1002,12 +1002,12 @@ async function showPriceHistory() {
 
 // ✅ 이력에서 단가 선택
 function selectPriceFromHistory(price) {
-  document.getElementById('addDetailPrice').value = price;
+  document.getElementById('addDetailPriceForOrder').value = price;
 
   // 금액 자동 재계산
-  const 수량 = parseFloat(document.getElementById('addDetailQuantity').value) || 0;
+  const 수량 = parseFloat(document.getElementById('addDetailQuantityForOrder').value) || 0;
   const 금액 = 수량 * price;
-  document.getElementById('addDetailAmount').value = 금액.toLocaleString();
+  document.getElementById('addDetailAmountForOrder').value = 금액.toLocaleString();
 
   // 모달 닫기
   closeOrderManagePriceHistoryModal();
@@ -1780,11 +1780,11 @@ function editOrderManageDetailRow(rowIndex) {
 
 // ✅ 공급가액 자동 계산 (품목 수정 모달)
 function calculateOrderManageEditDetailAmount() {
-  const quantity = parseFloat(document.getElementById('editDetailQuantity').value) || 0;
-  const price = parseFloat(document.getElementById('editDetailPrice').value) || 0;
+  const quantity = parseFloat(document.getElementById('editDetailQuantityForOrder').value) || 0;
+  const price = parseFloat(document.getElementById('editDetailPriceForOrder').value) || 0;
   const amount = quantity * price;
 
-  document.getElementById('editDetailAmount').value = amount.toLocaleString();
+  document.getElementById('editDetailAmountForOrder').value = amount.toLocaleString();
 }
 
 // ✅ 발주내역 품목 수정 모달 닫기
@@ -1834,8 +1834,8 @@ function confirmOrderManageDetailEdit() {
     }
 
     // 입력값 가져오기
-    const 수량 = parseFloat(document.getElementById('editDetailQuantity').value) || 0;
-    const 단가 = parseFloat(document.getElementById('editDetailPrice').value) || 0;
+    const 수량 = parseFloat(document.getElementById('editDetailQuantityForOrder').value) || 0;
+    const 단가 = parseFloat(document.getElementById('editDetailPriceForOrder').value) || 0;
     const 공급가액 = 수량 * 단가;
 
     if (수량 <= 0) {
@@ -2704,7 +2704,7 @@ window.selectOrderMaterialAdd = function (material) {
   };
 
   // UI 업데이트
-  const priceInput = document.getElementById('addDetailPrice');
+  const priceInput = document.getElementById('addDetailPriceForOrder');
   const selectedNameEl = document.getElementById('selectedMaterialName');
   const selectedCodeEl = document.getElementById('selectedMaterialCode');
   const selectedInfoEl = document.getElementById('selectedMaterialInfo');
@@ -2988,7 +2988,7 @@ function selectMaterialForOrder(material) {
   if (selectedCode) selectedCode.textContent = `품목코드: ${자재코드}`;
 
   // 기본 단가 설정 (값이 없을 때만)
-  const priceEl = document.getElementById('addDetailPrice');
+  const priceEl = document.getElementById('addDetailPriceForOrder');
   if (priceEl && (!priceEl.value || priceEl.value === '0')) {
     priceEl.value = material.출고단가1 || 0;
   }
@@ -3001,7 +3001,7 @@ function selectMaterialForOrder(material) {
   calculateDetailAmount();
 
   // 수량 입력란에 포커스
-  const qtyEl = document.getElementById('addDetailQuantity');
+  const qtyEl = document.getElementById('addDetailQuantityForOrder');
   if (qtyEl) {
     setTimeout(() => qtyEl.focus(), 100);
   }
